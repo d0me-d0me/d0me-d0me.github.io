@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Web — d0me</title>
+<meta name="description" content="Web 実装の弱点の索引。認証・デシリアライズ・SSTI・ファイルアップロードと、対になる検知/対策。">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/sheet.css">
+</head>
+<body>
+
+<header class="topbar"><div class="wrap">
+  <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">索引</span></div>
+  <button class="nav-toggle" aria-label="メニュー">≡</button>
+  <nav class="nav"><a href="../all.html">索引</a><a href="../index.html#certs">資格</a><a href="#" data-gh-url>github</a></nav>
+</div></header>
+
+<main>
+<section class="sheet-hero"><div class="wrap">
+  <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>伍 · Web</div>
+  <h1><span class="idx">伍</span>Web</h1>
+  <p class="lede">Web 実装で頻出する弱点を、発見の観点と定石で整理する。列挙 → 仮説 → 検証の順で、各項目に検知/対策を併記する。
+    <span class="jp">前提: 認可を得た検証対象。ペイロードは一般化した例に留める。</span></p>
+</div></section>
+
+<div class="wrap"><div class="sheet-layout">
+  <aside class="toc">
+    <div class="toc-label">目次</div>
+    <ul>
+      <li><a href="#recon">01 列挙 / recon</a></li>
+      <li><a href="#auth">02 認証・セッション</a></li>
+      <li><a href="#deser">03 デシリアライズ</a></li>
+      <li><a href="#ssti">04 SSTI</a></li>
+      <li><a href="#upload">05 アップロード</a></li>
+      <li><a href="#ref">06 参照</a></li>
+    </ul>
+  </aside>
+
+  <article class="doc">
+    <section id="recon" class="reveal">
+      <h2><span class="num">01</span>列挙<span class="jp">recon</span></h2>
+      <p>攻撃面はまず「見えている入口」を数える。ディレクトリ・パラメータ・技術スタックを列挙し、フレームワーク特有の弱点へ当たりを付ける。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># コンテンツ探索</span>
+ffuf -u https://<span class="v">$TARGET</span>/FUZZ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt
+gobuster dir -u https://<span class="v">$TARGET</span> -w /usr/share/wordlists/dirb/common.txt</code></pre></div>
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>404 の一貫化、レート制限、WAF で総当たり列挙を抑止。</li>
+          <li>技術スタックを露出するヘッダ・エラーページを削減。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="auth" class="reveal">
+      <h2><span class="num">02</span>認証・セッション<span class="jp">auth</span></h2>
+      <p>弱点は「資格情報の推測可能性」と「セッションの検証不備」に集約される。JWT は署名検証(alg=none・弱鍵)、Cookie は属性(HttpOnly/SameSite/Secure)を確認する。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ログイン総当たり（許可された範囲で）</span>
+hydra -L users.txt -P /usr/share/wordlists/rockyou.txt \
+  <span class="v">$TARGET</span> https-post-form \
+  "/login:user=^USER^&pass=^PASS^:F=invalid"
+
+<span class="c"># Flask セッション（弱い SECRET_KEY の検証）</span>
+flask-unsign --unsign --cookie '&lt;COOKIE&gt;' --wordlist /usr/share/wordlists/rockyou.txt</code></pre></div>
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>強固なランダム鍵、署名アルゴリズム固定、MFA、ロックアウト/レート制限。</li>
+          <li>Cookie に HttpOnly・SameSite・Secure を付与し、失敗ログを監視。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="deser" class="reveal">
+      <h2><span class="num">03</span>デシリアライズ<span class="jp">deserialization</span></h2>
+      <p>信頼できない入力をオブジェクト復元に渡すと、ガジェットチェーン経由で任意コード実行に至る。言語・ライブラリで成立条件が異なるため、まずシリアライズ形式(Java/PHP/.NET/Python pickle 等)を同定する。</p>
+      <ul>
+        <li><strong>同定</strong> — Base64 のマジックバイト(Java <code>rO0</code>、.NET <code>AAEAAAD</code> 等)や Cookie/パラメータ形状から推定。</li>
+        <li><strong>検証</strong> — 公開ガジェット生成器(ysoserial 系)で既知チェーンの成立可否を確認。</li>
+      </ul>
+      <div class="note warn"><span class="lbl">注意</span>ガジェットチェーンの実装詳細は載せない。成立条件の同定と、対策側の観点に留める。</div>
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>信頼境界を越えるデータをネイティブ・デシリアライズに渡さない(JSON+スキーマ検証へ)。</li>
+          <li>許可型リスト(look-ahead deserialization)、ライブラリ更新、実行監視。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="ssti" class="reveal">
+      <h2><span class="num">04</span>SSTI<span class="jp">template injection</span></h2>
+      <p>ユーザ入力がテンプレートエンジンに評価されると、式評価から RCE に発展し得る。まずポリグロットで反応を見てエンジンを同定する。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">text</span><button class="copy">copy</button></div><pre><code><span class="c"># 反応検知用ポリグロット（評価されるか）</span>
+${7*7}  {{7*7}}  &lt;%= 7*7 %&gt;  #{7*7}
+<span class="c"># 49 が返ればテンプレート評価あり → エンジン同定へ</span></code></pre></div>
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>ユーザ入力をテンプレートに連結しない。ロジックレス/サンドボックス化エンジンを使う。</li>
+          <li>出力エスケープと、テンプレート評価の監査ログ。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="upload" class="reveal">
+      <h2><span class="num">05</span>アップロード<span class="jp">file upload</span></h2>
+      <p>検証不備は拡張子・Content-Type・マジックバイト・保存先の実行可否の組合せで生じる。狙いは「実行可能な場所に、実行される形式で置けるか」。</p>
+      <table>
+        <thead><tr><th>検証</th><th>典型的な不備</th></tr></thead>
+        <tbody>
+          <tr><td>拡張子</td><td>ブラックリスト漏れ(代替拡張子・大文字・二重拡張子)</td></tr>
+          <tr><td>Content-Type</td><td>クライアント申告を信頼</td></tr>
+          <tr><td>内容検査</td><td>マジックバイト偽装を未検出</td></tr>
+          <tr><td>保存先</td><td>Web ルート配下で実行可能</td></tr>
+        </tbody>
+      </table>
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>許可型リスト検証 + サーバ側でのマジックバイト確認、ランダム名で保存。</li>
+          <li>保存先を Web ルート外・実行不可に。画像は再エンコードして無害化。</li>
+        </ul>
+      </div>
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>Web は「入口を数える → 技術スタックを同定 → 定石で検証」。列挙が精度を決める。</li>
+          <li>認証は鍵と署名検証、セッションは属性。デシリアライズ/SSTI はまず形式・エンジンの同定が先。</li>
+          <li>アップロードは単一検証では守れない。拡張子・内容・保存先の実行可否を多層で断つ。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="ref" class="reveal">
+      <h2><span class="num">06</span>参照<span class="jp">References</span></h2>
+      <ul>
+        <li>PortSwigger Web Security Academy — <a href="https://portswigger.net/web-security" target="_blank" rel="noopener">portswigger.net/web-security</a></li>
+        <li>OWASP Testing Guide — <a href="https://owasp.org/www-project-web-security-testing-guide/" target="_blank" rel="noopener">owasp.org</a></li>
+        <li>PayloadsAllTheThings — <a href="https://github.com/swisskyrepo/PayloadsAllTheThings" target="_blank" rel="noopener">github.com/swisskyrepo/PayloadsAllTheThings</a></li>
+      </ul>
+    </section>
+  </article>
+</div></div>
+</main>
+
+<footer class="foot"><div class="wrap">
+  <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · Web</span></div>
+  <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>github</a></div>
+  <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
+</div></footer>
+
+<script src="../content.js"></script>
+<script src="../assets/js/sheet.js"></script>
+</body>
+</html>

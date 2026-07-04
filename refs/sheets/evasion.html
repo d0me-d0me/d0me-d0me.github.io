@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evasion — d0me</title>
+<meta name="description" content="回避の索引。AMSI・ETW・スクリプトブロックログの仕組みと、インメモリ実行/難読化の考え方、そして検知観点。">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/sheet.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">索引</span></div>
+    <button class="nav-toggle" aria-label="メニュー">≡</button>
+    <nav class="nav"><a href="../all.html">索引</a><a href="../index.html#certs">資格</a><a href="#" data-gh-url>github</a></nav>
+  </div>
+</header>
+
+<main>
+<section class="sheet-hero">
+  <div class="wrap">
+    <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>弐 · Evasion</div>
+    <h1><span class="idx">弐</span>Evasion</h1>
+    <p class="lede">Windows 上の可視化レイヤ(AMSI・ETW・スクリプトブロックログ)がどこで何を見ているか、そして回避が成立/失敗する境界。手法は概念と公開ツール参照に留め、検知観点を厚く扱う。
+      <span class="jp">目的は「見えている場所」を理解すること。丸写しのバイパス文字列は載せない。</span></p>
+  </div>
+</section>
+
+<div class="wrap">
+<div class="sheet-layout">
+
+  <aside class="toc">
+    <div class="toc-label">目次</div>
+    <ul>
+      <li><a href="#surface">01 可視化レイヤ</a></li>
+      <li><a href="#amsi">02 AMSI</a></li>
+      <li><a href="#etw">03 ETW / logging</a></li>
+      <li><a href="#inmem">04 インメモリ実行</a></li>
+      <li><a href="#obf">05 難読化の考え方</a></li>
+      <li><a href="#ref">06 参照</a></li>
+    </ul>
+  </aside>
+
+  <article class="doc">
+
+    <section id="surface" class="reveal">
+      <h2><span class="num">01</span>可視化レイヤ<span class="jp">what is watching</span></h2>
+      <p>回避を語る前に、Windows がどこで挙動を観測しているかを分けて考える。層ごとに「何が見えるか」「無効化がどれだけ痕跡を残すか」が違う。</p>
+      <table>
+        <thead><tr><th>層</th><th>見えるもの</th><th>回避時の痕跡</th></tr></thead>
+        <tbody>
+          <tr><td>AMSI</td><td>スクリプト/マクロの実行前バッファ</td><td>プロセス内改変は EDR のメモリスキャンで露見しうる</td></tr>
+          <tr><td>ETW</td><td>.NET ロード、API 呼出等のテレメトリ</td><td>プロバイダ無効化自体がシグナル</td></tr>
+          <tr><td>Script Block Logging</td><td>PowerShell の逆難読化後スクリプト</td><td>Event 4104。無効化は監査対象</td></tr>
+          <tr><td>EDR user-mode hooks</td><td>Nt* API 呼出のフック</td><td>アンフック操作が検知される場合あり</td></tr>
+        </tbody>
+      </table>
+      <div class="note"><span class="lbl">前提</span>ここに載る手法はラボ/CTF/公開 CVE の再現が前提。実運用の EDR 回避データは公開ノートに含めない。</div>
+    </section>
+
+    <section id="amsi" class="reveal">
+      <h2><span class="num">02</span>AMSI<span class="jp">Antimalware Scan Interface</span></h2>
+      <p>AMSI は PowerShell・WScript・.NET などが「実行しようとしている内容」をスキャンエンジンへ渡すための橋。スクリプトはメモリ上で復号された後にスキャンされるため、単純な文字列難読化だけでは通り抜けない。</p>
+      <h3>公開されている回避カテゴリ(概念)</h3>
+      <ul>
+        <li><strong>初期化失敗の誘発</strong> — ロード済みマネージド状態のフラグ操作で以降のスキャンを無効化する系統。</li>
+        <li><strong>スキャン関数のメモリパッチ</strong> — <code>AmsiScanBuffer</code> 相当をプロセス内で書換え、常に「clean」を返させる系統。</li>
+        <li><strong>プロバイダ側の回避</strong> — そもそも AMSI 経由で実行しない(ネイティブロード等)系統。</li>
+      </ul>
+      <div class="note warn"><span class="lbl">重要</span>これらの実装文字列は世代ごとに署名され陳腐化する。AMSI bypass 実装は検証環境で都度確認するのが実際的で、公開ノートに動作コードを固定掲載する価値は低い。</div>
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>AMSI をバイパスするプロセス内メモリ改変は、EDR のランタイムメモリスキャンや RWX 領域監視で捕捉しうる。</li>
+          <li>PowerShell の言語モード制限(CLM)+ WDAC/AppLocker で「そもそも任意コードを走らせない」層を足す。</li>
+          <li>AMSI 無効化に伴う異常(scan 結果の急変、既知パッチのバイトパターン)を検知ルール化。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="etw" class="reveal">
+      <h2><span class="num">03</span>ETW とログ<span class="jp">telemetry</span></h2>
+      <p>ETW は .NET アセンブリのロードや各種 API をイベントとして流す。EDR の多くはここに乗る。無効化(プロバイダの停止・パッチ)は有効だが、<strong>無効化そのものが強いシグナル</strong>になる点が要点。</p>
+      <ul>
+        <li><strong>Script Block Logging (4104)</strong> — 逆難読化後のスクリプトを記録。難読化は無力で、むしろ復号後が残る。</li>
+        <li><strong>Module Logging / Transcription</strong> — パイプライン全体を記録。</li>
+        <li><strong>PPL 保護</strong> — ログ/AV プロセスの改変耐性を上げる。</li>
+      </ul>
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>Script Block / Module Logging を GPO で強制し、集約 SIEM へ転送(ローカル改変の影響を減らす)。</li>
+          <li>ETW プロバイダの停止・改変を、プロバイダ状態の欠損として検知。</li>
+          <li>PowerShell を Constrained Language Mode + 署名要求で運用。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="inmem" class="reveal">
+      <h2><span class="num">04</span>インメモリ実行<span class="jp">disk を触らない</span></h2>
+      <p>ディスク書込を避けると静的検知の面は減るが、メモリ側の監視面が増える。トレードオフの位置取りが要点。公開ツールの用途整理:</p>
+      <table>
+        <thead><tr><th>道具</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td><code>donut</code></td><td>PE/.NET/スクリプトを position-independent シェルコード化</td></tr>
+          <tr><td><code>SharpShooter</code></td><td>各種ステージャ生成(検証用テンプレート)</td></tr>
+          <tr><td>reflection load</td><td>.NET アセンブリをディスクに置かずロード</td></tr>
+        </tbody>
+      </table>
+      <div class="note"><span class="lbl">観点</span>「disk 静的 → memory 動的」へ検知面が移るだけ。どちらの面が薄い環境かを列挙で見極めてから選ぶ。</div>
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>RWX メモリ確保、リフレクティブロード痕跡、未バックド DLL のメモリ実行を EDR で監視。</li>
+          <li>Attack Surface Reduction ルールでスクリプト系ステージャの実行を抑止。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="obf" class="reveal">
+      <h2><span class="num">05</span>難読化の考え方<span class="jp">署名を外す</span></h2>
+      <p>難読化はシグネチャ回避の手段であって、振る舞い検知には効かない。有効なのは「静的署名を外す」局面で、「実行後のログ・メモリ」には無力という切り分けが実務上の要点。</p>
+      <ul>
+        <li>文字列分割・エンコード(XOR やカスタムエンコーダ)は AMSI 前段では有効、4104(復号後)では無力。</li>
+        <li>API 名の間接解決、シンボル除去はホーリスティックな静的検知に効く。</li>
+        <li>振る舞い(親子プロセス関係、LOLBIN 連鎖)は難読化で消えない。ここは別問題として扱う。</li>
+      </ul>
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>回避は「無効化」ではなく「観測面の選択」。層ごとに見えるものと痕跡が違う。</li>
+          <li>AMSI/ETW の無効化は有効だが、<strong>無効化した事実</strong>自体が検知シグナルになりうる。</li>
+          <li>難読化は静的署名向け。Script Block Logging(復号後)と振る舞い検知には効かない。</li>
+          <li>バイパス実装は世代で陳腐化する。固定文字列を覚えるより、検証環境で都度確認する運用が正しい。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="ref" class="reveal">
+      <h2><span class="num">06</span>参照<span class="jp">References</span></h2>
+      <ul>
+        <li>AMSI 公式 — <a href="https://learn.microsoft.com/windows/win32/amsi/antimalware-scan-interface-portal" target="_blank" rel="noopener">learn.microsoft.com / AMSI</a></li>
+        <li>ScriptBlock Logging — <a href="https://learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_logging_windows" target="_blank" rel="noopener">about_logging_windows</a></li>
+        <li>donut — <a href="https://github.com/TheWover/donut" target="_blank" rel="noopener">github.com/TheWover/donut</a></li>
+        <li>MITRE ATT&amp;CK — Defense Evasion (TA0005) — <a href="https://attack.mitre.org/tactics/TA0005/" target="_blank" rel="noopener">attack.mitre.org</a></li>
+      </ul>
+    </section>
+
+  </article>
+</div>
+</div>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · Evasion</span></div>
+    <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>GitHub</a></div>
+    <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
+  </div>
+</footer>
+
+<script src="../content.js"></script>
+<script src="../assets/js/sheet.js"></script>
+</body>
+</html>
