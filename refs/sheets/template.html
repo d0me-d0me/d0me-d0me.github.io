@@ -1,0 +1,85 @@
+<!doctype html>
+<!-- ============================================================
+     新しいチートシートを作るときはこのファイルを複製して編集する。
+     置換箇所: <TITLE> / <IDX 大字> / <SLUG> / <目次> / <本文>
+     大字: 壱 弐 参 肆 伍 陸 漆 捌
+     ============================================================ -->
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>&lt;TITLE&gt; — d0me</title>
+<meta name="description" content="&lt;説明&gt;">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/sheet.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">索引</span></div>
+    <button class="nav-toggle" aria-label="メニュー">≡</button>
+    <nav class="nav"><a href="../all.html">索引</a><a href="../index.html#certs">資格</a><a href="#" data-gh-url>github</a></nav>
+  </div>
+</header>
+
+<main>
+<section class="sheet-hero">
+  <div class="wrap">
+    <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>&lt;IDX&gt; · &lt;TITLE&gt;</div>
+    <h1><span class="idx">&lt;IDX&gt;</span>&lt;TITLE&gt;</h1>
+    <p class="lede">&lt;リード文（英）&gt;<span class="jp">&lt;リード文（和）&gt;</span></p>
+  </div>
+</section>
+
+<div class="wrap">
+<div class="sheet-layout">
+  <aside class="toc">
+    <div class="toc-label">目次</div>
+    <ul>
+      <li><a href="#s1">01 &lt;節&gt;</a></li>
+      <li><a href="#ref">02 参照</a></li>
+    </ul>
+  </aside>
+
+  <article class="doc">
+    <section id="s1" class="reveal">
+      <h2><span class="num">01</span>&lt;節見出し&gt;<span class="jp">&lt;subtitle&gt;</span></h2>
+      <p>&lt;本文&gt;</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># コメント</span>
+command --flag <span class="v">&lt;PLACEHOLDER&gt;</span></code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul><li>&lt;対策&gt;</li></ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul><li>&lt;要点&gt;</li></ul>
+      </div>
+    </section>
+
+    <section id="ref" class="reveal">
+      <h2><span class="num">02</span>参照<span class="jp">References</span></h2>
+      <ul><li>&lt;出典&gt; — <a href="https://example.com" target="_blank" rel="noopener">example.com</a></li></ul>
+    </section>
+  </article>
+</div>
+</div>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · &lt;TITLE&gt;</span></div>
+    <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>GitHub</a></div>
+    <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
+  </div>
+</footer>
+
+<script src="../content.js"></script>
+<script src="../assets/js/sheet.js"></script>
+</body>
+</html>

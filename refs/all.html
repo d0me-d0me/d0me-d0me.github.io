@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ja" data-accent="mono">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>d0me // all — index</title>
+<meta name="description" content="全索引。Offensive / Defensive / Other を横断してキーワード検索できる。">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme-terminal.css">
+</head>
+<body>
+
+<header class="top"><div class="wrap">
+  <span class="p"><b data-handle>d0me</b>:~$</span>
+  <nav><a href="/" data-blog>blog</a><a href="index.html">home</a><a href="index.html#certs">certs</a><a href="#" data-gh>github</a></nav>
+</div></header>
+
+<main class="wrap">
+  <section class="sec">
+    <div class="sh"><span class="hx">##</span> index <span class="mute jp">全索引</span><span class="ln"></span><span class="rt"><span data-count-ready>6</span>/<span data-count-vol>10</span> ready · <span data-count-domain>3</span> domains</span></div>
+
+    <div class="search">
+      <span class="search-hx">/</span>
+      <input id="search" type="search" placeholder="キーワードで検索 — title · 日本語 · topics · slug  ( / でフォーカス, Esc で消去 )" autocomplete="off" aria-label="索引検索">
+      <span id="search-count" class="search-count"></span>
+    </div>
+
+    <nav id="domain-nav" aria-label="大項目"></nav>
+
+    <div id="index-all"></div>
+  </section>
+</main>
+
+<footer class="ft"><div class="wrap">
+  <span><b data-handle>d0me</b> // security field references</span>
+  <span>© <span data-year>2026</span> · pseudonymous · <b>CC BY-NC-SA 4.0</b></span>
+</div></footer>
+
+<script src="content.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

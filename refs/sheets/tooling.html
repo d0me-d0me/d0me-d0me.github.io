@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tooling — d0me</title>
+<meta name="description" content="道具立ての索引。環境・起動テンプレート・再利用スニペット・公開前サニタイズとコミット衛生。">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/sheet.css">
+</head>
+<body>
+
+<header class="topbar"><div class="wrap">
+  <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">索引</span></div>
+  <button class="nav-toggle" aria-label="メニュー">≡</button>
+  <nav class="nav"><a href="../all.html">索引</a><a href="../index.html#certs">資格</a><a href="#" data-gh-url>github</a></nav>
+</div></header>
+
+<main>
+<section class="sheet-hero"><div class="wrap">
+  <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>陸 · Tooling</div>
+  <h1><span class="idx">陸</span>Tooling</h1>
+  <p class="lede">よく使う道具の起動テンプレートと、再利用しやすいスニペット。加えて、公開ノートへ落とす前のサニタイズとコミット衛生を定型化する。パスは環境変数・プレースホルダで一般化する。
+    <span class="jp">前提: Kali 系。<code>$TOOLS</code> は各自のツール置き場、impacket は venv 優先。</span></p>
+</div></section>
+
+<div class="wrap"><div class="sheet-layout">
+  <aside class="toc">
+    <div class="toc-label">目次</div>
+    <ul>
+      <li><a href="#env">01 環境 / environment</a></li>
+      <li><a href="#launch">02 起動テンプレート</a></li>
+      <li><a href="#snip">03 スニペット</a></li>
+      <li><a href="#sanitize">04 サニタイズ / commit</a></li>
+      <li><a href="#ref">05 参照</a></li>
+    </ul>
+  </aside>
+
+  <article class="doc">
+    <section id="env" class="reveal">
+      <h2><span class="num">01</span>環境<span class="jp">environment</span></h2>
+      <p>再現性のため、道具は固定パスに集約し、Python 系は venv に隔離する。impacket は system と venv で版が割れやすいので、<strong>venv の実体を優先</strong>してパスを固定する。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">zsh</span><button class="copy">copy</button></div><pre><code><span class="c"># 置き場と venv（例）</span>
+export TOOLS="$HOME/Tool"
+source ~/venvs/impacket/bin/activate
+
+<span class="c"># impacket は venv の実体を直呼び（版ズレ回避）</span>
+alias secretsdump='~/venvs/impacket/bin/secretsdump.py'
+alias getst='~/venvs/impacket/bin/getST.py'</code></pre></div>
+      <div class="note"><span class="lbl">tips</span>system と venv で挙動が違うときは <code>which -a secretsdump.py</code> で実体を確認し、フルパスで固定する。</div>
+    </section>
+
+    <section id="launch" class="reveal">
+      <h2><span class="num">02</span>起動テンプレート<span class="jp">launch</span></h2>
+      <p>頻用ツールの最短起動形。値はすべてプレースホルダ。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 資格情報の面を測る</span>
+nxc smb <span class="v">&lt;TARGETS&gt;</span> -u '<span class="v">&lt;USER&gt;</span>' -p '<span class="v">&lt;PASS&gt;</span>'
+
+<span class="c"># ファイル配布用の一時 HTTP</span>
+python3 -m http.server 8000
+
+<span class="c"># ligolo-ng（攻撃側 proxy）</span>
+sudo ip tuntap add user $USER mode tun ligolo; sudo ip link set ligolo up
+$TOOLS/ligolo/proxy -selfcert
+
+<span class="c"># chisel（reverse socks）</span>
+$TOOLS/chisel server -p 8080 --reverse</code></pre></div>
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>これらは検証側の起動形。防御視点では、一時 HTTP 配布や reverse socks の外向き接続を egress で検知する。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="snip" class="reveal">
+      <h2><span class="num">03</span>スニペット<span class="jp">snippets</span></h2>
+      <h3>LHOST を動的取得(tun0)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>export LHOST=$(ip a show tun0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
+echo "$LHOST"</code></pre></div>
+      <h3>待受</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># TTY を含むリスナ運用は必要に応じて stty raw -echo で調整</span>
+rlwrap nc -lvnp 443</code></pre></div>
+      <div class="note"><span class="lbl">tips</span>ワンライナは環境変数(<code>$LHOST</code> 等)で持ち、値の直書きを避ける。公開ノートに実値を残さない習慣づけになる。</div>
+    </section>
+
+    <section id="sanitize" class="reveal">
+      <h2><span class="num">04</span>サニタイズ / コミット衛生<span class="jp">publish pipeline</span></h2>
+      <p>private vault → 検証再現 → <strong>サニタイズ</strong> → 公開、の一方向を守る。公開前に実値(IP・FQDN・ハッシュ・パス・利用者名)を機械的に当て、コミットは著者情報とタイムゾーンを固定する。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 公開前サニタイズ検査</span>
+grep -rInE '([0-9]{1,3}\.){3}[0-9]{1,3}|@gmail\.com|C:\\Users\\[A-Za-z0-9._-]+|/home/[a-z]+/[A-Za-z0-9._-]+' . \
+  --include='*.html' --include='*.md' --include='*.js'
+
+<span class="c"># コミット衛生（著者=noreply, TZ=UTC）</span>
+git config user.email '<span class="v">&lt;ID&gt;</span>+<span class="v">&lt;HANDLE&gt;</span>@users.noreply.github.com'
+export TZ=UTC
+git log -3 --format='%an &lt;%ae&gt; | %ai'   <span class="c"># 全行 noreply / +0000 を確認</span></code></pre></div>
+      <div class="note warn"><span class="lbl">重要</span>denylist(実識別子の列挙)は公開リポジトリに絶対に含めない。それ自体が deanonymization 材料になる。</div>
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>道具は固定パス+venv 隔離で再現性を確保。impacket は版ズレ回避に venv 実体を直呼び。</li>
+          <li>ワンライナは環境変数で持ち、実値の直書きを避ける。これが公開時のサニタイズを楽にする。</li>
+          <li>公開前は grep で実値を機械検査し、コミットは noreply + <code>TZ=UTC</code> を固定。denylist は公開しない。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="ref" class="reveal">
+      <h2><span class="num">05</span>参照<span class="jp">References</span></h2>
+      <ul>
+        <li>NetExec — <a href="https://www.netexec.wiki" target="_blank" rel="noopener">netexec.wiki</a></li>
+        <li>ligolo-ng — <a href="https://github.com/nicocha30/ligolo-ng" target="_blank" rel="noopener">github.com/nicocha30/ligolo-ng</a></li>
+        <li>git filter-repo — <a href="https://github.com/newren/git-filter-repo" target="_blank" rel="noopener">github.com/newren/git-filter-repo</a></li>
+        <li>GitHub noreply email — <a href="https://docs.github.com/account-and-profile/setting-up-and-managing-your-personal-account-on-github/managing-email-preferences/setting-your-commit-email-address" target="_blank" rel="noopener">docs.github.com</a></li>
+      </ul>
+    </section>
+  </article>
+</div></div>
+</main>
+
+<footer class="foot"><div class="wrap">
+  <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · Tooling</span></div>
+  <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>github</a></div>
+  <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
+</div></footer>
+
+<script src="../content.js"></script>
+<script src="../assets/js/sheet.js"></script>
+</body>
+</html>
