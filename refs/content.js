@@ -22,7 +22,14 @@ window.CONTENT = {
   ],
 
   // 保有資格
-  certs: [],
+  certs: [
+    { code: "OSCP",  issuer: "OffSec",       img: "oscp.png" },
+    { code: "OSEP",  issuer: "OffSec",       img: "osep.png" },
+    { code: "CPTS",  issuer: "Hack The Box", img: "cpts.png" },
+    { code: "SAL1",  issuer: "TryHackMe",    img: "sal1.png" },
+    { code: "CySA+", issuer: "CompTIA",      img: "cysa.png" },
+    { code: "CCNA",  issuer: "Cisco",        img: "ccna.png" },
+  ],
 
   // チートシート。domain で大項目に紐付け、n(大字)は大項目ごとに振る。
   // status: "ready" は sheets/<slug>.html へリンク、"soon" は準備中表示。

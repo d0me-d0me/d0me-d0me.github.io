@@ -38,7 +38,7 @@
   if (wall) {
     wall.innerHTML = certs.map(c => `
       <figure class="badge">
-        <img src="assets/badges/${esc(c.svg)}.svg" alt="${esc(c.code)} — ${esc(c.issuer)}" decoding="async"
+        <img src="assets/badges/${esc(c.img)}" alt="${esc(c.code)} — ${esc(c.issuer)}" decoding="async"
              onerror="this.hidden=true;this.nextElementSibling.hidden=false">
         <figcaption class="fb" hidden><b>${esc(c.code)}</b><span>${esc(c.issuer)}</span></figcaption>
       </figure>`).join("");
