@@ -79,12 +79,10 @@ h1 .cur{display:inline-block;width:.6ch;height:1em;background:var(--accent);vert
 .vol-list{border:1px solid var(--line);border-radius:4px;overflow:hidden}
 
 /* index — ls-style rows */
-.vol{display:grid;grid-template-columns:64px 1fr auto;gap:1rem;align-items:center;
+.vol{display:grid;grid-template-columns:1fr auto;gap:1rem;align-items:center;
   padding:.9rem 1.1rem;border-bottom:1px solid var(--line);transition:background .18s,padding .18s;position:relative}
 .vol:last-child{border-bottom:0}
 .vol[data-status="ready"]:hover{background:var(--panel);padding-left:1.5rem}
-.vol-n{font-family:var(--jp);color:var(--mute);font-size:1.05rem}
-.vol[data-status="ready"]:hover .vol-n{color:var(--accent)}
 .vol-main{display:flex;flex-direction:column;min-width:0}
 .vol-title{color:var(--fg);font-weight:500}
 .vol[data-status="ready"]:hover .vol-title{color:var(--accent-soft)}
@@ -98,7 +96,7 @@ h1 .cur{display:inline-block;width:.6ch;height:1em;background:var(--accent);vert
 .ft{border-top:1px solid var(--line);margin-top:1.4rem;padding:1.6rem 0 2.4rem;color:var(--mute);font-size:.78rem}
 .ft .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
 .ft b{color:var(--dim);font-weight:500}
-@media(max-width:620px){.top nav{display:none}.vol{grid-template-columns:1fr auto}.vol-n{display:none}}
+@media(max-width:620px){.top nav{display:none}}
 
 /* ---- domain "more" link, all-index link, search (added) ---- */
 .dh-more{color:var(--accent);font-family:var(--mono);font-size:.78rem;margin-left:.6rem}
