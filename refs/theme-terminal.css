@@ -59,10 +59,9 @@ h1 .cur{display:inline-block;width:.6ch;height:1em;background:var(--accent);vert
 
 /* cert wall — bracketed tokens */
 #cert-wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px}
-.badge{position:relative;background:var(--panel);border:1px solid var(--accent-2);border-radius:3px;padding:.9rem;
-  display:grid;place-items:center;color:var(--accent);aspect-ratio:1/1;transition:background .18s,border-color .18s}
+.badge{position:relative;background:var(--panel);border:1px solid var(--accent-2);border-radius:3px;padding:.9rem;min-width:96px;min-height:96px;display:grid;place-items:center;color:var(--accent);aspect-ratio:1/1;transition:background .18s,border-color .18s}
 .badge:hover{background:var(--panel-2);border-color:var(--accent)}
-.badge img{width:100%;height:100%;max-width:80px;object-fit:contain}
+.badge img{width:100%;height:auto;max-width:100%;object-fit:contain;display:block}
 .badge .fb{font-family:var(--mono);text-align:center;font-size:.86rem;color:var(--fg)}
 .badge .fb b{display:block;color:var(--accent)}
 .badge .fb span{font-size:.62rem;color:var(--mute)}
