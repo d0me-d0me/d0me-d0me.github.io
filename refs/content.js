@@ -2,9 +2,16 @@
    content.js — 唯一の編集点。ナレッジが増えたらここに足すだけ。
    大項目は domains[]、各巻は domain で紐付ける。
    ・チートシート追加: volumes[] に1項目追加 + sheets/<slug>.html を置く
-   ・資格追加/削除:   certs[] を編集（assets/badges/<svg>.svg を用意）
+   ・資格追加/削除:   certs[] を編集（assets/badges/<png>.png を用意）
    ホーム(索引・資格・件数)は app.js が大項目ごとに自動描画する。
-   大字: 壱 弐 参 肆 伍 陸 漆 捌
+
+   識別子ポリシー:
+     - slug: 不変の永続キー。URL anchor と内部リンクに使用。一度確定したら変更しない。
+             kebab-case、英小文字+数字+ハイフンのみ。
+     - title / jp: 表示専用。改訂自由(URL は壊れない)。
+     - domain: 主分類(offensive / defensive / other)。表示順の一次キー。
+     - tags:   横断的属性。多重付与可。将来の filter view の基盤。
+     - 番号(大字含む)は使用しない。表示順は配列順で暗黙的に制御する。
    ============================================================ */
 window.CONTENT = {
   handle:    "d0me",
@@ -31,33 +38,43 @@ window.CONTENT = {
     { code: "CCNA",  issuer: "Cisco",        img: "ccna.png" },
   ],
 
-  // チートシート。domain で大項目に紐付け、n(大字)は大項目ごとに振る。
+  // チートシート。slug が永続キー(URL anchor)、domain が主分類、tags が横断属性。
   // status: "ready" は sheets/<slug>.html へリンク、"soon" は準備中表示。
   volumes: [
     // ---- offensive ----
-    { domain: "offensive", n: "壱", slug: "active-directory", title: "Active Directory", jp: "認証と権限",
-      topics: "enum · kerberoast · as-rep · delegation · dcsync", status: "ready" },
-    { domain: "offensive", n: "弐", slug: "evasion",          title: "Evasion",          jp: "回避",
-      topics: "amsi · etw · script-block logging · in-memory",   status: "ready" },
-    { domain: "offensive", n: "参", slug: "lateral-movement", title: "Lateral Movement", jp: "横展開",
-      topics: "pass-the-hash · winrm/wmi · ligolo · chisel",     status: "ready" },
-    { domain: "offensive", n: "肆", slug: "command-control",  title: "Command & Control", jp: "指揮統制",
-      topics: "payload delivery · listeners · egress",           status: "ready" },
-    { domain: "offensive", n: "伍", slug: "web",              title: "Web",              jp: "ウェブ",
-      topics: "auth · deserialization · ssti · upload",          status: "ready" },
-    { domain: "offensive", n: "陸", slug: "tooling",          title: "Tooling",          jp: "道具",
-      topics: "launch templates · reusable snippets",            status: "ready" },
+    { domain: "offensive", slug: "active-directory", title: "Active Directory", jp: "認証と権限",
+      topics: "enum · kerberoast · as-rep · delegation · dcsync",
+      tags: ["ad", "kerberos", "windows", "auth"], status: "ready" },
+    { domain: "offensive", slug: "evasion",          title: "Evasion",          jp: "回避",
+      topics: "amsi · etw · script-block logging · in-memory",
+      tags: ["evasion", "windows", "in-memory"], status: "ready" },
+    { domain: "offensive", slug: "lateral-movement", title: "Lateral Movement", jp: "横展開",
+      topics: "pass-the-hash · winrm/wmi · ligolo · chisel",
+      tags: ["lateral-movement", "pivoting", "windows"], status: "ready" },
+    { domain: "offensive", slug: "command-control",  title: "Command & Control", jp: "指揮統制",
+      topics: "payload delivery · listeners · egress",
+      tags: ["c2", "payload", "egress"], status: "ready" },
+    { domain: "offensive", slug: "web",              title: "Web",              jp: "ウェブ",
+      topics: "auth · deserialization · ssti · upload",
+      tags: ["web", "appsec"], status: "ready" },
+    { domain: "offensive", slug: "tooling",          title: "Tooling",          jp: "道具",
+      topics: "launch templates · reusable snippets",
+      tags: ["tooling", "snippets"], status: "ready" },
 
     // ---- defensive ----
-    { domain: "defensive", n: "壱", slug: "detection",        title: "Detection & Monitoring", jp: "検知・監視",
-      topics: "sigma · event-id · siem · yara",                  status: "soon" },
-    { domain: "defensive", n: "弐", slug: "forensics-ir",     title: "Forensics & IR",   jp: "フォレンジック・IR",
-      topics: "triage · timeline · memory · log analysis",       status: "soon" },
+    { domain: "defensive", slug: "detection",        title: "Detection & Monitoring", jp: "検知・監視",
+      topics: "sigma · event-id · siem · yara",
+      tags: ["detection", "siem", "sigma", "yara"], status: "soon" },
+    { domain: "defensive", slug: "forensics-ir",     title: "Forensics & IR",   jp: "フォレンジック・IR",
+      topics: "triage · timeline · memory · log analysis",
+      tags: ["forensics", "ir", "memory", "logs"], status: "soon" },
 
     // ---- other ----
-    { domain: "other",     n: "壱", slug: "crypto",           title: "Crypto & Protocols", jp: "暗号・プロトコル",
-      topics: "tls · hashing · pki · jwt",                       status: "soon" },
-    { domain: "other",     n: "弐", slug: "vuln-notes",       title: "Vuln Notes",       jp: "脆弱性メモ",
-      topics: "cve解説 · poc読解 · patch diff",                 status: "soon" },
+    { domain: "other",     slug: "crypto",           title: "Crypto & Protocols", jp: "暗号・プロトコル",
+      topics: "tls · hashing · pki · jwt",
+      tags: ["crypto", "protocols", "tls", "pki"], status: "soon" },
+    { domain: "other",     slug: "vuln-notes",       title: "Vuln Notes",       jp: "脆弱性メモ",
+      topics: "cve解説 · poc読解 · patch diff",
+      tags: ["vuln", "cve", "poc"], status: "soon" },
   ],
 };
