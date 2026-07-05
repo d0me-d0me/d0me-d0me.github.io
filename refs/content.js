@@ -2,7 +2,7 @@
    content.js — 唯一の編集点。ナレッジが増えたらここに足すだけ。
    大項目は domains[]、各巻は domain で紐付ける。
    ・チートシート追加: volumes[] に1項目追加 + sheets/<slug>.html を置く
-   ・資格追加/削除:   certs[] を編集（assets/badges/<png>.png を用意）
+   ・資格追加/削除:   certs[] を編集（assets/badges/<name>.png を用意）
    ホーム(索引・資格・件数)は app.js が大項目ごとに自動描画する。
 
    識別子ポリシー:
@@ -11,7 +11,7 @@
      - title / jp: 表示専用。改訂自由(URL は壊れない)。
      - domain: 主分類(offensive / defensive / other)。表示順の一次キー。
      - tags:   横断的属性。多重付与可。将来の filter view の基盤。
-     - 番号(大字含む)は使用しない。表示順は配列順で暗黙的に制御する。
+     - 番号は使用しない。表示順は配列順で暗黙的に制御する。
    ============================================================ */
 window.CONTENT = {
   handle:    "d0me",
