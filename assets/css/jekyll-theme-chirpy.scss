@@ -8,5 +8,64 @@ html:not([data-mode]),
   --main-bg: #0B0B0C !important;
   --bs-body-bg: #0B0B0C !important;
   --sidebar-bg: #0B0B0C !important;
-  --topbar-bg: rgba(11,11,12,.64) !important;
+  --topbar-bg: rgba(11, 11, 12, .64) !important;
+}
+
+/* ── phosphor styling for tab pages / posts (match HOME) ── */
+$ph-hi:  #F2F4EA;
+$ph:     #D9DCCF;
+$ph-dim: #8F8875;
+$grn:    #48B44A;
+$rule:   rgba(217, 220, 207, .15);
+$mono:   "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+$body:   "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", #{$mono};
+
+.content {
+  max-width: 52rem;
+  margin-inline: auto;
+  color: $ph;
+  font-family: $body;
+  line-height: 1.85;
+  overflow-wrap: break-word;
+  word-break: break-word;
+
+  h1, h2, h3, h4, h5 {
+    color: $ph-hi;
+    font-family: $mono;
+    font-weight: 700;
+    letter-spacing: .01em;
+    line-height: 1.4;
+  }
+
+  h2 {
+    margin-top: 2.4rem;
+    padding-bottom: .35rem;
+    border-bottom: 1px solid $rule;
+  }
+
+  a { color: $grn; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  strong, b { color: $ph-hi; }
+
+  :not(pre) > code {
+    background: rgba(217, 220, 207, .07);
+    color: $ph-hi;
+    padding: .12em .38em;
+    border-radius: .25rem;
+    font-family: $mono;
+    font-size: .92em;
+  }
+
+  blockquote {
+    border-left: 2px solid $ph-dim;
+    color: $ph-dim;
+    padding-left: 1rem;
+    font-style: italic;
+  }
+
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: .3rem 0; }
+
+  hr { border: 0; border-top: 1px solid $rule; margin: 2.2rem 0; }
 }
