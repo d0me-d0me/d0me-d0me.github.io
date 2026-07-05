@@ -1,4 +1,3 @@
-```markdown
 ---
 # the default layout is 'page'
 icon: fas fa-info-circle
@@ -71,5 +70,3 @@ Trying to understand everything was never realistic. What remains is to keep cli
 > 我以外皆我師  
 > *Everyone I meet has something to teach me.*
 ```
-
-OPSEC確認: 取得日・IPA資格名は不記載(denylist通り)。他の識別子該当なし。push前PART C grep実施を推奨。
