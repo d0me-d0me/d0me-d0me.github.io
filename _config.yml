@@ -16,7 +16,7 @@ timezone: Etc/UTC
 
 title: d0me # the main title
 
-tagline: offensive & defensive security notes # it will display as the subtitle
+tagline: offensive & defensive security # it will display as the subtitle
 
 description: >- # used by seo meta and the atom feed
   Field references and notes on offensive and defensive security — labs, CTFs, and disclosed CVEs.
