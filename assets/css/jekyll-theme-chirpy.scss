@@ -77,3 +77,11 @@ $body:   "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu
 #sidebar li::before {
   content: none !important;
 }
+
+#sidebar .site-subtitle {
+  white-space: normal !important;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
