@@ -2,9 +2,11 @@
 ---
 @use "main";
 
-html[data-mode=dark], :root[data-bs-theme=dark] {
-  --main-bg: #0B0B0C;
-  --bs-body-bg: #0B0B0C;
-  --sidebar-bg: #0B0B0C;
-  --topbar-bg: rgba(11,11,12,.64);
+html[data-mode="dark"],
+html:not([data-mode]),
+:root[data-bs-theme="dark"] {
+  --main-bg: #0B0B0C !important;
+  --bs-body-bg: #0B0B0C !important;
+  --sidebar-bg: #0B0B0C !important;
+  --topbar-bg: rgba(11,11,12,.64) !important;
 }
