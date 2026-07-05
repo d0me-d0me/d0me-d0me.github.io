@@ -21,15 +21,8 @@ window.CONTENT = {
     { id: "other",     label: "Other",     jp: "その他", glyph: "雑" },
   ],
 
-  // 保有資格（日本の資格は非掲載）
-  certs: [
-    { code: "OSCP",  issuer: "OffSec",       svg: "oscp" },
-    { code: "OSEP",  issuer: "OffSec",       svg: "osep" },
-    { code: "CPTS",  issuer: "Hack The Box", svg: "cpts" },
-    { code: "SAL1",  issuer: "TryHackMe",    svg: "sal1" },
-    { code: "CySA+", issuer: "CompTIA",      svg: "cysa" },
-    { code: "CCNA",  issuer: "Cisco",        svg: "ccna" },
-  ],
+  // 保有資格
+  certs: [],
 
   // チートシート。domain で大項目に紐付け、n(大字)は大項目ごとに振る。
   // status: "ready" は sheets/<slug>.html へリンク、"soon" は準備中表示。
