@@ -66,3 +66,14 @@ $body:   "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu
 .content ol { padding-left: 1.5rem; }
 .content li { margin: .3rem 0; }
 .content hr { border: 0; border-top: 1px solid $rule; margin: 2.2rem 0; }
+
+#sidebar .nav,
+#sidebar .nav-item,
+#sidebar ul,
+#sidebar li {
+  list-style: none !important;
+}
+#sidebar .nav-item::before,
+#sidebar li::before {
+  content: none !important;
+}
