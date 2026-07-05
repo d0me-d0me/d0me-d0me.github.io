@@ -7,7 +7,7 @@ order: 4
 Field notes on offensive and defensive security, built through lab work, CTFs, and reproductions of publicly disclosed CVEs.
 Originally written as a notebook for myself, but published in the hope that someone stuck on the same problem might find a shortcut.
 
-攻撃・防御両面のフィールドノート。ラボ、CTF、公開済み CVE の再現を通じて得た知見を記録している。
+攻撃・防御両面の実務ノート。ラボ、CTF、公開済み CVE の再現を通じて得た知見を記録している。
 もともとは自分のための備忘録だが、同じところで詰まった誰かの遠回りを少しでも減らせればと思い公開している。
 
 ## Scope
@@ -47,7 +47,7 @@ The level of detail changes, but the way of thinking does not. Attack and defens
 
 evasion を考えるときは、検知側から何が見え、どこに痕跡が残るかを同時に考える。
 逆に検知やハンティングを考えるときは、その証跡を攻撃側の視点から追い直す。
-見ている層は違っても、思考の流れは最初から切り離せない。
+視点は違っても、思考の流れは攻撃と防御を切り離せない。
 だからこのサイトでも、攻撃と防御を別々には扱っていない。
 
 ## A note on perspective
@@ -67,6 +67,4 @@ Trying to understand everything was never realistic. What remains is to keep cli
 
 ---
 
-> 我以外皆我師  
-> *Everyone I meet has something to teach me.*
-```
+> 我以外皆我師 — everyone I meet has something to teach me.
