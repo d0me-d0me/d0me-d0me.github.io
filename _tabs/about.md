@@ -12,7 +12,7 @@ Techniques are described neutrally, always paired with detection and defensive c
 
 A terminal-styled quick reference lives alongside this blog:
 
-[**security field refs →**](/refs/)
+[**Security Field Refs →**](/refs/)
 
 ## Certifications
 
