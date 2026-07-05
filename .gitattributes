@@ -17,3 +17,13 @@
 
 # refs/ static subsite: force LF (strip Windows CRLF fingerprint from committed blobs)
 refs/** text eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary
+refs/assets/badges/*.png binary
+refs/**/*.png binary
+refs/**/*.png -text
+refs/**/*.jpg -text
+refs/**/*.ico -text
+refs/**/*.woff2 -text
