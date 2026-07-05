@@ -1,4 +1,169 @@
 ---
-layout: home
-# Index page
+layout: default
 ---
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap');
+
+.dome-home{
+  --ph:#cdd3c2;
+  --ph-dim:rgba(205,211,194,.52);
+  --rule:rgba(205,211,194,.13);
+  --card:rgba(205,211,194,.03);
+  --card-hi:rgba(205,211,194,.06);
+  --margin:#a85d54;
+  position:relative;
+  margin:-.5rem 0 0;
+  padding:2rem 0 1rem;
+  background-image:radial-gradient(rgba(205,211,194,.10) 1px,transparent 1px);
+  background-size:22px 22px;
+  background-position:0 0;
+}
+.dome-home__page{
+  position:relative;
+  max-width:52rem;
+  padding-left:1.6rem;
+}
+.dome-home__page::before{
+  content:"";
+  position:absolute;
+  left:.35rem;top:.15rem;bottom:.15rem;
+  width:1px;background:var(--margin);opacity:.5;
+}
+
+.dome-home__prompt{
+  font-family:'JetBrains Mono',monospace;
+  color:var(--ph-dim);
+  font-size:.85rem;
+  margin:0 0 1.4rem;
+  letter-spacing:.01em;
+}
+.dome-home__prompt b{color:var(--ph);font-weight:700;}
+.dome-home__prompt .cur{
+  display:inline-block;width:.55ch;height:1em;background:var(--ph);
+  margin-left:.2rem;vertical-align:-.12em;animation:dh-blink 1.1s steps(1) infinite;
+}
+@keyframes dh-blink{50%{opacity:0;}}
+
+.dome-home__intro{margin:0 0 .2rem;}
+.dome-home__intro .jp{
+  font-family:'Zen Kaku Gothic New',sans-serif;font-weight:500;
+  font-size:clamp(1.35rem,3.4vw,1.9rem);line-height:1.55;
+  color:var(--ph);margin:0 0 .55rem;
+}
+.dome-home__intro .en{
+  font-family:'JetBrains Mono',monospace;
+  font-size:clamp(.82rem,1.8vw,.95rem);line-height:1.55;
+  color:var(--ph-dim);margin:0;
+}
+
+.dome-home__domains{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;
+  margin:2.2rem 0 0;
+}
+.dome-home .card{
+  position:relative;display:flex;flex-direction:column;gap:.15rem;
+  padding:1.15rem 1.15rem 1.1rem;overflow:hidden;
+  background:var(--card);border:1px solid var(--rule);
+  border-left:2px solid var(--ph-dim);border-radius:2px;
+  text-decoration:none;
+  transition:transform .16s ease,border-color .16s ease,background .16s ease;
+}
+.dome-home .card .glyph{
+  position:absolute;right:.35rem;bottom:-.5rem;
+  font-family:'Zen Kaku Gothic New',sans-serif;font-weight:700;
+  font-size:4.4rem;line-height:1;color:rgba(205,211,194,.08);
+  pointer-events:none;transition:color .16s ease;
+}
+.dome-home .card .label{
+  font-family:'JetBrains Mono',monospace;font-weight:700;
+  font-size:1.02rem;letter-spacing:.02em;color:var(--ph);
+}
+.dome-home .card .sub{
+  font-family:'Zen Kaku Gothic New',sans-serif;
+  font-size:.82rem;color:var(--ph-dim);
+}
+.dome-home .card:hover{
+  transform:translateY(-2px);background:var(--card-hi);
+  border-color:var(--ph-dim);border-left-color:var(--ph);
+}
+.dome-home .card:hover .glyph{color:rgba(205,211,194,.15);}
+.dome-home .card:focus-visible{outline:2px solid var(--ph);outline-offset:2px;}
+
+.dome-home__links{
+  display:flex;gap:1.7rem;margin:2.2rem 0 0;
+  font-family:'JetBrains Mono',monospace;
+}
+.dome-home__links a{
+  color:var(--ph);text-decoration:none;font-size:.95rem;
+  border-bottom:1px solid transparent;padding-bottom:2px;
+  transition:border-color .16s ease;
+}
+.dome-home__links a:hover{border-bottom-color:var(--ph);}
+.dome-home__links a:focus-visible{outline:2px solid var(--ph);outline-offset:3px;}
+
+.dome-home__motto{margin:2.6rem 0 0;}
+.dome-home__motto hr{border:0;border-top:1px solid var(--rule);margin:0 0 1rem;}
+.dome-home__motto blockquote{
+  margin:0;padding:0;border:0;
+  font-family:'Zen Kaku Gothic New',sans-serif;
+  color:var(--ph-dim);font-size:.9rem;line-height:1.6;
+}
+
+.dome-home__page>*{animation:dh-rise .5s ease both;}
+.dome-home__prompt{animation-delay:.02s;}
+.dome-home__intro{animation-delay:.08s;}
+.dome-home__domains{animation-delay:.16s;}
+.dome-home__links{animation-delay:.24s;}
+.dome-home__motto{animation-delay:.30s;}
+@keyframes dh-rise{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+
+@media (max-width:620px){
+  .dome-home__domains{grid-template-columns:1fr;}
+  .dome-home__page{padding-left:1.1rem;}
+}
+@media (prefers-reduced-motion:reduce){
+  .dome-home__page>*,.dome-home__prompt .cur{animation:none;}
+}
+</style>
+
+<div class="dome-home">
+  <div class="dome-home__page">
+
+    <p class="dome-home__prompt"><b>d0me</b>:~$ cat intro<span class="cur"></span></p>
+
+    <header class="dome-home__intro">
+      <p class="jp">攻撃と防御、双方の視点で書き留めた実務ノート。</p>
+      <p class="en">Notes from both sides of security — offensive and defensive.</p>
+    </header>
+
+    <nav class="dome-home__domains" aria-label="domains">
+      <a class="card" href="{{ '/refs/' | relative_url }}">
+        <span class="glyph" aria-hidden="true">攻</span>
+        <span class="label">Offensive</span>
+        <span class="sub">攻撃</span>
+      </a>
+      <a class="card" href="{{ '/refs/' | relative_url }}">
+        <span class="glyph" aria-hidden="true">守</span>
+        <span class="label">Defensive</span>
+        <span class="sub">防御</span>
+      </a>
+      <a class="card" href="{{ '/refs/' | relative_url }}">
+        <span class="glyph" aria-hidden="true">雑</span>
+        <span class="label">Other</span>
+        <span class="sub">その他</span>
+      </a>
+    </nav>
+
+    <div class="dome-home__links">
+      <a href="{{ '/posts/' | relative_url }}">→ Posts</a>
+      <a href="{{ '/refs/' | relative_url }}">→ Refs</a>
+    </div>
+
+    <footer class="dome-home__motto">
+      <hr>
+      <blockquote>我以外皆我師 — everyone I meet has something to teach me.</blockquote>
+    </footer>
+
+  </div>
+</div>
