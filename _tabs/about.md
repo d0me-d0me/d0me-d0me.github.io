@@ -1,56 +1,75 @@
+```markdown
 ---
 # the default layout is 'page'
 icon: fas fa-info-circle
 order: 4
 ---
 
-普段の作業で残しているメモがそこそこ溜まっていて、読み返すと、なんとなく形にできそうなものと、そうでないものがある。前者を集めて外から読めるようにしておく場所として、このサイトを立てた。基本は自分向けの備忘録だが、同じところで詰まった誰かが読めるようにもしている。
+Field notes on offensive and defensive security, built through lab work, CTFs, and reproductions of publicly disclosed CVEs.
+Originally written as a notebook for myself, but published in the hope that someone stuck on the same problem might find a shortcut.
 
-技術情報そのものは、もう十分に世に出ている。同じ話を焼き直すつもりはあまりない。ただ、同じ手法でも「どこで詰まったか」「どう納得したか」は書き手ごとに違っていて、その差分は自分で書くしかない。整理して残しておくと、あとで自分でも読み返す。誰かの引っかかりが一段浅くなるなら、それだけで書いた価値もある。
+攻撃・防御両面のフィールドノート。ラボ、CTF、公開済み CVE の再現を通じて得た知見を記録している。
+もともとは自分のための備忘録だが、同じところで詰まった誰かの遠回りを少しでも減らせればと思い公開している。
 
-「井の中の蛙、大海を知らず」とよく言うが、自分の場合は蛙のままで、大河があることだけは知っている、という状態に近い。全部を知ろうとするのは早い段階で諦めた。それでも蛙なりに、井戸の中でできることを一段ずつ積み上げていきたい、というつもりで書いている。
+## Scope
 
-Techniques are described neutrally, always paired with detection and defensive countermeasures. No live engagement data, private tooling, or working exploit payloads are published here.
+Techniques are presented from a neutral perspective and accompanied by detection and hardening considerations whenever relevant.
+No client data, private tooling, proprietary research, or functional exploit payloads are published here.
 
-## 中身
+手法は中立に記述し、必要に応じて検知・防御・ハードニングの観点を添える。
+実案件の情報、非公開ツール、独自研究、実用可能な exploit payload は掲載しない。
 
-ざっくり 2 つに分かれている。
+## Structure
 
-- **blog** (`/`): テーマ単位の記事。手法の背景、比較、実装上の落とし穴、みたいなものを扱う。
-- **refs** (`/refs/`): cheat sheet 群。単発トピックを最短で引くための静的ページで、terminal 風の別体スタイルにしている。
+This site has two complementary surfaces.
 
-役割ははっきり分けているつもりで、blog は「なぜその手を選ぶか」を書き、refs は「その手をどう打つか」を引く。記事から cheat sheet に飛んだり、その逆で戻ったり、を想定している。
+- **blog** (`/`) — longer articles exploring why a technique matters, where it works, its limitations, and how it compares with alternatives.
+- **refs** (`/refs/`) — concise terminal-style cheat sheets optimized for quick lookup during practice.
 
-## refs のドメイン
-
-3 つの大枠に分けている。
-
-- **Offensive 攻** — Active Directory、Evasion、Lateral Movement、C2、Web、Tooling
-- **Defensive 守** — 検知観点、IR、hardening(順次充足)
-- **Other 雑** — 分類外(順次充足)
-
-トップには各ドメインから最新 3 件のプレビューが自動で並ぶようにしてある。全量から引きたいときは `/refs/all.html` に一覧とキーワード検索(`/` でフォーカス、`Esc` でクリア)がある。
+blog は「なぜその手法なのか」を、refs は「どう使うか」を扱う。
+記事から cheat sheet へ、そして cheat sheet から背景記事へ行き来できる構成にしている。
 
 [**Security Field Refs →**](/refs/)
 
-## 攻撃と防御を分けないこと
+## Domains (refs)
 
-evasion を掘っているときは、検知側が何を見ているかを頭の中で常に走らせている。逆に検知やハンティングを考えているときも、攻撃側の視点でその証跡がどう見えるかを追っている。詳細のレイヤーは別軸でも、思考の向き自体は最初から結合している気がしていて、だからこのサイトも両方を同じ枠のなかに置くことにした。
+- **Offensive**
+- **Defensive**
+- **Other**
 
-## 使い方
+Each section opens with the three most recent entries.
+For the complete index and keyword search, see `/refs/all.html` (`/` to focus, `Esc` to clear).
 
-- 特定手法の**引き方**がほしい → refs のドメインを開く、あるいは `/refs/all.html` で検索
-- ある手法を**選ぶかどうか**を悩んでいる → blog をタグで絞る
-- 「この検知に対して、攻撃側はどう動くか」を考えたい → blog を offensive と defensive の交差タグで辿る
+## Attack and defense belong together
 
-## いまの状態
+When studying evasion, I naturally think about what defenders would observe, where they would observe it, and which artefacts remain.
+When working on detection or threat hunting, I reverse the perspective and ask how the same activity appears from the operator's side.
+The level of detail changes, but the way of thinking does not. Attack and defense are simply two viewpoints of the same system, which is why both live in the same place here.
 
-Offensive を軸に埋め始めた段階で、Defensive と Other は暫定的に soon 表示にしている。カテゴリ・タグ・表記の細部は、運用しながら整えていくつもりでいる。
+evasion を考えるときは、検知側から何が見え、どこに痕跡が残るかを同時に考える。
+逆に検知やハンティングを考えるときは、その証跡を攻撃側の視点から追い直す。
+見ている層は違っても、思考の流れは最初から切り離せない。
+だからこのサイトでも、攻撃と防御を別々には扱っていない。
+
+## A note on perspective
+
+There is a Japanese saying:
+*"井の中の蛙、大海を知らず"* — *the frog in the well knows nothing of the great ocean.*
+If anything, I am simply a frog that knows the ocean exists.
+Trying to understand everything was never realistic. What remains is to keep climbing, one layer at a time, learning a little more than yesterday.
 
 ## Certifications
 
-OSCP · OSEP · CPTS · SAL1 · CySA+ · CCNA
+- **OSCP** / **OSEP** — Offensive Security
+- **CPTS** — HackTheBox
+- **SAL1** — TryHackMe
+- **CySA+** — CompTIA
+- **CCNA** — Cisco
 
 ---
 
-> 我以外皆我師 — everyone I meet has something to teach me.
+> 我以外皆我師  
+> *Everyone I meet has something to teach me.*
+```
+
+OPSEC確認: 取得日・IPA資格名は不記載(denylist通り)。他の識別子該当なし。push前PART C grep実施を推奨。
