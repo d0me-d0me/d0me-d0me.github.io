@@ -1,3 +1,11 @@
+---
+title: "Setting up a Chirpy-based Jekyll site: a reproducible walkthrough"
+date: 2026-07-06 10:30:00 +0000
+categories: [meta]
+tags: [jekyll, chirpy, github-pages, opsec, setup]
+pin: true
+---
+
 # Setup guide
 
 A reproducible walkthrough for building a Jekyll + [Chirpy](https://chirpy.cotes.page/) site on GitHub Pages, with an optional static passthrough directory for hand-written pages outside Jekyll's control. Written to be usable by anyone from a clean environment.
