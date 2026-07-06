@@ -1,6 +1,6 @@
 ---
 title: "Setting up a Chirpy-based Jekyll site: a reproducible walkthrough"
-date: 2026-07-06 10:30:00 +0000
+date: 2026-07-06 10:00:00 +0000
 categories: [meta]
 tags: [jekyll, chirpy, github-pages, opsec, setup]
 pin: true
