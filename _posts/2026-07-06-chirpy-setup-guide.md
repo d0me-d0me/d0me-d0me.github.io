@@ -4,6 +4,7 @@ date: 2026-07-06 10:00:00 +0000
 categories: [meta]
 tags: [jekyll, chirpy, github-pages, opsec, setup]
 pin: true
+permalink: /posts/chirpy-setup-guide/
 ---
 
 # Setup guide
