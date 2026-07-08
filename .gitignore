@@ -37,3 +37,4 @@ sanitize.py
 .env
 *.local.*
 .obsidian/
+*.bak
