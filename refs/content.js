@@ -44,6 +44,7 @@ window.CONTENT = {
     // ---- offensive ----
     { domain: "offensive", slug: "active-directory", title: "Active Directory", jp: "認証と権限",
       topics: "enum · kerberoast · as-rep · delegation · dcsync",
+      keywords: ["powerview","powerup","powerupsql","rubeus","mimikatz","sharphound","bloodhound","constrained delegation","unconstrained delegation","rbcd","s4u","golden ticket","silver ticket","asrep","asreproast","pth","pass-the-hash","ptt","pass-the-ticket","spoolsample","printerbug","lsass","sekurlsa","ntlm","secretsdump","sam","genericall","writeproperty","domain controller","domain admin","enumeration"],
       tags: ["ad", "kerberos", "windows", "auth"], status: "ready" },
     { domain: "offensive", slug: "evasion",          title: "Evasion",          jp: "回避",
       topics: "applocker · clm · amsi · defender · ppl · edr-evasion",
