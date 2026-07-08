@@ -56,7 +56,7 @@
   // --- one volume row ---
   const volMarkup = (v) => {
     const isReady = v.status === "ready";
-    const search = [v.title, v.jp, v.topics, v.slug].filter(Boolean).join(" ").toLowerCase();
+    const search = [v.title, v.jp, v.topics, v.slug, (v.keywords || []).join(" ")].filter(Boolean).join(" ").toLowerCase();
     const inner = `
       <span class="vol-main">
         <span class="vol-title">${esc(v.title)}</span>
