@@ -42,6 +42,14 @@ window.CONTENT = {
   // status: "ready" は sheets/<slug>.html へリンク、"soon" は準備中表示。
   volumes: [
     // ---- offensive ----
+    { domain: "offensive", slug: "situational-awareness", title: "Situational Awareness", jp: "状況把握",
+      topics: "identity · defense probe · privesc · creds · dpapi",
+      keywords: ["winpeas","seatbelt","watson","sherlock","snaffler","privesccheck","lazagne","unquoted service path","alwaysinstallelevated","modifiable service","vault","cmdkey","dpapi","masterkey","consolehost_history","psreadline","scriptblocklogging","unattend","sysprep","integrity level","mandatory label","post-exploitation","situational awareness","host triage","whoami","systeminfo","sysmon"],
+      tags: ["post-exploitation", "windows", "privesc"], status: "ready" },
+    { domain: "offensive", slug: "reconnaissance",  title: "Reconnaissance",  jp: "偵察",
+      topics: "nmap · rustscan · service enum · web enum · pivot recon",
+      keywords: ["rustscan","masscan","fping","netdiscover","whatweb","nikto","gobuster","ffuf","feroxbuster","smbclient","netexec","crackmapexec","enum4linux","kerbrute","wpscan","onesixtyone","subfinder","amass","arjun","wfuzz","proxychains","autoroute","socks","port scan","host discovery","service enumeration","vhost fuzzing"],
+      tags: ["recon", "enumeration", "nmap"], status: "ready" },
     { domain: "offensive", slug: "active-directory", title: "Active Directory", jp: "認証と権限",
       topics: "enum · kerberoast · as-rep · delegation · dcsync",
       keywords: ["powerview","powerup","powerupsql","rubeus","mimikatz","sharphound","bloodhound","constrained delegation","unconstrained delegation","rbcd","s4u","golden ticket","silver ticket","asrep","asreproast","pth","pass-the-hash","ptt","pass-the-ticket","spoolsample","printerbug","lsass","sekurlsa","ntlm","secretsdump","sam","genericall","writeproperty","domain controller","domain admin","enumeration"],
@@ -59,8 +67,9 @@ window.CONTENT = {
     { domain: "offensive", slug: "web",              title: "Web",              jp: "ウェブ",
       topics: "auth · deserialization · ssti · upload",
       tags: ["web", "appsec"], status: "ready" },
-    { domain: "offensive", slug: "tooling",          title: "Tooling",          jp: "道具",
-      topics: "launch templates · reusable snippets",
+    { domain: "offensive", slug: "tooling",          title: "File Transfer & Tooling",          jp: "転送と道具",
+      topics: "http · smb · base64 · exfil · av-evasion",
+      keywords: ["certutil","bitsadmin","smbserver","pyftpdlib","impacket-smbserver","base64 transfer","xor encode","split transfer","in-memory","reflective load","dns tunnel","meterpreter","nishang","netcat","dnscat2","scp","wget","curl","exfiltration","loot","data transfer","iwr","invoke-webrequest","webclient","proxychains","dd","file transfer"],
       tags: ["tooling", "snippets"], status: "ready" },
 
     // ---- defensive ----
