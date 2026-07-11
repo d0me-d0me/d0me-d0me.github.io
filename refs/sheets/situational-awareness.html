@@ -14,6 +14,77 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/sheet.css">
+<style>
+/* attack-flow: decision flow axis (situational-awareness) */
+.attack-flow{padding:2rem 0 1.4rem;border-bottom:1px solid var(--line)}
+.flow-head{display:flex;align-items:baseline;gap:.7rem;margin-bottom:1.1rem;font-family:var(--mono)}
+.flow-head .hx{color:var(--accent-2);font-weight:700}
+.flow-head .lbl{color:var(--accent-soft);font-weight:700;font-size:1rem;letter-spacing:.02em}
+.flow-head .jp{font-family:var(--jp);color:var(--mute);font-size:.78rem}
+.flow-head .rt{margin-left:auto;color:var(--mute);font-size:.72rem;letter-spacing:.06em}
+
+.flow-chain{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}
+.flow-phase{
+  position:relative;display:flex;flex-direction:column;gap:.28rem;
+  padding:.85rem .95rem;background:var(--panel);
+  border:1px solid var(--line);border-left:2px solid var(--accent-2);
+  border-radius:3px;text-decoration:none;overflow:hidden;
+  transition:all .16s ease;min-width:0
+}
+.flow-phase:hover{
+  border-color:var(--accent-2);border-left-color:var(--accent);
+  background:var(--panel-2);transform:translateY(-1px)
+}
+.flow-phase:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.flow-phase .p-num{
+  font-family:var(--mono);font-size:.68rem;color:var(--accent);
+  font-weight:700;letter-spacing:.14em
+}
+.flow-phase .p-title{
+  font-family:var(--mono);font-size:.86rem;color:var(--accent-soft);
+  font-weight:700;line-height:1.3
+}
+.flow-phase .p-jp{
+  font-family:var(--jp);font-size:.7rem;color:var(--mute)
+}
+.flow-phase .p-techs{
+  font-family:var(--mono);font-size:.66rem;color:var(--dim);
+  line-height:1.55;margin-top:.35rem;padding-top:.4rem;
+  border-top:1px dashed var(--line)
+}
+
+.flow-scenarios{
+  display:flex;align-items:center;gap:.8rem;
+  margin-top:.9rem;padding:.75rem 1rem;
+  background:transparent;border:1px solid var(--accent-2);
+  border-radius:3px;text-decoration:none;
+  transition:all .16s ease
+}
+.flow-scenarios:hover{background:var(--panel);border-color:var(--accent)}
+.flow-scenarios:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.flow-scenarios .sc-num{
+  font-family:var(--mono);font-size:.7rem;color:var(--accent);
+  font-weight:700;letter-spacing:.12em
+}
+.flow-scenarios .sc-title{
+  font-family:var(--mono);font-size:.82rem;color:var(--accent-soft);
+  font-weight:500
+}
+.flow-scenarios .sc-jp{
+  font-family:var(--jp);font-size:.72rem;color:var(--mute);
+  margin-left:auto
+}
+
+/* precise jump target inside s07 */
+#dpapi{scroll-margin-top:70px}
+
+@media (max-width:860px){.flow-chain{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:520px){
+  .flow-chain{grid-template-columns:1fr}
+  .flow-scenarios .sc-jp{display:none}
+}
+@media (prefers-reduced-motion:reduce){.flow-phase{transition:none}.flow-phase:hover{transform:none}}
+</style>
 </head>
 <body>
 
@@ -33,6 +104,54 @@
     <p class="lede">A checklist for triaging a Windows host immediately after foothold — identity, defenses, privesc paths, network position, credentials.<span class="jp">侵入直後の Windows ホストで即実行する状況把握チェックリスト。権限・防御・昇格経路・ネットワーク位置・認証情報を段階的に確認する。</span></p>
   </div>
 </section>
+
+<div class="wrap">
+<section class="attack-flow" aria-label="Situational Awareness decision flow">
+  <div class="flow-head">
+    <span class="hx">##</span>
+    <span class="lbl">Decision Flow</span>
+    <span class="jp">判断フロー軸</span>
+    <span class="rt">click phase → jump to section</span>
+  </div>
+  <div class="flow-chain">
+    <a class="flow-phase" href="#s01">
+      <span class="p-num">01 · IDENTITY</span>
+      <span class="p-title">Identity Check</span>
+      <span class="p-jp">権限・整合性確認</span>
+      <span class="p-techs">whoami · integrity level · privs · SID / groups</span>
+    </a>
+    <a class="flow-phase" href="#s03">
+      <span class="p-num">02 · DEFENSE</span>
+      <span class="p-title">Defense Probe</span>
+      <span class="p-jp">防御機構検出</span>
+      <span class="p-techs">AV/EDR · AMSI · AppLocker · CLM · logging</span>
+    </a>
+    <a class="flow-phase" href="#s04">
+      <span class="p-num">03 · PRIV ESC</span>
+      <span class="p-title">PrivEsc Candidates</span>
+      <span class="p-jp">権限昇格パス探索</span>
+      <span class="p-techs">WinPEAS · unquoted svc · registry · scheduled task</span>
+    </a>
+    <a class="flow-phase" href="#s07">
+      <span class="p-num">04 · CREDS</span>
+      <span class="p-title">Creds Harvest</span>
+      <span class="p-jp">認証情報・機密ファイル探索</span>
+      <span class="p-techs">Vault · files · registry · history · LSASS · browser</span>
+    </a>
+    <a class="flow-phase" href="#dpapi">
+      <span class="p-num">05 · DPAPI</span>
+      <span class="p-title">DPAPI Decrypt</span>
+      <span class="p-jp">DPAPI 復号</span>
+      <span class="p-techs">masterkey · vault decrypt · offline crack</span>
+    </a>
+  </div>
+  <a class="flow-scenarios" href="#s08">
+    <span class="sc-num">→ 08</span>
+    <span class="sc-title">Decision Matrix</span>
+    <span class="sc-jp">次アクション判断表</span>
+  </a>
+</section>
+</div>
 
 <div class="wrap">
 <div class="sheet-layout">
@@ -504,7 +623,7 @@ vaultcmd /listcreds:"Windows Credentials" /all
 dir /a:h /s C:\Users\%USERNAME%\AppData\Local\Microsoft\Credentials\
 dir /a:h /s C:\Users\%USERNAME%\AppData\Roaming\Microsoft\Credentials\</code></pre></div>
 
-      <h3>DPAPI マスターキー</h3>
+      <h3 id="dpapi">DPAPI マスターキー</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div>
 <pre><code>dir /a:h C:\Users\%USERNAME%\AppData\Roaming\Microsoft\Protect\</code></pre></div>
 
