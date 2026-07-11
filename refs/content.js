@@ -69,10 +69,10 @@ window.CONTENT = {
       topics: "recon · injection · ssti · ssrf/xxe · client-side · api",
       keywords: ["sqli","xss","csrf","lfi","rfi","idor","jwt","oauth","saml","nosqli","sqlmap","jwt_tool","ysoserial","phpggc","jinja2","freemarker","twig","pug","graphql","gopher","cors","samesite","race-condition","command-injection","mass-assignment","log-poisoning","deserialization","webshell"],
       tags: ["web", "appsec"], status: "ready" },
-    { domain: "offensive", slug: "tooling",          title: "File Transfer & Tooling",          jp: "転送と道具",
+    { domain: "offensive", slug: "tooling",          title: "File Transfer",          jp: "ファイル転送",
       topics: "http · smb · base64 · exfil · av-evasion",
       keywords: ["certutil","bitsadmin","smbserver","pyftpdlib","impacket-smbserver","base64 transfer","xor encode","split transfer","in-memory","reflective load","dns tunnel","meterpreter","nishang","netcat","dnscat2","scp","wget","curl","exfiltration","loot","data transfer","iwr","invoke-webrequest","webclient","proxychains","dd","file transfer"],
-      tags: ["tooling", "snippets"], status: "ready" },
+      tags: ["file-transfer", "snippets"], status: "ready" },
 
     // ---- defensive ----
     { domain: "defensive", slug: "detection",        title: "Detection & Monitoring", jp: "検知・監視",

