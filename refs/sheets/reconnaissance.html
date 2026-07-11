@@ -14,6 +14,49 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/sheet.css">
+<style>
+/* attack-flow: recon phase progression (reconnaissance) */
+.attack-flow{padding:2rem 0 1.4rem;border-bottom:1px solid var(--line)}
+.flow-head{display:flex;align-items:baseline;gap:.7rem;margin-bottom:1.1rem;font-family:var(--mono)}
+.flow-head .hx{color:var(--accent-2);font-weight:700}
+.flow-head .lbl{color:var(--accent-soft);font-weight:700;font-size:1rem;letter-spacing:.02em}
+.flow-head .jp{font-family:var(--jp);color:var(--mute);font-size:.78rem}
+.flow-head .rt{margin-left:auto;color:var(--mute);font-size:.72rem;letter-spacing:.06em}
+
+.flow-chain{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}
+.flow-phase{
+  position:relative;display:flex;flex-direction:column;gap:.28rem;
+  padding:.85rem .95rem;background:var(--panel);
+  border:1px solid var(--line);border-left:2px solid var(--accent-2);
+  border-radius:3px;text-decoration:none;overflow:hidden;
+  transition:all .16s ease;min-width:0
+}
+.flow-phase:hover{
+  border-color:var(--accent-2);border-left-color:var(--accent);
+  background:var(--panel-2);transform:translateY(-1px)
+}
+.flow-phase:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.flow-phase .p-num{
+  font-family:var(--mono);font-size:.68rem;color:var(--accent);
+  font-weight:700;letter-spacing:.14em
+}
+.flow-phase .p-title{
+  font-family:var(--mono);font-size:.86rem;color:var(--accent-soft);
+  font-weight:700;line-height:1.3
+}
+.flow-phase .p-jp{
+  font-family:var(--jp);font-size:.7rem;color:var(--mute)
+}
+.flow-phase .p-techs{
+  font-family:var(--mono);font-size:.66rem;color:var(--dim);
+  line-height:1.55;margin-top:.35rem;padding-top:.4rem;
+  border-top:1px dashed var(--line)
+}
+
+@media (max-width:860px){.flow-chain{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:520px){.flow-chain{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.flow-phase{transition:none}.flow-phase:hover{transform:none}}
+</style>
 </head>
 <body>
 
@@ -33,6 +76,55 @@
     <p class="lede">A phased flow for discovering hosts, ports, services, and internal networks — from initial handshake to post-pivot scanning.<span class="jp">ホスト発見からピボット後の内部偵察まで、段階的な情報収集の実行順序ノート。</span></p>
   </div>
 </section>
+
+<div class="wrap">
+<section class="attack-flow" aria-label="Reconnaissance phase flow">
+  <div class="flow-head">
+    <span class="hx">##</span>
+    <span class="lbl">Recon Flow</span>
+    <span class="jp">偵察フェーズ</span>
+    <span class="rt">click phase → jump to section</span>
+  </div>
+  <div class="flow-chain">
+    <a class="flow-phase" href="#s01">
+      <span class="p-num">01 · CONTEXT</span>
+      <span class="p-title">Attacker Context</span>
+      <span class="p-jp">攻撃元コンテキスト</span>
+      <span class="p-techs">LHOST (tun0) · env vars · scope 定義</span>
+    </a>
+    <a class="flow-phase" href="#s02">
+      <span class="p-num">02 · DISCOVERY</span>
+      <span class="p-title">Host Discovery</span>
+      <span class="p-jp">ホスト発見</span>
+      <span class="p-techs">nmap ping sweep · netdiscover · fping · masscan</span>
+    </a>
+    <a class="flow-phase" href="#s03">
+      <span class="p-num">03 · PORT SCAN</span>
+      <span class="p-title">Port Scanning</span>
+      <span class="p-jp">ポートスキャン</span>
+      <span class="p-techs">RustScan · nmap 3-stage · timing · IDS evasion</span>
+    </a>
+    <a class="flow-phase" href="#s04">
+      <span class="p-num">04 · SERVICE</span>
+      <span class="p-title">Service Enumeration</span>
+      <span class="p-jp">サービス列挙</span>
+      <span class="p-techs">SMB · LDAP · Kerberos · WinRM · MSSQL · +9 more</span>
+    </a>
+    <a class="flow-phase" href="#s05">
+      <span class="p-num">05 · WEB</span>
+      <span class="p-title">Web Enumeration</span>
+      <span class="p-jp">Web 列挙</span>
+      <span class="p-techs">ffuf · gobuster · nikto · VHOST · CMS · WAF</span>
+    </a>
+    <a class="flow-phase" href="#s06">
+      <span class="p-num">06 · INTERNAL</span>
+      <span class="p-title">Internal Recon</span>
+      <span class="p-jp">ピボット後の内部偵察</span>
+      <span class="p-techs">Post-pivot scan · SOCKS via ligolo · in-host recon</span>
+    </a>
+  </div>
+</section>
+</div>
 
 <div class="wrap">
 <div class="sheet-layout">
