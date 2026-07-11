@@ -10,6 +10,74 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/sheet.css">
+<style>
+/* attack-flow: MITRE ATT&CK kill chain diagram (ad-compromise) */
+.attack-flow{padding:2rem 0 1.4rem;border-bottom:1px solid var(--line)}
+.flow-head{display:flex;align-items:baseline;gap:.7rem;margin-bottom:1.1rem;font-family:var(--mono)}
+.flow-head .hx{color:var(--accent-2);font-weight:700}
+.flow-head .lbl{color:var(--accent-soft);font-weight:700;font-size:1rem;letter-spacing:.02em}
+.flow-head .jp{font-family:var(--jp);color:var(--mute);font-size:.78rem}
+.flow-head .rt{margin-left:auto;color:var(--mute);font-size:.72rem;letter-spacing:.06em}
+
+.flow-chain{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem}
+.flow-phase{
+  position:relative;display:flex;flex-direction:column;gap:.28rem;
+  padding:.85rem .95rem;background:var(--panel);
+  border:1px solid var(--line);border-left:2px solid var(--accent-2);
+  border-radius:3px;text-decoration:none;overflow:hidden;
+  transition:all .16s ease;min-width:0
+}
+.flow-phase:hover{
+  border-color:var(--accent-2);border-left-color:var(--accent);
+  background:var(--panel-2);transform:translateY(-1px)
+}
+.flow-phase:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.flow-phase .p-num{
+  font-family:var(--mono);font-size:.68rem;color:var(--accent);
+  font-weight:700;letter-spacing:.14em
+}
+.flow-phase .p-title{
+  font-family:var(--mono);font-size:.86rem;color:var(--accent-soft);
+  font-weight:700;line-height:1.3
+}
+.flow-phase .p-jp{
+  font-family:var(--jp);font-size:.7rem;color:var(--mute)
+}
+.flow-phase .p-techs{
+  font-family:var(--mono);font-size:.66rem;color:var(--dim);
+  line-height:1.55;margin-top:.35rem;padding-top:.4rem;
+  border-top:1px dashed var(--line)
+}
+
+.flow-scenarios{
+  display:flex;align-items:center;gap:.8rem;
+  margin-top:.9rem;padding:.75rem 1rem;
+  background:transparent;border:1px solid var(--accent-2);
+  border-radius:3px;text-decoration:none;
+  transition:all .16s ease
+}
+.flow-scenarios:hover{background:var(--panel);border-color:var(--accent)}
+.flow-scenarios:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.flow-scenarios .sc-num{
+  font-family:var(--mono);font-size:.7rem;color:var(--accent);
+  font-weight:700;letter-spacing:.12em
+}
+.flow-scenarios .sc-title{
+  font-family:var(--mono);font-size:.82rem;color:var(--accent-soft);
+  font-weight:500
+}
+.flow-scenarios .sc-jp{
+  font-family:var(--jp);font-size:.72rem;color:var(--mute);
+  margin-left:auto
+}
+
+@media (max-width:860px){.flow-chain{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:520px){
+  .flow-chain{grid-template-columns:1fr}
+  .flow-scenarios .sc-jp{display:none}
+}
+@media (prefers-reduced-motion:reduce){.flow-phase{transition:none}.flow-phase:hover{transform:none}}
+</style>
 </head>
 <body>
 
@@ -29,6 +97,60 @@
     <p class="lede">Full AD attack chain from initial foothold to forest compromise, structured by MITRE ATT&amp;CK tactics from Discovery through Impact.<span class="jp">初期侵入から DA 取得・Forest 侵害までの完全な攻撃連鎖を、MITRE ATT&amp;CK の Tactic 軸 (Discovery → Impact) で整理。</span></p>
   </div>
 </section>
+
+<div class="wrap">
+<section class="attack-flow" aria-label="AD Compromise kill chain">
+  <div class="flow-head">
+    <span class="hx">##</span>
+    <span class="lbl">Kill Chain</span>
+    <span class="jp">MITRE ATT&amp;CK 軸</span>
+    <span class="rt">click phase → jump to section</span>
+  </div>
+  <div class="flow-chain">
+    <a class="flow-phase" href="#s1">
+      <span class="p-num">01 · DISCOVERY</span>
+      <span class="p-title">Discovery</span>
+      <span class="p-jp">偵察・列挙</span>
+      <span class="p-techs">PowerView · BloodHound · LDAP/SMB enum · Trust mapping</span>
+    </a>
+    <a class="flow-phase" href="#s2">
+      <span class="p-num">02 · CRED ACCESS</span>
+      <span class="p-title">Credential Access</span>
+      <span class="p-jp">認証情報取得</span>
+      <span class="p-techs">Kerberoast · ASREProast · Spray · LSASS / NTDS</span>
+    </a>
+    <a class="flow-phase" href="#s3">
+      <span class="p-num">03 · PRIV ESC</span>
+      <span class="p-title">Privilege Escalation</span>
+      <span class="p-jp">特権昇格</span>
+      <span class="p-techs">Delegation abuse · ADCS ESC1-8 · DACL · Shadow Creds</span>
+    </a>
+    <a class="flow-phase" href="#s4">
+      <span class="p-num">04 · LATERAL</span>
+      <span class="p-title">Lateral Movement</span>
+      <span class="p-jp">横展開</span>
+      <span class="p-techs">PtH · OverPtH · PtT · WinRM / WMI / PSExec</span>
+    </a>
+    <a class="flow-phase" href="#s5">
+      <span class="p-num">05 · PERSISTENCE</span>
+      <span class="p-title">Persistence</span>
+      <span class="p-jp">永続化</span>
+      <span class="p-techs">Golden / Silver Ticket · DSRM · AdminSDHolder · Skeleton Key</span>
+    </a>
+    <a class="flow-phase" href="#s6">
+      <span class="p-num">06 · IMPACT</span>
+      <span class="p-title">Impact</span>
+      <span class="p-jp">侵害拡大</span>
+      <span class="p-techs">DCSync · Forest trust abuse · Full NTDS · krbtgt reset</span>
+    </a>
+  </div>
+  <a class="flow-scenarios" href="#s7">
+    <span class="sc-num">→ 07</span>
+    <span class="sc-title">Chained scenarios</span>
+    <span class="sc-jp">典型的な組み合わせ例</span>
+  </a>
+</section>
+</div>
 
 <div class="wrap">
 <div class="sheet-layout">
