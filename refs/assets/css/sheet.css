@@ -147,3 +147,9 @@ a{color:var(--accent);text-decoration:none}
 @media (max-width:860px){.flow-chain{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:520px){.flow-chain{grid-template-columns:1fr}.flow-scenarios .sc-jp{display:none}}
 @media (prefers-reduced-motion:reduce){.flow-phase{transition:none}.flow-phase:hover{transform:none}}
+
+/* ===== back to top (全 sheet 共通) ===== */
+.to-top{position:fixed;right:1.4rem;bottom:1.4rem;width:42px;height:42px;display:grid;place-items:center;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--accent);font-size:1.1rem;cursor:pointer;opacity:0;visibility:hidden;transform:translateY(8px);transition:opacity .2s,transform .2s,visibility .2s,border-color .16s;z-index:60}
+.to-top.show{opacity:1;visibility:visible;transform:none}
+.to-top:hover{border-color:var(--accent-2);color:var(--accent-soft)}
+@media(prefers-reduced-motion:reduce){.to-top{transition:opacity .2s,visibility .2s}}
