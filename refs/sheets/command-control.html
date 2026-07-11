@@ -561,7 +561,7 @@ execute -o powershell <span class="s">'Start-Process "C:\Windows\System32\fodhel
 
     <section id="s07" class="reveal">
       <h2><span class="num">07</span>Credentials Dumping<span class="jp">認証情報取得</span></h2>
-      <p>Elevated セッションを得たら LSASS / SAM / DPAPI / vault / ブラウザ / 履歴といった credential store を取り出す。Sliver からは mimikatz を execute-assembly 経由で流すか、SharpKatz / LaZagne を assembly 実行する。Metasploit は <code>hashdump</code>, <code>kiwi</code>, <code>post/windows/gather/credentials/*</code> 系がベース。手法は <a href="ad-compromise.html#s02">ad-compromise s02</a> と重複する部分あり、そちらは詳細解説寄り、こちらは Sliver / MSF での実行方法に絞る。</p>
+      <p>Elevated セッションを得たら LSASS / SAM / DPAPI / vault / ブラウザ / 履歴といった credential store を取り出す。Sliver からは mimikatz を execute-assembly 経由で流すか、SharpKatz / LaZagne を assembly 実行する。Metasploit は <code>hashdump</code>, <code>kiwi</code>, <code>post/windows/gather/credentials/*</code> 系がベース。手法は <a href="ad-compromise.html#s2">ad-compromise s02</a> と重複する部分あり、そちらは詳細解説寄り、こちらは Sliver / MSF での実行方法に絞る。</p>
 
       <h3>Mimikatz — LSA 保護解除 (RunAsPPL 対策)</h3>
       <p>Windows 10 以降デフォルトで LSASS が PPL (Protected Process Light) 保護される。<code>mimidrv.sys</code> を upload して mimikatz のドライバ機能で保護を解除してから <code>sekurlsa</code> を回す。</p>
@@ -1460,7 +1460,7 @@ psexec -d <span class="v">&lt;SVC_TITLE&gt;</span> -s <span class="v">&lt;SVC_DE
   </div>
 </footer>
 
-<script src="../app.js"></script>
+<script src="../content.js"></script>
 <script src="../assets/js/sheet.js"></script>
 </body>
 </html>
