@@ -112,3 +112,9 @@ a{color:var(--accent);text-decoration:none}
 :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
 @media(max-width:860px){.sheet-layout{grid-template-columns:1fr}.toc{position:static;border:1px solid var(--line);border-radius:5px;padding:1rem;background:var(--panel);margin-bottom:1.4rem}}
 @media(max-width:620px){.nav{display:none;position:absolute;top:52px;left:0;right:0;flex-direction:column;gap:0;background:var(--panel);border-bottom:1px solid var(--line);padding:.4rem clamp(16px,4vw,40px)}.nav.open{display:flex}.nav a{padding:.7rem 0;border-bottom:1px solid var(--line)}.nav-toggle{display:grid;place-items:center}.foot .wrap{flex-direction:column;align-items:flex-start}}
+
+/* ===== back to top (全 sheet 共通) ===== */
+.to-top{position:fixed;right:1.4rem;bottom:1.4rem;width:42px;height:42px;display:grid;place-items:center;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--accent);font-size:1.1rem;cursor:pointer;opacity:0;visibility:hidden;transform:translateY(8px);transition:opacity .2s,transform .2s,visibility .2s,border-color .16s;z-index:60}
+.to-top.show{opacity:1;visibility:visible;transform:none}
+.to-top:hover{border-color:var(--accent-2);color:var(--accent-soft)}
+@media(prefers-reduced-motion:reduce){.to-top{transition:opacity .2s,visibility .2s}}

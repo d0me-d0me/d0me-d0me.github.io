@@ -47,3 +47,26 @@
     map.forEach((_, t) => spy.observe(t));
   }
 })();
+
+/* ===== back to top (全 sheet 共通、ボタンを動的生成) ===== */
+(function(){
+  var btn = document.createElement('button');
+  btn.className = 'to-top';
+  btn.id = 'toTop';
+  btn.type = 'button';
+  btn.setAttribute('aria-label', '上部へ戻る');
+  btn.setAttribute('title', '上部へ戻る');
+  btn.textContent = '↑';
+  document.body.appendChild(btn);
+
+  var threshold = 420;
+  function onScroll(){
+    var y = window.pageYOffset || document.documentElement.scrollTop || 0;
+    btn.classList.toggle('show', y > threshold);
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  btn.addEventListener('click', function(){
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+  onScroll();
+})();
