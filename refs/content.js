@@ -76,19 +76,11 @@ window.CONTENT = {
       tags: ["file-transfer", "snippets"], status: "ready" },
 
     // ---- defensive ----
-    { domain: "defensive", slug: "detection",        title: "Detection & Monitoring", jp: "検知・監視",
-      topics: "sigma · event-id · siem · yara",
-      tags: ["detection", "siem", "sigma", "yara"], status: "soon" },
-    { domain: "defensive", slug: "forensics-ir",     title: "Forensics & IR",   jp: "フォレンジック・IR",
-      topics: "triage · timeline · memory · log analysis",
-      tags: ["forensics", "ir", "memory", "logs"], status: "soon" },
+    { domain: "defensive", slug: "hardening",       title: "Linux Hardening", jp: "Linux 強化",
+      topics: "sysctl · pam · backup · web · db · ufw · audit",
+      keywords: ["sysctl","syncookies","pam_faillock","pam_pwquality","auditd","aide","unattended-upgrades","limits.conf","sshd_config","permitrootlogin","maxauthtries","server_tokens","log_format","bind-address","listen_addresses","mynetworks","nginx","apache","mariadb","postgresql","unbound","postfix","proftpd","memcached","tomcat","groupsession","wordpress","wp-cli","eccube","phpmyadmin"],
+      tags: ["hardening", "defensive", "linux", "web-stack"], status: "ready" },
 
     // ---- other ----
-    { domain: "other",     slug: "crypto",           title: "Crypto & Protocols", jp: "暗号・プロトコル",
-      topics: "tls · hashing · pki · jwt",
-      tags: ["crypto", "protocols", "tls", "pki"], status: "soon" },
-    { domain: "other",     slug: "vuln-notes",       title: "Vuln Notes",       jp: "脆弱性メモ",
-      topics: "cve解説 · poc読解 · patch diff",
-      tags: ["vuln", "cve", "poc"], status: "soon" },
   ],
 };

@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Linux Hardening — d0me</title>
+<meta name="description" content="Linux + Web スタックの hardening 実務ノート — 状態調査、カーネル、SSH/PAM、Web、DB、UFW、監査、監視まで。">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/sheet.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">索引</span></div>
+    <button class="nav-toggle" aria-label="メニュー">≡</button>
+    <nav class="nav"><a href="../all.html">索引</a><a href="../index.html#certs">資格</a><a href="#" data-gh-url>github</a></nav>
+  </div>
+</header>
+
+<main>
+<section class="sheet-hero">
+  <div class="wrap">
+    <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>Linux Hardening</div>
+    <h1>Linux Hardening</h1>
+    <p class="lede">A defender's field checklist for Linux + LAMP/LEMP hosts under active adversarial pressure — from baseline audit through kernel/PAM hardening, network isolation, auditing, and continuous monitoring (Hardening Project / Micro Hardening style).<span class="jp">状態調査 → 退避確保 → カーネル・システム基本設定 → サービス強化 → ネットワーク隔離 → 監査・監視までの、Linux + Web スタック向け防御チェックリスト。</span></p>
+  </div>
+</section>
+
+<section class="attack-flow">
+  <div class="wrap">
+    <div class="flow-head">
+      <span class="hx">##</span>
+      <span class="label">Hardening Flow</span>
+      <span class="jp">強化の順序</span>
+      <span class="rt">assess → backup → baseline → harden → isolate → monitor</span>
+    </div>
+    <div class="flow-chain">
+      <a class="phase-box" href="#s01">
+        <span class="phase-num">01</span>
+        <span class="phase-label">Assess</span>
+        <span class="phase-jp">状態調査</span>
+      </a>
+      <a class="phase-box" href="#s02">
+        <span class="phase-num">02</span>
+        <span class="phase-label">Backup</span>
+        <span class="phase-jp">退避確保</span>
+      </a>
+      <a class="phase-box" href="#s03">
+        <span class="phase-num">03</span>
+        <span class="phase-label">Baseline</span>
+        <span class="phase-jp">カーネル基本</span>
+      </a>
+      <a class="phase-box" href="#s04">
+        <span class="phase-num">04</span>
+        <span class="phase-label">Harden Services</span>
+        <span class="phase-jp">サービス強化</span>
+      </a>
+      <a class="phase-box" href="#s07">
+        <span class="phase-num">05</span>
+        <span class="phase-label">Isolate Network</span>
+        <span class="phase-jp">ネットワーク隔離</span>
+      </a>
+      <a class="phase-box" href="#s09">
+        <span class="phase-num">06</span>
+        <span class="phase-label">Monitor &amp; Audit</span>
+        <span class="phase-jp">監視・監査</span>
+      </a>
+    </div>
+    <aside class="flow-scenarios">
+      <span class="lbl">Order matters / 実施順の含意</span>
+      <p>Backup を最初に取らずに hardening を始めると、権限変更ミスや設定破壊で復旧手段を失う。Kernel/sysctl の反映は再起動不要だが、<code>systemctl mask</code> による削減や PAM 変更は必ず別セッションを保持したまま反映する。Network isolation はサービス単位で段階的に締める(すべての UFW ルールを一括で入れると疎通確認が難しくなる)。</p>
+    </aside>
+  </div>
+</section>
+
+<div class="wrap">
+<div class="sheet-layout">
+  <aside class="toc">
+    <div class="toc-label">目次</div>
+    <ul>
+      <li><a href="#s01">01 Assess &amp; Audit</a></li>
+      <li><a href="#s02">02 Backup &amp; Restore</a></li>
+      <li><a href="#s03">03 Kernel &amp; System Baseline</a></li>
+      <li><a href="#s04">04 SSH &amp; PAM</a></li>
+      <li><a href="#s05">05 Web Servers</a></li>
+      <li><a href="#s06">06 Databases &amp; Apps</a></li>
+      <li><a href="#s07">07 Network Controls (UFW)</a></li>
+      <li><a href="#s08">08 Infrastructure Services</a></li>
+      <li><a href="#s09">09 Monitoring, Auditing &amp; Cleanup</a></li>
+      <li><a href="#ref">10 References</a></li>
+    </ul>
+  </aside>
+
+  <article class="doc">
+
+    <!-- =========================================================== -->
+    <section id="s01" class="reveal">
+      <h2><span class="num">01</span>Assess &amp; Audit<span class="jp">状態調査</span></h2>
+      <p>侵害仮定で入った直後にまず把握するのは、動いているサービス、存在するアカウント、緩すぎる権限。防御側のスタート地点であると同時に、攻撃者にとっての初動情報でもある。</p>
+
+      <h3 id="services-users">Service and account enumeration</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 稼働サービス一覧</span>
+service --status-all
+systemctl list-units --type=service --state=running
+
+<span class="c"># ユーザ / グループ</span>
+cat /etc/passwd
+cat /etc/group
+
+<span class="c"># 昇格対象になり得る sudoers 設定</span>
+sudo cat /etc/sudoers
+sudo ls /etc/sudoers.d/
+sudo grep -RIn 'NOPASSWD\|ALL=(ALL)' /etc/sudoers /etc/sudoers.d/
+
+<span class="c"># cron エントリ (root 含む)</span>
+crontab -l -u root
+ls -la /etc/cron.*
+cat /etc/crontab</code></pre></div>
+
+      <h3 id="perm-audit">Permission audit</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># world-writable なディレクトリ (真っ先に潰す)</span>
+find / -type d -perm -0002 -ls 2&gt;/dev/null
+
+<span class="c"># mode 777 のディレクトリ (旧手順互換の書き方)</span>
+find / -type d -perm 777 -ls 2&gt;/dev/null
+
+<span class="c"># SUID / SGID ファイル (privesc の主戦場)</span>
+find / -perm -4000 -type f 2&gt;/dev/null
+find / -perm -2000 -type f 2&gt;/dev/null
+
+<span class="c"># root 所有だがユーザが書ける不整合</span>
+find /var/www -user root -perm -o+w 2&gt;/dev/null
+
+<span class="c"># 空パスワードのアカウント検出</span>
+sudo awk -F: '($2 == "" || $2 == "!" ) {print $1}' /etc/shadow</code></pre></div>
+
+      <h3 id="perm-corrective">Corrective examples</h3>
+      <p>EC-CUBE 系アプリの標準的な締め方(ディレクトリ 705 / ファイル 604 を出発点に、書込みが必須な cache/log/plugin/template を個別に緩めるパターン)。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 一括ベースライン</span>
+sudo find /var/www/html/shop -type d -exec chmod 705 {} \;
+sudo find /var/www/html/shop -type f -exec chmod 604 {} \;
+
+<span class="c"># 書き込みが必要な領域を個別に開ける</span>
+sudo chmod 707 /var/www/html/shop
+sudo chmod 707 /var/www/html/shop/app
+sudo chmod 707 /var/www/html/shop/app/Plugin/
+sudo chmod 707 /var/www/html/shop/app/template/
+sudo chmod 707 /var/www/html/shop/vendor/
+sudo chmod 606 /var/www/html/shop/composer.json
+sudo chmod 606 /var/www/html/shop/composer.lock
+
+<span class="c"># template / cache / log / config は 750-755 に絞る</span>
+chmod -R 755 /root/www/html/shop/app/template
+chmod -R 755 /root/www/html/shop/app/Plugin
+chmod -R 750 /root/www/html/shop/app/config
+chmod -R 750 /root/www/html/shop/app/cache
+chmod -R 750 /root/www/html/shop/app/log
+chmod -R 755 /root/www/html/shop/html/template
+chmod -R 755 /root/www/html/shop/html/plugin
+chmod -R 755 /root/www/html/shop/html/user_data
+chmod -R 755 /root/www/html/shop/html/upload</code></pre></div>
+
+      <div class="note"><span class="lbl">Attacker's view</span>状態調査の直後にサービスを止める・パーミッションを落とすと、既に潜んでいる攻撃者のセッションを一時的に維持したまま「見た目だけ堅い」状態にしてしまう。<code>ss -tnp</code> / <code>last</code> / <code>w</code> で確立中の接続とログインを先に把握しておく。</div>
+    </section>
+
+    <!-- =========================================================== -->
+    <section id="s02" class="reveal">
+      <h2><span class="num">02</span>Backup &amp; Restore<span class="jp">退避と復旧</span></h2>
+      <p>Hardening 手順の最初に置くべき工程。設定を書き換えた瞬間にサービスが止まって、切り戻し手段が無いという事故を防ぐ。タイムスタンプ付きで撮っておき、時系列で状態を比較可能にする。</p>
+
+      <h3 id="ts-backup">Timestamped snapshots</h3>
+      <table>
+        <thead><tr><th>対象</th><th>バックアップ</th><th>復元</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>/etc</code></td>
+            <td><code>cp -pr /etc /backup/etc-$(date +%H-%M)</code></td>
+            <td><code>rm -rf /etc && cp -pr /backup/etc-* /etc</code></td>
+          </tr>
+          <tr>
+            <td><code>/var</code></td>
+            <td><code>cp -pr /var /backup/var-$(date +%H-%M)</code></td>
+            <td><code>rm -rf /var && cp -pr /backup/var-* /var</code></td>
+          </tr>
+          <tr>
+            <td><code>/var/www</code></td>
+            <td><code>cp -pr /var/www /backup/www-$(date +%H-%M)</code></td>
+            <td><code>rm -rf /var/www && cp -pr /backup/www-* /var/www</code></td>
+          </tr>
+          <tr>
+            <td>MySQL / MariaDB</td>
+            <td><code>mysqldump -u root -p -x --all-databases &gt; /backup/mysql-$(date +%H-%M)</code></td>
+            <td><code>mysql -u root -p &lt; /backup/mysql-*</code></td>
+          </tr>
+          <tr>
+            <td>PostgreSQL</td>
+            <td><code>pg_dumpall -U admin &gt; /backup/postgresql-$(date +%H-%M)</code></td>
+            <td><code>psql &lt; /backup/postgresql-*</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 id="quick-copy">Quick working copy (/b pattern)</h3>
+      <p>作業卓上の /b に「今この瞬間の断面」を置いておくと、設定破壊時の即時ロールバックが 1 コマンドで済む。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>sudo mkdir /b
+cd /b
+sudo cp -r /var/www/html/shop /b/
+sudo cp -r /var/www/nginx/blog /b/
+sudo cp /etc/apache2/apache2.conf /b/
+sudo cp /etc/nginx/nginx.conf /b/
+
+<span class="c"># ロールバック</span>
+sudo cp -r /b/shop /var/www/html/shop
+sudo cp -r /b/blog /var/www/nginx/blog
+sudo cp    /b/apache2.conf /etc/apache2/apache2.conf
+sudo cp    /b/nginx.conf   /etc/nginx/nginx.conf</code></pre></div>
+
+      <div class="note warn"><span class="lbl">Pitfall / 落とし穴</span><code>cp -pr</code> は元の <code>owner/group/permission/timestamp</code> を保つ。<code>-p</code> を落とすと権限が root 所有で復元されてサービス起動不能になる。ダンプ系(<code>mysqldump</code>)は結果ファイルに認証情報が残るため、バックアップ先自体のパーミッションを <code>chmod 600</code> に絞る。</div>
+    </section>
+
+    <!-- =========================================================== -->
+    <section id="s03" class="reveal">
+      <h2><span class="num">03</span>Kernel &amp; System Baseline<span class="jp">カーネル・システム基本</span></h2>
+      <p>Kernel パラメータ、ulimit、モジュール制限、サービス最小化、自動パッチはサービス個別の hardening より先に「土台」として揃える。再起動なしで反映できるものが多く、影響範囲も予測しやすい。</p>
+
+      <h3 id="sysctl">sysctl — kernel &amp; network</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">conf</span><button class="copy">copy</button></div><pre><code><span class="c"># /etc/sysctl.d/99-hardening.conf</span>
+
+<span class="c"># ---- Network ----</span>
+<span class="c"># SYN flood 対策</span>
+<span class="k">net.ipv4.tcp_syncookies</span> = 1
+<span class="c"># ICMP redirect (偽装経路)</span>
+<span class="k">net.ipv4.conf.all.accept_redirects</span> = 0
+<span class="k">net.ipv4.conf.all.send_redirects</span> = 0
+<span class="k">net.ipv6.conf.all.accept_redirects</span> = 0
+<span class="c"># Source routing (経路表迂回)</span>
+<span class="k">net.ipv4.conf.all.accept_source_route</span> = 0
+<span class="k">net.ipv6.conf.all.accept_source_route</span> = 0
+<span class="c"># Reverse path filter (spoofing 抑止)</span>
+<span class="k">net.ipv4.conf.all.rp_filter</span> = 1
+<span class="k">net.ipv4.conf.default.rp_filter</span> = 1
+<span class="c"># ICMP ブロードキャスト (smurf 反射)</span>
+<span class="k">net.ipv4.icmp_echo_ignore_broadcasts</span> = 1
+<span class="k">net.ipv4.icmp_ignore_bogus_error_responses</span> = 1
+<span class="c"># 不正パケットの kern.log 記録</span>
+<span class="k">net.ipv4.conf.all.log_martians</span> = 1
+
+<span class="c"># ---- Kernel ----</span>
+<span class="c"># ASLR 完全有効</span>
+<span class="k">kernel.randomize_va_space</span> = 2
+<span class="c"># 一般ユーザからの dmesg / kernel pointer 隠蔽</span>
+<span class="k">kernel.dmesg_restrict</span> = 1
+<span class="k">kernel.kptr_restrict</span> = 2
+<span class="c"># ptrace の範囲を子プロセスに限定 (root は例外)</span>
+<span class="k">kernel.yama.ptrace_scope</span> = 1
+<span class="c"># SUID プログラムの core dump 抑止</span>
+<span class="k">fs.suid_dumpable</span> = 0
+<span class="c"># hardlink / symlink 保護 (/tmp race condition 対策)</span>
+<span class="k">fs.protected_hardlinks</span> = 1
+<span class="k">fs.protected_symlinks</span> = 1
+<span class="k">fs.protected_fifos</span> = 2
+<span class="k">fs.protected_regular</span> = 2</code></pre></div>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 反映 (即時、再起動不要)</span>
+sudo sysctl -p /etc/sysctl.d/99-hardening.conf
+
+<span class="c"># 適用値の確認</span>
+sudo sysctl -a 2&gt;/dev/null | grep -E 'tcp_syncookies|rp_filter|randomize_va_space|ptrace_scope'</code></pre></div>
+
+      <h3 id="limits">Resource limits — limits.conf</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">conf</span><button class="copy">copy</button></div><pre><code><span class="c"># /etc/security/limits.d/99-hardening.conf</span>
+
+<span class="c"># core dump を全ユーザ無効化 (機密漏洩防止)</span>
+*  hard  core   0
+*  soft  core   0
+
+<span class="c"># fork bomb 対策</span>
+*  soft  nproc  1024
+*  hard  nproc  4096
+
+<span class="c"># 開けるファイル数 (実サービスの実測値に合わせて調整)</span>
+*  soft  nofile 4096
+*  hard  nofile 8192</code></pre></div>
+
+      <h3 id="modules">Kernel module blacklist</h3>
+      <p>使わないファイルシステムやプロトコルをカーネルに読み込ませない。攻撃サーフェス削減と過去 CVE の予防的無効化を兼ねる。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">conf</span><button class="copy">copy</button></div><pre><code><span class="c"># /etc/modprobe.d/blacklist-hardening.conf</span>
+
+<span class="c"># 未使用ファイルシステム</span>
+install cramfs    /bin/false
+install freevxfs  /bin/false
+install jffs2     /bin/false
+install hfs       /bin/false
+install hfsplus   /bin/false
+install udf       /bin/false
+
+<span class="c"># 稀少 or 未使用の L4 プロトコル (CVE 頻出領域)</span>
+install dccp /bin/false
+install sctp /bin/false
+install rds  /bin/false
+install tipc /bin/false
+
+<span class="c"># 物理経路を締める必要があれば</span>
+install usb-storage /bin/false
+install firewire-core /bin/false</code></pre></div>
+
+      <h3 id="services-minimize">Service minimization</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 有効化されているサービス一覧</span>
+systemctl list-unit-files --type=service --state=enabled
+
+<span class="c"># LISTEN しているポートと紐付くプロセスの棚卸し</span>
+sudo ss -tulnp
+
+<span class="c"># 無効化 + マスク (誤って再有効化されないように)</span>
+sudo systemctl disable --now <span class="v">&lt;SERVICE&gt;</span>
+sudo systemctl mask <span class="v">&lt;SERVICE&gt;</span>
+
+<span class="c"># 現場でよく落とす候補 (要件を確認してから)</span>
+<span class="c">#   bluetooth / cups / avahi-daemon / snapd / ModemManager / rpcbind</span></code></pre></div>
+
+      <h3 id="patches">Automatic security updates</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># --- Debian / Ubuntu ---</span>
+sudo apt install -y unattended-upgrades apt-listchanges
+sudo dpkg-reconfigure -plow unattended-upgrades
+
+<span class="c"># /etc/apt/apt.conf.d/50unattended-upgrades を編集</span>
+<span class="c">#   Allowed-Origins に security を残す</span>
+<span class="c">#   Automatic-Reboot / Automatic-Reboot-Time は運用ポリシー次第</span>
+
+sudo unattended-upgrades --dry-run --debug
+
+<span class="c"># --- RHEL / AlmaLinux / Rocky ---</span>
+sudo dnf install -y dnf-automatic
+sudo systemctl enable --now dnf-automatic.timer
+<span class="c"># /etc/dnf/automatic.conf を編集 (apply_updates = yes)</span></code></pre></div>
+
+      <div class="defense"><span class="lbl">Countermeasures</span>
+        <ul>
+          <li><strong>sysctl は永続化ファイルで管理</strong>: <code>sysctl -w</code> の即時変更は再起動で消える。<code>/etc/sysctl.d/</code> にファイルを置いて <code>sysctl -p</code> で反映するのが恒久策。</li>
+          <li><strong>module blacklist は <code>install ... /bin/false</code> で</strong>: 単なる <code>blacklist</code> ディレクティブでは依存モジュールの automatic load を止められない。</li>
+          <li><strong>自動 reboot は業務時間外に</strong>: <code>Unattended-Upgrade::Automatic-Reboot-Time</code> で明示。</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- =========================================================== -->
+    <section id="s04" class="reveal">
+      <h2><span class="num">04</span>SSH &amp; PAM<span class="jp">SSH と認証強化</span></h2>
+      <p>root 直接ログイン抑止・空パスワード禁止・試行回数制限が SSH の最小三点セット。<code>MaxAuthTries</code> はホスト内のカウントなので、送信元 IP の連続試行そのものは止められない。PAM (pam_faillock / pam_pwquality) と併用して初めて成立する。</p>
+
+      <h3 id="user-mgmt">User management</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># パスワード変更</span>
+sudo passwd <span class="v">&lt;USERNAME&gt;</span>
+
+<span class="c"># ホームディレクトリの他ユーザ読取制限</span>
+chmod 701 /home/<span class="v">&lt;USERNAME&gt;</span>
+
+<span class="c"># ロック / 削除</span>
+sudo usermod -L <span class="v">&lt;USERNAME&gt;</span>
+sudo userdel -r <span class="v">&lt;USERNAME&gt;</span>
+
+<span class="c"># システムアカウントで shell を持つ不整合を検出</span>
+awk -F: '$3 &lt; 1000 && $7 !~ /(nologin|false)$/ {print}' /etc/passwd</code></pre></div>
+
+      <h3 id="sshd-config">sshd_config</h3>
+      <p>設定ファイル: <code>/etc/ssh/sshd_config</code>。書き換え後は <code>sshd -t</code> で syntax チェックしてから <code>systemctl reload sshd</code>。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">conf</span><button class="copy">copy</button></div><pre><code><span class="c"># root 直接ログインの抑止 (公開鍵のみ許可なら prohibit-password)</span>
+<span class="k">PermitRootLogin</span> no
+
+<span class="c"># 空パスワードでのログイン禁止</span>
+<span class="k">PermitEmptyPasswords</span> no
+
+<span class="c"># 認証試行回数の上限 (総当たり緩和)</span>
+<span class="k">MaxAuthTries</span> 3
+
+<span class="c"># パスワード認証を止めて公開鍵のみへ (可能なら)</span>
+<span class="k">PasswordAuthentication</span> no
+<span class="k">PubkeyAuthentication</span> yes
+<span class="k">ChallengeResponseAuthentication</span> no
+
+<span class="c"># プロトコル / 弱いアルゴリズムの明示除外</span>
+<span class="k">Protocol</span> 2
+<span class="k">KexAlgorithms</span> curve25519-sha256,curve25519-sha256@libssh.org
+<span class="k">Ciphers</span> chacha20-poly1305@openssh.com,aes256-gcm@openssh.com
+<span class="k">MACs</span> hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com
+
+<span class="c"># アイドル切断</span>
+<span class="k">ClientAliveInterval</span> 300
+<span class="k">ClientAliveCountMax</span> 2
+
+<span class="c"># ログイン許可を明示</span>
+<span class="k">AllowUsers</span> <span class="v">&lt;USERNAME&gt;</span></code></pre></div>
+
+      <h3 id="pam-faillock">PAM — account lockout (pam_faillock)</h3>
+      <p>SSH の <code>MaxAuthTries</code> はセッション内カウント。IP を変えたり再接続すればリセットされる。pam_faillock は tally file にユーザ単位で失敗を蓄積するので、複数セッションにまたがってロックが効く。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">conf</span><button class="copy">copy</button></div><pre><code><span class="c"># /etc/security/faillock.conf (systemd 系)</span>
+
+<span class="c"># ロックまでの失敗回数</span>
+<span class="k">deny</span> = 5
+<span class="c"># ロック解除までの秒数</span>
+<span class="k">unlock_time</span> = 900
+<span class="c"># root にも適用</span>
+<span class="k">even_deny_root</span>
+<span class="k">root_unlock_time</span> = 60
+<span class="c"># 失敗カウントの集計時間窓</span>
+<span class="k">fail_interval</span> = 900</code></pre></div>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># /etc/pam.d/sshd と /etc/pam.d/login に組み込み (RHEL 系は authselect 経由が推奨)</span>
+<span class="c"># 例: /etc/pam.d/common-auth (Debian/Ubuntu) 冒頭付近に</span>
+auth    required    pam_faillock.so preauth
+auth    [success=1 default=bad] pam_unix.so
+auth    [default=die] pam_faillock.so authfail
+auth    sufficient  pam_faillock.so authsucc
+
+<span class="c"># 現在ロックされているユーザの確認</span>
+sudo faillock
+
+<span class="c"># 手動でロック解除</span>
+sudo faillock --user <span class="v">&lt;USERNAME&gt;</span> --reset</code></pre></div>
+
+      <h3 id="pam-pwquality">PAM — password quality (pam_pwquality)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">conf</span><button class="copy">copy</button></div><pre><code><span class="c"># /etc/security/pwquality.conf</span>
+
+<span class="k">minlen</span> = 14
+<span class="k">minclass</span> = 3          <span class="c"># 大文字 / 小文字 / 数字 / 記号 の 3 種以上</span>
+<span class="k">maxrepeat</span> = 3         <span class="c"># 同一文字の連続</span>
+<span class="k">maxsequence</span> = 3       <span class="c"># 単純な連続 (abcd, 1234)</span>
+<span class="k">dictcheck</span> = 1         <span class="c"># 辞書チェック</span>
+<span class="k">enforce_for_root</span> = 1
+<span class="k">retry</span> = 3</code></pre></div>
+
+      <h3 id="login-defs">login.defs</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">conf</span><button class="copy">copy</button></div><pre><code><span class="c"># /etc/login.defs</span>
+
+<span class="k">PASS_MAX_DAYS</span>   90        <span class="c"># パスワード有効期限</span>
+<span class="k">PASS_MIN_DAYS</span>   7         <span class="c"># 連続変更間隔</span>
+<span class="k">PASS_WARN_AGE</span>   14        <span class="c"># 期限警告開始</span>
+<span class="k">UMASK</span>           027       <span class="c"># デフォルト umask</span>
+<span class="k">ENCRYPT_METHOD</span>  SHA512    <span class="c"># /etc/shadow のハッシュ方式</span>
+<span class="k">FAILLOG_ENAB</span>    yes</code></pre></div>
+
+      <div class="defense"><span class="lbl">Countermeasures</span>
+        <ul>
+          <li><strong>別セッション保持</strong>: <code>systemctl reload sshd</code> や PAM 変更の前に必ず既存 SSH セッションを1本残しておく。</li>
+          <li><strong>fail2ban / sshguard の併用</strong>: pam_faillock はユーザ単位、fail2ban は IP 単位で、両者は補完関係。</li>
+          <li><strong>ポート変更は防御ではない</strong>: 22 → 高位ポートは security-through-obscurity。副次効果としてノイズは減るが、鍵認証必須の代替にはならない。</li>
+          <li><strong>root のロックアウトに注意</strong>: <code>even_deny_root</code> を入れる場合は復旧手段(コンソールアクセス、rescue mode)を確保しておく。</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- =========================================================== -->
+    <section id="s05" class="reveal">
+      <h2><span class="num">05</span>Web Servers<span class="jp">Nginx / Apache</span></h2>
+      <p>バージョン情報の露出抑制、デフォルトページの隠蔽、管理系パスの IP 制限、リクエストボディまで含めたアクセスログ拡張が典型項目。</p>
+
+      <h3 id="nginx-paths">Nginx — paths &amp; control</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 設定 / ログ</span>
+/etc/nginx/nginx.conf
+/var/log/nginx/access.log
+/var/log/nginx/error.log
+
+<span class="c"># 稼働 / 起動 / 停止 / 再読込</span>
+sudo systemctl status nginx
+sudo systemctl start   nginx
+sudo systemctl stop    nginx
+sudo systemctl reload  nginx</code></pre></div>
+
+      <h3 id="nginx-tokens">Version banner &amp; default page</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">conf</span><button class="copy">copy</button></div><pre><code><span class="c"># /etc/nginx/nginx.conf</span>
+http {
+    <span class="k">server_tokens</span> off;
+    ...
+}</code></pre></div>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># デフォルトの welcome ページを Not Found 相当に差し替え</span>
+sudo tee /usr/share/nginx/html/index.html &lt;&lt;&lt; 'Not Found'</code></pre></div>
+
+      <h3 id="nginx-ipacl">IP-based access control</h3>
+      <p>基本形は <code>allow</code> / <code>deny</code> の逐次評価。<code>location</code> ブロックに閉じて評価順を明示する。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">conf</span><button class="copy">copy</button></div><pre><code><span class="c"># /etc/nginx/nginx.conf</span>
+http {
+    server {
+        location /phpmyadmin {
+            allow <span class="v">&lt;CRAWLER_IP&gt;</span>;
+            deny  all;
+        }
+    }
+}</code></pre></div>
+
+      <h3 id="nginx-geo">Allowlist via <code>geo</code> module</h3>
+      <p>複数拠点の IP を集約管理する場合は <code>geo</code> で bool 化し、<code>if</code> で分岐すると <code>upstream</code> の受け付け先も切り替えやすい。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">conf</span><button class="copy">copy</button></div><pre><code><span class="c"># /etc/nginx/conf.d/sample_app.conf</span>
+upstream sample_app {
+    server unix:/tmp/unicorn.sock;
+}
+
+geo $allow_ip {
+    default 0;
+    <span class="v">&lt;OFFICE_IP&gt;</span>    1;  <span class="c"># 自社 IP</span>
+    <span class="v">&lt;BRANCH_A_IP&gt;</span> 1;  <span class="c"># 支社 A</span>
+    <span class="v">&lt;BRANCH_B_IP&gt;</span> 1;  <span class="c"># 支社 B</span>
+}
+
+server {
+    location ~ ^/admin/ {
+        if ($allow_ip) {
+            proxy_pass http://sample_app;
+        }
+        deny all;
+    }
+}</code></pre></div>
+
+      <h3 id="nginx-logs">Access log with request body</h3>
+      <p>侵害調査時にリクエストボディが取れないと、POST 経由の攻撃 payload が復元できない。標準の <code>combined</code> 相当に <code>$request_body</code> を追加する。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">conf</span><button class="copy">copy</button></div><pre><code><span class="c"># /etc/nginx/nginx.conf — 元の access_log 行はコメントアウト</span>
+<span class="k">log_format</span>  request_body '$remote_addr - $remote_user [$time_local] "$request" '
+                          '$status $body_bytes_sent "$http_referer" '
+                          '"$http_user_agent" "$http_x_forwarded_for" "$request_body"';
+<span class="k">access_log</span>  /var/log/nginx/access.log  request_body;</code></pre></div>
+
+      <div class="note warn"><span class="lbl">Note</span><code>$request_body</code> はパスワード等の秘匿値もそのまま平文で残る。ログの取扱区分・保持期間・アクセス権を先に決めておく。</div>
+
+      <h3 id="apache-paths">Apache — paths &amp; control</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 設定 / ログ</span>
+/etc/apache2/apache2.conf
+/var/log/apache2/access.log
+/var/log/apache2/error.log
+
+sudo systemctl status  apache2
+sudo systemctl start   apache2
+sudo systemctl stop    apache2
+sudo systemctl restart apache2</code></pre></div>
+
+      <h3 id="apache-hardening">Banner, listing, admin path</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">conf</span><button class="copy">copy</button></div><pre><code><span class="c"># /etc/apache2/apache2.conf — HTTP reply header の抑制</span>
+<span class="k">ServerTokens</span> ProductOnly
+<span class="k">ServerSignature</span> Off
+
+<span class="c"># directory listing 解除は Options -Indexes を該当 Directory に</span>
+&lt;Directory /var/www/html&gt;
+    Options -Indexes +FollowSymLinks
+    AllowOverride None
+    Require all granted
+&lt;/Directory&gt;</code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">conf</span><button class="copy">copy</button></div><pre><code><span class="c"># /admin/ に IP 制限 (LocationMatch)</span>
+&lt;LocationMatch ".*/admin/.*"&gt;
+    Require all denied
+    Require ip <span class="v">&lt;CRAWLER_IP&gt;</span>
+&lt;/LocationMatch&gt;
+
+<span class="c"># /etc/apache2/sites-enabled/mailgraph.conf 等の管理系</span>
+Require ip 127.0.0.1 <span class="v">&lt;INTERNAL_IP&gt;/32</span> <span class="v">&lt;CRAWLER_IP&gt;/32</span></code></pre></div>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">conf</span><button class="copy">copy</button></div><pre><code><span class="c"># /etc/apache2/conf-enabled/phpmyadmin.conf</span>
+Require all denied
+Require ip <span class="v">&lt;CRAWLER_IP&gt;</span></code></pre></div>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>sudo systemctl restart apache2</code></pre></div>
+    </section>
+
+    <!-- =========================================================== -->
+    <section id="s06" class="reveal">
+      <h2><span class="num">06</span>Databases &amp; Apps<span class="jp">DB / アプリ強化</span></h2>
+      <p>DB 側は「default 認証・空パスワード・全ホスト bind」を潰す。アプリ側は「install スクリプトの残置・設定ファイルの読取権限・cache の消し忘れ」を潰す。</p>
+
+      <h3 id="mariadb">MariaDB / MySQL</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 設定ファイル / 接続</span>
+/etc/my.cnf
+/etc/mysql/mariadb.conf.d/50-server.cnf
+mysql -u <span class="v">&lt;USERNAME&gt;</span> -p</code></pre></div>
+      <div class="code"><div class="code-bar"><span class="code-lang">sql</span><button class="copy">copy</button></div><pre><code><span class="c">-- 既存アカウントの棚卸し</span>
+SELECT User, Host FROM mysql.user;
+
+<span class="c">-- パスワード変更 (root / admin / app 用)</span>
+SET PASSWORD FOR 'root'@'localhost'      = PASSWORD('<span class="v">&lt;PASSWORD&gt;</span>');
+SET PASSWORD FOR 'admin'@'localhost'     = PASSWORD('<span class="v">&lt;PASSWORD&gt;</span>');
+SET PASSWORD FOR 'wordpress'@'localhost' = PASSWORD('<span class="v">&lt;PASSWORD&gt;</span>');
+
+<span class="c">-- 匿名ユーザ / test DB を落とす</span>
+DROP USER ''@'localhost';
+DROP DATABASE IF EXISTS test;
+FLUSH PRIVILEGES;</code></pre></div>
+
+      <h3 id="postgres">PostgreSQL</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 設定ファイル (バージョン毎にパスが変わる)</span>
+/etc/postgresql/9.5/main/postgresql.conf
+/etc/postgresql/12/main/postgresql.conf
+
+<span class="c"># 接続</span>
+psql -U <span class="v">&lt;USERNAME&gt;</span> -d <span class="v">&lt;DBNAME&gt;</span> -h <span class="v">&lt;HOSTNAME&gt;</span></code></pre></div>
+      <div class="code"><div class="code-bar"><span class="code-lang">sql</span><button class="copy">copy</button></div><pre><code><span class="c">-- 例: EC-CUBE の admin ユーザのパスワード変更</span>
+ALTER USER admin WITH PASSWORD '<span class="v">&lt;PASSWORD&gt;</span>';
+
+<span class="c">-- アプリ側の接続情報も同期を忘れない</span>
+<span class="c">-- /var/www/html/shop/app/config/eccube/database.yml</span></code></pre></div>
+
+      <h3 id="wordpress">WordPress</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 設定ファイル</span>
+/var/www/nginx/blog/wp-config.php
+
+<span class="c"># WP-CLI での設定確認・変更 (CLI 経由なら wp-admin ログインなしで済む)</span>
+wp --path=/var/www/nginx/blog config list
+wp --path=/var/www/nginx/blog option list
+wp --path=/var/www/nginx/blog user list
+wp --path=/var/www/nginx/blog user update <span class="v">&lt;USER_ID&gt;</span> --user_pass='<span class="v">&lt;PASSWORD&gt;</span>'
+
+<span class="c"># プラグイン / テーマの一括更新</span>
+wp --path=/var/www/nginx/blog plugin update --all
+wp --path=/var/www/nginx/blog theme update --all
+wp --path=/var/www/nginx/blog core update</code></pre></div>
+
+      <h3 id="eccube">EC-CUBE</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># キャッシュクリア (テンプレート / 設定変更を反映)</span>
+cd /var/www/html/shop
+sudo php app/console cache:clear
+
+<span class="c"># インストーラの残置ファイルを削除 (次節 s09 で一括再掲)</span>
+sudo rm -f /var/www/html/shop/html/install.php
+sudo rm -f /var/www/html/shop/eccube_install.sh</code></pre></div>
+
+      <div class="defense"><span class="lbl">Countermeasures</span>
+        <ul>
+          <li><strong>設定ファイルの読取権限</strong>: <code>wp-config.php</code> / <code>database.yml</code> は <code>chmod 640</code> でウェブサーバプロセス所有グループのみに絞る。</li>
+          <li><strong>DB は localhost バインド</strong>: 次節 <a href="#s07">Network Controls</a> で <code>bind-address</code> / <code>listen_addresses</code> を <code>127.0.0.1</code> に固定。</li>
+          <li><strong>アプリ管理画面へのパス制限</strong>: <code>/wp-admin/</code> や <code>/admin/</code> は Web 層(Nginx/Apache)で IP allowlist を掛ける。</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- =========================================================== -->
+    <section id="s07" class="reveal">
+      <h2><span class="num">07</span>Network Controls (UFW)<span class="jp">ネットワーク制御</span></h2>
+      <p>UFW で外向きは default deny incoming / allow outgoing、内向けは「必要なポート・必要な送信元」だけを段階的に開ける。段階を飛ばして一括で締めると疎通確認が困難になる。</p>
+
+      <h3 id="ufw-baseline">Baseline</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 状態確認</span>
+sudo ufw status
+sudo ufw status verbose
+
+<span class="c"># デフォルトポリシー</span>
+sudo ufw default deny  incoming
+sudo ufw default allow outgoing
+
+<span class="c"># SSH の到達性を先に確保 (self-lockout 防止)</span>
+sudo ufw allow 22/tcp
+
+<span class="c"># 例: クローラ / 特定サービスのみ許可</span>
+sudo ufw allow from <span class="v">&lt;CRAWLER_IP&gt;</span>
+sudo ufw allow 80/tcp
+sudo ufw allow 53
+sudo ufw allow 25
+sudo ufw allow 81
+sudo ufw allow from <span class="v">&lt;CRAWLER_IP&gt;</span> to any port 143
+
+sudo ufw enable
+sudo ufw reload</code></pre></div>
+
+      <h3 id="ufw-db">Databases to localhost</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># MariaDB / MySQL — 3306 を loopback 限定</span>
+sudo ufw deny 3306
+sudo ufw allow from 127.0.0.1 to any port 3306
+<span class="c"># /etc/mysql/mariadb.conf.d/50-server.cnf</span>
+<span class="c">#   bind-address = 127.0.0.1</span>
+
+<span class="c"># PostgreSQL — 5432 を loopback 限定</span>
+sudo ufw deny 5432
+sudo ufw allow from 127.0.0.1 to any port 5432
+<span class="c"># /etc/postgresql/12/main/postgresql.conf</span>
+<span class="c">#   listen_addresses = 'localhost'</span></code></pre></div>
+
+      <h3 id="ufw-tomcat">Tomcat / GroupSession</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 8080 は外に出さない</span>
+sudo ufw deny 8080
+sudo ufw allow from 127.0.0.1 to any port 8080
+
+<span class="c"># http://&lt;HOST&gt;:8080/host-manager/html の管理画面は特に要確認</span></code></pre></div>
+
+      <h3 id="ufw-block">Attack source block &amp; watch</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 攻撃元 IP を deny</span>
+sudo ufw deny from <span class="v">&lt;ATTACKER_IP&gt;</span>
+
+<span class="c"># 不審な既存ルールの削除 (deny 80 が刺さっていた例)</span>
+sudo ufw delete deny 80
+
+<span class="c"># ルール改変の常時監視</span>
+watch -n 5 sudo ufw status</code></pre></div>
+
+      <div class="note"><span class="lbl">Order matters</span>UFW は登録順に評価される。<code>ufw enable</code> の <em>前</em>に SSH の <code>allow 22</code>(または実運用ポート)が入っていないと自分自身を締め出す。<code>ufw enable</code> は SSH セッション経由で叩かない、あるいは事前に別セッションを保持する。</div>
+    </section>
+
+    <!-- =========================================================== -->
+    <section id="s08" class="reveal">
+      <h2><span class="num">08</span>Infrastructure Services<span class="jp">周辺サービス</span></h2>
+      <p>DNS / SMTP / FTP / cache は「listen 範囲」と「送信元制限」が肝。デフォルト設定のまま公開すると DDoS の踏み台や情報漏洩の起点になる。</p>
+
+      <h3 id="unbound">Unbound (DNS)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">conf</span><button class="copy">copy</button></div><pre><code><span class="c"># /etc/unbound/unbound.conf</span>
+<span class="k">control-enable:</span> no
+
+<span class="c"># 参照許可はセグメント全体ではなくホスト単位に絞る</span>
+<span class="k">access-control:</span> <span class="v">&lt;INTERNAL_IP&gt;</span>/32  allow
+<span class="k">access-control:</span> <span class="v">&lt;PROXY_IP&gt;</span>/32     allow
+<span class="k">access-control:</span> <span class="v">&lt;CRAWLER_IP&gt;</span>/32   allow
+
+<span class="c"># ローカルゾーン例</span>
+local-data: "www.example.local. 10 IN A <span class="v">&lt;HOST_IP&gt;</span>"
+local-data: "www.example.local. 10 IN NS <span class="v">&lt;HOST_IP&gt;</span>"
+local-data: "internal.example.local. 10 IN A <span class="v">&lt;HOST_IP&gt;</span>"
+local-data: "mail.example.local. 10 IN A <span class="v">&lt;HOST_IP&gt;</span>"
+local-data: "example.local. IN MX 10 mail.example.local."
+local-data-ptr: "<span class="v">&lt;HOST_IP&gt;</span> 10 www.example.local."</code></pre></div>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>sudo systemctl status  unbound
+sudo systemctl start   unbound
+sudo systemctl stop    unbound
+sudo systemctl restart unbound</code></pre></div>
+
+      <h3 id="postfix">Postfix (SMTP)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">conf</span><button class="copy">copy</button></div><pre><code><span class="c"># /etc/postfix/main.cf — オープンリレー化を防ぐ</span>
+<span class="k">mynetworks</span> = 127.0.0.0/8, <span class="v">&lt;INTERNAL_IP&gt;/32</span>
+
+<span class="c"># SMTP AUTH 前提の運用ならこれも</span>
+<span class="k">smtpd_relay_restrictions</span> = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination
+<span class="k">smtpd_helo_required</span> = yes</code></pre></div>
+
+      <h3 id="proftpd">Proftpd (FTP)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 設定 / ログ</span>
+/etc/proftpd/proftpd.conf
+/var/log/proftpd/
+
+<span class="c"># 匿名ログイン禁止 / ルート禁止 / chroot 化を conf 側で確認</span>
+grep -E 'Anonymous|RootLogin|DefaultRoot' /etc/proftpd/proftpd.conf</code></pre></div>
+
+      <h3 id="memcached">memcached</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># /etc/memcached.conf — 全公開を loopback 限定に</span>
+-l 127.0.0.1
+
+<span class="c"># 反射増幅攻撃の踏み台にならないよう UDP も落とす</span>
+-U 0</code></pre></div>
+
+      <h3 id="proxy">Proxy client configuration</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 内部からの外向き通信は明示的にプロキシ経由</span>
+export http_proxy=http://<span class="v">&lt;PROXY_IP&gt;</span>:3128
+export https_proxy=http://<span class="v">&lt;PROXY_IP&gt;</span>:3128
+echo $http_proxy
+echo $https_proxy
+sudo apt update
+
+<span class="c"># apt 用に永続化する場合</span>
+<span class="c"># /etc/apt/apt.conf.d/95proxy</span>
+<span class="c">#   Acquire::http::Proxy  "http://&lt;PROXY_IP&gt;:3128";</span>
+<span class="c">#   Acquire::https::Proxy "http://&lt;PROXY_IP&gt;:3128";</span></code></pre></div>
+    </section>
+
+    <!-- =========================================================== -->
+    <section id="s09" class="reveal">
+      <h2><span class="num">09</span>Monitoring, Auditing &amp; Cleanup<span class="jp">監視・監査・後始末</span></h2>
+      <p>Hardening は一発反映では終わらず、差分の検出と改竄検知を継続する。<code>watch</code> による軽量監視、<code>auditd</code> による syscall 監査、<code>AIDE</code> によるファイル完全性検証、公開ディレクトリの残置ファイル一掃が実務の中心。</p>
+
+      <h3 id="watch-files">Change detection with watch</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 直近 5 分以内に更新された web 配下のファイル (cache 除外)</span>
+watch -n 2 'find /var/www/html/ -type f -mmin -5 | grep -v cache'
+
+<span class="c"># 大量書換の兆候: /tmp や /dev/shm への WebShell 展開監視</span>
+watch -n 5 'find /tmp /dev/shm -type f -mmin -5 -ls'</code></pre></div>
+
+      <h3 id="watch-svc">Service status</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>watch -n 5 '
+  echo "Unbound: "; sudo systemctl status unbound       | grep Active:
+  echo "Apache2: "; sudo systemctl status apache2       | grep Active:
+  echo "Nginx:   "; sudo systemctl status nginx         | grep Active:
+  echo "Tomcat8: "; sudo systemctl status tomcat8       | grep Active:
+  echo "MariaDB: "; sudo systemctl status mariadb       | grep Active:
+  echo "Postfix: "; sudo systemctl status postfix       | grep Active:
+'</code></pre></div>
+
+      <h3 id="watch-ufw">UFW rule watch</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>watch -n 5 sudo ufw status
+
+<span class="c"># 不審なルール(例: deny 80 が挿入されていた)を削除</span>
+sudo ufw delete deny 80</code></pre></div>
+
+      <h3 id="auditd">auditd — syscall &amp; identity audit</h3>
+      <p>認証情報の変更、権限変更 syscall、SSH 設定の書換え、sudoers の改変を追う。<code>-e 2</code> でルール自体をイミュータブル化すると、再起動まで rule set を凍結できる。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>sudo apt install -y auditd
+sudo systemctl enable --now auditd
+
+<span class="c"># 実行中のルール確認</span>
+sudo auditctl -l
+sudo auditctl -s</code></pre></div>
+      <div class="code"><div class="code-bar"><span class="code-lang">conf</span><button class="copy">copy</button></div><pre><code><span class="c"># /etc/audit/rules.d/hardening.rules</span>
+
+<span class="c"># 認証情報の変更を追跡</span>
+-w /etc/passwd    -p wa -k identity
+-w /etc/group     -p wa -k identity
+-w /etc/shadow    -p wa -k identity
+-w /etc/gshadow   -p wa -k identity
+-w /etc/sudoers   -p wa -k identity
+-w /etc/sudoers.d/ -p wa -k identity
+
+<span class="c"># SSH 設定の変更</span>
+-w /etc/ssh/sshd_config -p wa -k sshd
+
+<span class="c"># 権限変更 syscall (人ユーザ発)</span>
+-a always,exit -F arch=b64 -S chmod,fchmod,fchmodat -F auid&gt;=1000 -F auid!=4294967295 -k perm_mod
+-a always,exit -F arch=b64 -S chown,fchown,fchownat,lchown -F auid&gt;=1000 -F auid!=4294967295 -k perm_mod
+
+<span class="c"># 特権実行の追跡</span>
+-a always,exit -F arch=b64 -S execve -F euid=0 -F auid&gt;=1000 -F auid!=4294967295 -k privileged
+
+<span class="c"># ルール自体の変更禁止 (最下行)</span>
+-e 2</code></pre></div>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ルール反映</span>
+sudo augenrules --load
+sudo systemctl restart auditd
+
+<span class="c"># ログ検索</span>
+sudo ausearch -k identity -ts today
+sudo ausearch -k sshd     -ts today
+sudo aureport --summary
+sudo aureport --auth --summary</code></pre></div>
+
+      <h3 id="aide">AIDE — file integrity</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>sudo apt install -y aide
+
+<span class="c"># 初期 DB 生成 (時間かかる)</span>
+sudo aideinit
+sudo mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db
+
+<span class="c"># 変更検知</span>
+sudo aide --check
+
+<span class="c"># cron で日次実行</span>
+echo '0 4 * * * root /usr/bin/aide --check | mail -s "AIDE report" root' \
+  | sudo tee /etc/cron.d/aide
+
+<span class="c"># 設定変更後は DB を作り直す (合法な差分でノイズが増えないように)</span>
+sudo aide --update
+sudo mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db</code></pre></div>
+
+      <h3 id="log-protect">Log protection (chattr +a)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 追記のみ許可 (改竄防止)</span>
+sudo chattr +a /var/log/auth.log
+sudo chattr +a /var/log/syslog
+
+<span class="c"># 属性確認</span>
+lsattr /var/log/auth.log
+
+<span class="c"># 一時解除 (logrotate と競合するので rotate 前後で外す/戻す)</span>
+sudo chattr -a /var/log/auth.log</code></pre></div>
+      <div class="note warn"><span class="lbl">Note</span><code>chattr +a</code> は root であっても上書き・削除を拒否する。logrotate の prerotate / postrotate で <code>chattr -a</code> / <code>chattr +a</code> を組み込むか、rsyslog で forward 先を別ホストにするのが実務的。</div>
+
+      <h3 id="cleanup-installers">Removing installer / info leaks</h3>
+      <p>公開領域に残ったインストーラや <code>phpinfo</code> は、再インストール実行や環境情報漏洩に直結する。存在確認 → 削除を素直に行う。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 存在確認</span>
+cd /var/www
+find -type f -name "install.php"
+find -type f -name "phpinfo.php"
+find -type f -name "readme.html"
+
+<span class="c"># 一括削除 (EC-CUBE / WordPress / phpMyAdmin / 独立ディレクトリの残骸)</span>
+rm ./html/shop/html/install.php
+rm ./nginx/blog/wp-admin/install.php
+rm ./html/shop/eccube_install.sh
+rm ./nginx/blog/readme.html
+rm ./html/shop/vendor/swiftmailer/swiftmailer/tests/_samples/files/textfile.zip
+rm ./nginx/phpinfo.php
+rm ./nginx/phpmyadmin/phpinfo.php
+rm ./html/phpinfo.php</code></pre></div>
+
+      <h3 id="cache-clear">Cache invalidation</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># EC-CUBE: テンプレート / 設定変更後の反映</span>
+cd /var/www/html/shop
+sudo php app/console cache:clear
+
+<span class="c"># WordPress: object-cache / transient のクリア</span>
+wp --path=/var/www/nginx/blog cache flush
+wp --path=/var/www/nginx/blog transient delete --all</code></pre></div>
+
+      <div class="takeaway"><span class="lbl">Key takeaways</span>
+        <ul>
+          <li>Hardening の順序は <strong>Assess → Backup → Baseline (kernel) → Harden → Isolate → Monitor/Audit</strong>。Backup を最初に取らずに始めない。</li>
+          <li>SSH / UFW の締め直しは <strong>別セッションを保持したまま</strong>反映する(自己締め出し防止)。</li>
+          <li>SSH の <code>MaxAuthTries</code> と PAM の <code>pam_faillock</code> は<strong>両方</strong>入れて意味を持つ。前者はセッション内、後者は永続 tally。</li>
+          <li>DB は <code>bind-address</code> と UFW の<strong>両方</strong>で localhost に閉じる(片方だけでは設定漏れ時に露出する)。</li>
+          <li>auditd の <code>-e 2</code> と AIDE の DB は、それぞれ「rule set の凍結」「baseline の凍結」で改竄検知の基準を作る。</li>
+          <li>公開ディレクトリの <code>install.php</code> / <code>readme.html</code> / <code>phpinfo.php</code> は必ず削除。再インストール攻撃と環境情報漏洩の主要経路。</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- =========================================================== -->
+    <section id="ref" class="reveal">
+      <h2><span class="num">10</span>References<span class="jp">参照</span></h2>
+      <ul>
+        <li>CIS Benchmarks (Ubuntu / Debian / RHEL / Apache / Nginx / MySQL / PostgreSQL) — <a href="https://www.cisecurity.org/cis-benchmarks" target="_blank" rel="noopener">cisecurity.org/cis-benchmarks</a></li>
+        <li>NSA Kernel Self-Protection Project — <a href="https://kernsec.org/wiki/index.php/Kernel_Self_Protection_Project" target="_blank" rel="noopener">kernsec.org/wiki/…/Kernel_Self_Protection_Project</a></li>
+        <li>OWASP Secure Headers Project — <a href="https://owasp.org/www-project-secure-headers/" target="_blank" rel="noopener">owasp.org/www-project-secure-headers</a></li>
+        <li>Mozilla SSL Configuration Generator (nginx/apache) — <a href="https://ssl-config.mozilla.org/" target="_blank" rel="noopener">ssl-config.mozilla.org</a></li>
+        <li>OpenSSH sshd_config(5) — <a href="https://man.openbsd.org/sshd_config" target="_blank" rel="noopener">man.openbsd.org/sshd_config</a></li>
+        <li>Linux PAM System Administrators' Guide — <a href="https://www.linux-pam.org/Linux-PAM-html/Linux-PAM_SAG.html" target="_blank" rel="noopener">linux-pam.org/…/Linux-PAM_SAG.html</a></li>
+        <li>Linux Audit Documentation — <a href="https://github.com/linux-audit/audit-documentation/wiki" target="_blank" rel="noopener">github.com/linux-audit/audit-documentation/wiki</a></li>
+        <li>AIDE — <a href="https://aide.github.io/" target="_blank" rel="noopener">aide.github.io</a></li>
+        <li>Lynis (host audit tool) — <a href="https://cisofy.com/lynis/" target="_blank" rel="noopener">cisofy.com/lynis</a></li>
+        <li>Nginx docs — <a href="https://nginx.org/en/docs/" target="_blank" rel="noopener">nginx.org/en/docs</a></li>
+        <li>Apache HTTP Server Security Tips — <a href="https://httpd.apache.org/docs/current/misc/security_tips.html" target="_blank" rel="noopener">httpd.apache.org/docs/current/misc/security_tips.html</a></li>
+        <li>PostgreSQL Client Authentication — <a href="https://www.postgresql.org/docs/current/client-authentication.html" target="_blank" rel="noopener">postgresql.org/docs/current/client-authentication</a></li>
+      </ul>
+    </section>
+
+  </article>
+</div>
+</div>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · Linux Hardening</span></div>
+    <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>GitHub</a></div>
+    <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
+  </div>
+</footer>
+
+<script src="../content.js"></script>
+<script src="../assets/js/sheet.js"></script>
+</body>
+</html>
