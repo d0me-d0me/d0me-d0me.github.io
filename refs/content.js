@@ -64,6 +64,7 @@ window.CONTENT = {
       tags: ["lateral-movement", "pivoting", "windows", "kerberos", "cross-platform"], status: "ready" },
     { domain: "offensive", slug: "command-control",  title: "Command & Control", jp: "指揮統制",
       topics: "payload delivery · listeners · egress",
+      keywords: ["sliver","metasploit","msf","msfconsole","msfvenom","meterpreter","implant","beacon","callback","stager","stageless","sacrificial process","mtls","http listener","dns listener","wireguard","shellcode","donut","reflective dll","srdi","bof","armory","alias","sliver extension","sliver generate","execute-assembly","sideload","sharpsh","invoke-binary","hashdump","kiwi","getsystem","migrate","loot","jump-winrm","autoroute","portfwd","socks_proxy"],
       tags: ["c2", "payload", "egress"], status: "ready" },
     { domain: "offensive", slug: "web",              title: "Web",              jp: "ウェブ",
       topics: "recon · injection · ssti · ssrf/xxe · client-side · api",
