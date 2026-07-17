@@ -52,7 +52,7 @@ Time is the only axis you can't substitute for. Deciding how much time reconnais
 
 Time budgets vary by orders of magnitude across engagement types:
 
-![Engagement contexts across the four axes](/assets/img/posts/recon-time-budget/engagement-radar.svg)
+![Engagement contexts across the four axes](/assets/img/posts/recon-time-budget/engagement-radar.svg){: width="640" height="460" }
 _The four axes made explicit for each engagement type. CTF is pointed toward depth (need every service detail on a single box); red team stretches vertically (need time and stealth above all); standard pentest is roughly balanced across all four; bug bounty leans right (coverage-first, everything else secondary)._
 
 **CTF (Hack The Box, TryHackMe)**: One target, expected solve time of a few hours. Practical recon budget is 10–30 minutes. If you haven't found your foothold in that window, you're out of time for the actual exploitation work. Top 1000 ports plus service versioning plus basic content discovery is the standard compromise. Anything more elaborate cuts into exploitation time.
@@ -73,7 +73,7 @@ Port scanning is where the four axes are most visible.
 
 **Top 100 vs. top 1000 vs. full range**: Nmap without `-p` scans the top 1000 ports per protocol, drawn from `nmap-services` frequency data. Fyodor's published statistics show this covers approximately 93% of TCP ports found open in real-world scans. `-F` (top 100) covers 78%. Reaching 90% coverage requires 576 ports. That's the shape of the curve: a 10× jump from top 100 to top 1000 buys 15 percentage points; going from top 1000 to full range (another 65×) buys 7 more. Meanwhile the wallclock cost grows in proportion to port count, not coverage.
 
-![Nmap top-ports coverage vs. wallclock time cost](/assets/img/posts/recon-time-budget/coverage-curve.svg)
+![Nmap top-ports coverage vs. wallclock time cost](/assets/img/posts/recon-time-budget/coverage-curve.svg){: width="720" height="440" }
 _Coverage curve (green, solid) saturates fast; wallclock time cost (amber, dashed) grows linearly. Past the default top 1000, the gap widens dramatically: adding 65× more ports buys only 7 percentage points of coverage. Source: Fyodor, Nmap Network Scanning._
 
 Once you see the curve, the choices become clear. Single CTF box: full range is worth it, because the remaining 7% often contains the "hidden management interface" the challenge was designed around. Standard pentest with dozens of hosts: top 1000 for the sweep, escalate to full range only on hosts that show promising services. Red team: full range distributed across days or weeks at very low rates, because time is cheap and detection is expensive.
@@ -86,46 +86,24 @@ Once you see the curve, the choices become clear. Single CTF box: full range is 
 
 ```mermaid
 flowchart TD
-    Start([Start: recon design]) --> P1
+    Start([Start])
+    Passive["Phase 1 — Passive · noise ≈ 0<br/>crt.sh CT logs<br/>Shodan / Censys / ZoomEye<br/>Wayback / GitHub dorks<br/>SecurityTrails DNS history"]
+    D1{"Passive coverage<br/>sufficient?"}
+    Low["Phase 2 — Low-noise active<br/>Nmap top 1000 SYN sweep<br/>Subdomain wordlist 110k<br/>dig + CDN triage"]
+    D2{"Interesting<br/>responses?"}
+    High["Phase 3 — High-noise active · selective<br/>Nmap -sV -sC on selected<br/>Full range on selected<br/>ffuf raft-medium + extensions"]
+    Rank[Rank services by attack value]
+    Down["Downstream: vuln probing · credential targeting"]
 
-    subgraph passive["Phase 1 — Passive · noise ≈ 0"]
-        P1[crt.sh · CT logs]
-        P2[Shodan · Censys · ZoomEye]
-        P3[Wayback · GitHub dorks]
-        P4[SecurityTrails · DNS history]
-    end
-
-    P1 --> D1
-    P2 --> D1
-    P3 --> D1
-    P4 --> D1
-    D1{Passive coverage<br/>sufficient?}
+    Start --> Passive
+    Passive --> D1
     D1 -->|Yes| Rank
-    D1 -->|No| L1
-
-    subgraph lownoise["Phase 2 — Low-noise active · noise: low"]
-        L1[Nmap top 1000 SYN sweep]
-        L2[Subdomain wordlist 110k]
-        L3[dig + CDN triage]
-    end
-
-    L1 --> D2
-    L2 --> D2
-    L3 --> D2
-    D2{Interesting<br/>responses?}
-    D2 -->|Yes| H1
+    D1 -->|No| Low
+    Low --> D2
+    D2 -->|Yes| High
     D2 -->|No| Rank
-
-    subgraph highnoise["Phase 3 — High-noise active · selective"]
-        H1[Nmap -sV -sC on selected hosts]
-        H2[Full range on interesting hosts]
-        H3[ffuf raft-medium + extensions]
-    end
-
-    H1 --> Rank
-    H2 --> Rank
-    H3 --> Rank
-    Rank[Rank services by attack value] --> Down[Downstream:<br/>vuln probing · credential targeting]
+    High --> Rank
+    Rank --> Down
 ```
 _Passive-first flow structured as 3 phases with increasing noise cost. Escalation between phases is gated by explicit decisions — coverage sufficiency after passive, and response quality after low-noise active. Skipping straight to Phase 3 is what CTF habits produce; Phase 3 activity should always be scoped by what earlier phases surfaced._
 
