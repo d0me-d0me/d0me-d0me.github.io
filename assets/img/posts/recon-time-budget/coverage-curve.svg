@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 440" role="img" aria-labelledby="cc-title" preserveAspectRatio="xMidYMid meet">
+  <title id="cc-title">Nmap top-ports coverage vs. wallclock time cost</title>
+
+  <!-- Sweet spot band (around top 1000 default) -->
+  <rect x="285" y="30" width="80" height="320" fill="#48B44A" fill-opacity="0.06"/>
+
+  <!-- Grid: horizontal (shared, based on coverage % on the left axis) -->
+  <g stroke="#2A2620" stroke-width="1" stroke-dasharray="2 4" fill="none">
+    <line x1="80" y1="350" x2="640" y2="350"/>
+    <line x1="80" y1="286" x2="640" y2="286"/>
+    <line x1="80" y1="222" x2="640" y2="222"/>
+    <line x1="80" y1="158" x2="640" y2="158"/>
+    <line x1="80" y1="94"  x2="640" y2="94"/>
+    <line x1="80" y1="30"  x2="640" y2="30"/>
+    <line x1="220" y1="30" x2="220" y2="350"/>
+    <line x1="360" y1="30" x2="360" y2="350"/>
+    <line x1="500" y1="30" x2="500" y2="350"/>
+    <line x1="640" y1="30" x2="640" y2="350"/>
+  </g>
+
+  <!-- Axes -->
+  <g stroke="#8F8875" stroke-width="1.5" fill="none">
+    <line x1="80"  y1="30"  x2="80"  y2="350"/>
+    <line x1="640" y1="30"  x2="640" y2="350"/>
+    <line x1="80"  y1="350" x2="640" y2="350"/>
+  </g>
+
+  <!-- Left Y-axis labels (Coverage %) -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#48B44A" text-anchor="end">
+    <text x="72" y="354">0%</text>
+    <text x="72" y="290">20%</text>
+    <text x="72" y="226">40%</text>
+    <text x="72" y="162">60%</text>
+    <text x="72" y="98">80%</text>
+    <text x="72" y="34">100%</text>
+  </g>
+
+  <!-- Right Y-axis labels (Wallclock time relative to default) -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#E5A03B" text-anchor="start">
+    <text x="648" y="354">0.01×</text>
+    <text x="648" y="274">0.1×</text>
+    <text x="648" y="194">1×</text>
+    <text x="648" y="114">10×</text>
+    <text x="648" y="34">100×</text>
+  </g>
+
+  <!-- X-axis labels -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#8F8875" text-anchor="middle">
+    <text x="80"  y="368">10</text>
+    <text x="220" y="368">100</text>
+    <text x="360" y="368">1,000</text>
+    <text x="500" y="368">10,000</text>
+    <text x="640" y="368">100,000</text>
+  </g>
+
+  <!-- Axis titles -->
+  <text x="360" y="390" font-family="Zen Kaku Gothic New, sans-serif" font-size="11" fill="#D9DCCF" text-anchor="middle">Ports scanned (log scale)</text>
+  <text font-family="Zen Kaku Gothic New, sans-serif" font-size="11" fill="#48B44A" text-anchor="middle" transform="translate(28 190) rotate(-90)">TCP coverage %</text>
+  <text font-family="Zen Kaku Gothic New, sans-serif" font-size="11" fill="#E5A03B" text-anchor="middle" transform="translate(700 190) rotate(90)">Wallclock time (× default)</text>
+
+  <!-- Sweet spot label -->
+  <text x="325" y="46" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#48B44A" text-anchor="middle" opacity="0.85">sweet spot</text>
+
+  <!-- Wallclock time curve (amber, dashed, straight line on log-log) -->
+  <line x1="80" y1="350" x2="640" y2="30" stroke="#E5A03B" stroke-width="2" stroke-dasharray="5 4"/>
+
+  <!-- Coverage curve (green, solid) -->
+  <path d="M 80,190 C 140,150 190,120 220,100 C 260,80 305,68 325,62 C 342,55 355,53 360,52 C 460,42 550,35 620,32 L 640,30"
+        stroke="#48B44A" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+
+  <!-- Coverage data points -->
+  <g>
+    <circle cx="80"  cy="190" r="4" fill="#F2F4EA" stroke="#48B44A" stroke-width="2"/>
+    <circle cx="220" cy="100" r="4" fill="#F2F4EA" stroke="#48B44A" stroke-width="2"/>
+    <circle cx="325" cy="62"  r="4" fill="#F2F4EA" stroke="#48B44A" stroke-width="2"/>
+    <circle cx="360" cy="52"  r="6" fill="#48B44A" stroke="#F2F4EA" stroke-width="2"/>
+    <circle cx="620" cy="32"  r="4" fill="#F2F4EA" stroke="#48B44A" stroke-width="2"/>
+  </g>
+
+  <!-- Coverage callouts -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#D9DCCF">
+    <text x="88"  y="182">top 10 · ~50%</text>
+    <text x="228" y="92">-F top 100 · 78%</text>
+    <text x="332" y="55">576 ports · 90%</text>
+    <text x="367" y="42" fill="#48B44A" font-weight="700">default top 1000 · 93%</text>
+    <text x="616" y="24" text-anchor="end">full range · 100%</text>
+  </g>
+
+  <!-- Delta annotation boxes -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="9">
+    <rect x="245" y="200" width="90" height="34" fill="#131210" stroke="#48B44A" stroke-width="1" rx="2"/>
+    <text x="290" y="215" fill="#F2F4EA" text-anchor="middle" font-weight="700">100 → 1,000</text>
+    <text x="290" y="228" fill="#D9DCCF" text-anchor="middle">+15pp · 10× time</text>
+
+    <rect x="425" y="200" width="120" height="34" fill="#131210" stroke="#E5A03B" stroke-width="1" rx="2"/>
+    <text x="485" y="215" fill="#F2F4EA" text-anchor="middle" font-weight="700">1,000 → full range</text>
+    <text x="485" y="228" fill="#D9DCCF" text-anchor="middle">+7pp · 65× time</text>
+  </g>
+
+  <!-- Legend -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#D9DCCF">
+    <line x1="90"  y1="418" x2="118" y2="418" stroke="#48B44A" stroke-width="2.5"/>
+    <text x="124" y="422">Coverage %</text>
+    <line x1="240" y1="418" x2="268" y2="418" stroke="#E5A03B" stroke-width="2" stroke-dasharray="5 4"/>
+    <text x="274" y="422">Wallclock time (× default)</text>
+  </g>
+</svg>
