@@ -1,0 +1,187 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 950 780" width="950" height="780" role="img" aria-labelledby="artifact-radar-title" preserveAspectRatio="xMidYMid meet">
+  <title id="artifact-radar-title">Six-axis Windows forensic artifact comparison</title>
+  <defs>
+    <marker id="art-arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#8F8875"/>
+    </marker>
+  </defs>
+
+  <!-- Header -->
+  <text x="475" y="42" font-family="JetBrains Mono, ui-monospace, monospace" font-size="16" font-weight="700" fill="#F2F4EA" text-anchor="middle">
+    Six-Axis Windows Forensic Artifact Landscape
+  </text>
+  <text x="475" y="62" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#8F8875" text-anchor="middle">
+    Score: 0.0 (weakest) → 1.0 (strongest) · outer edge = defender-favorable
+  </text>
+
+  <!-- Concentric grid rings (5 levels) -->
+  <g fill="none" stroke="#2A2620" stroke-width="1" stroke-dasharray="2 4">
+    <circle cx="450" cy="380" r="48"/>
+    <circle cx="450" cy="380" r="96"/>
+    <circle cx="450" cy="380" r="144"/>
+    <circle cx="450" cy="380" r="192"/>
+    <circle cx="450" cy="380" r="240" stroke="#615C50" stroke-dasharray="none"/>
+  </g>
+
+  <!-- Ring value labels along top axis -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#615C50" text-anchor="middle">
+    <text x="458" y="336">0.2</text>
+    <text x="458" y="288">0.4</text>
+    <text x="458" y="240">0.6</text>
+    <text x="458" y="192">0.8</text>
+    <text x="458" y="144">1.0</text>
+  </g>
+
+  <!-- Radial axes -->
+  <g stroke="#8F8875" stroke-width="1.2" fill="none">
+    <line x1="450" y1="380" x2="450.0" y2="140.0"/>
+    <line x1="450" y1="380" x2="657.8" y2="260.0"/>
+    <line x1="450" y1="380" x2="657.8" y2="500.0"/>
+    <line x1="450" y1="380" x2="450.0" y2="620.0"/>
+    <line x1="450" y1="380" x2="242.2" y2="500.0"/>
+    <line x1="450" y1="380" x2="242.2" y2="260.0"/>
+  </g>
+
+  <!-- Axis labels with subtitles (English only) -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" fill="#F2F4EA" text-anchor="middle" font-weight="700">
+    <text x="450" y="118" font-size="14">Retention</text>
+    <text x="450" y="132" font-size="10" fill="#8F8875" font-weight="400">survives past incident</text>
+
+    <text x="666" y="248" font-size="14" text-anchor="start">Reliability</text>
+    <text x="666" y="262" font-size="10" fill="#8F8875" font-weight="400" text-anchor="start">unambiguous semantics</text>
+
+    <text x="666" y="512" font-size="14" text-anchor="start">Parse-Ease</text>
+    <text x="666" y="526" font-size="10" fill="#8F8875" font-weight="400" text-anchor="start">standard tooling exists</text>
+
+    <text x="450" y="646" font-size="14">Coverage</text>
+    <text x="450" y="660" font-size="10" fill="#8F8875" font-weight="400">breadth of activity captured</text>
+
+    <text x="234" y="512" font-size="14" text-anchor="end">Tamper-Resist</text>
+    <text x="234" y="526" font-size="10" fill="#8F8875" font-weight="400" text-anchor="end">hard to delete or fake</text>
+
+    <text x="234" y="248" font-size="14" text-anchor="end">Availability</text>
+    <text x="234" y="262" font-size="10" fill="#8F8875" font-weight="400" text-anchor="end">on by default</text>
+  </g>
+
+  <!-- Polygons -->
+  <polygon points="450.0,164.0 637.1,272.0 553.9,440.0 450.0,548.0 283.7,476.0 242.2,260.0"
+           fill="#48B44A" fill-opacity="0.10" stroke="#48B44A" stroke-width="1.8"/>
+  <polygon points="450.0,188.0 637.1,272.0 637.1,488.0 450.0,500.0 325.3,452.0 304.5,296.0"
+           fill="#E5A03B" fill-opacity="0.10" stroke="#E5A03B" stroke-width="1.8"/>
+  <polygon points="450.0,236.0 553.9,320.0 595.5,464.0 450.0,524.0 304.5,464.0 242.2,260.0"
+           fill="#D9DCCF" fill-opacity="0.08" stroke="#D9DCCF" stroke-width="1.8" stroke-dasharray="4 3"/>
+  <polygon points="450.0,284.0 616.3,284.0 616.3,476.0 450.0,596.0 346.1,440.0 366.9,332.0"
+           fill="#E5533B" fill-opacity="0.10" stroke="#E5533B" stroke-width="1.8"/>
+  <polygon points="450.0,260.0 657.8,260.0 616.3,476.0 450.0,620.0 325.3,452.0 408.4,356.0"
+           fill="#7FA8FF" fill-opacity="0.10" stroke="#7FA8FF" stroke-width="1.8"/>
+  <polygon points="450.0,356.0 657.8,260.0 533.1,428.0 450.0,620.0 262.9,488.0 346.1,320.0"
+           fill="#B48BFF" fill-opacity="0.10" stroke="#B48BFF" stroke-width="1.8"/>
+
+  <!-- All regular data points (drawn first) -->
+  <g>
+    <!-- MFT (Availability 1.0 will be highlighted) -->
+    <circle cx="450.0" cy="164.0" r="3" fill="#48B44A"/>
+    <circle cx="637.1" cy="272.0" r="3" fill="#48B44A"/>
+    <circle cx="553.9" cy="440.0" r="3" fill="#48B44A"/>
+    <circle cx="450.0" cy="548.0" r="3" fill="#48B44A"/>
+    <circle cx="283.7" cy="476.0" r="3" fill="#48B44A"/>
+    <!-- Prefetch (Parse-Ease 0.9 will be highlighted) -->
+    <circle cx="450.0" cy="188.0" r="3" fill="#E5A03B"/>
+    <circle cx="637.1" cy="272.0" r="3" fill="#E5A03B"/>
+    <circle cx="450.0" cy="500.0" r="3" fill="#E5A03B"/>
+    <circle cx="325.3" cy="452.0" r="3" fill="#E5A03B"/>
+    <circle cx="304.5" cy="296.0" r="3" fill="#E5A03B"/>
+    <!-- ShimCache + AmCache (no highlight) -->
+    <circle cx="450.0" cy="236.0" r="3" fill="#D9DCCF"/>
+    <circle cx="553.9" cy="320.0" r="3" fill="#D9DCCF"/>
+    <circle cx="595.5" cy="464.0" r="3" fill="#D9DCCF"/>
+    <circle cx="450.0" cy="524.0" r="3" fill="#D9DCCF"/>
+    <circle cx="304.5" cy="464.0" r="3" fill="#D9DCCF"/>
+    <circle cx="242.2" cy="260.0" r="3" fill="#D9DCCF"/>
+    <!-- Security EVTX (Coverage 0.9 will be highlighted) -->
+    <circle cx="450.0" cy="284.0" r="3" fill="#E5533B"/>
+    <circle cx="616.3" cy="284.0" r="3" fill="#E5533B"/>
+    <circle cx="616.3" cy="476.0" r="3" fill="#E5533B"/>
+    <circle cx="346.1" cy="440.0" r="3" fill="#E5533B"/>
+    <circle cx="366.9" cy="332.0" r="3" fill="#E5533B"/>
+    <!-- Sysmon EVTX (Coverage 1.0 will be highlighted) -->
+    <circle cx="450.0" cy="260.0" r="3" fill="#7FA8FF"/>
+    <circle cx="657.8" cy="260.0" r="3" fill="#7FA8FF"/>
+    <circle cx="616.3" cy="476.0" r="3" fill="#7FA8FF"/>
+    <circle cx="325.3" cy="452.0" r="3" fill="#7FA8FF"/>
+    <circle cx="408.4" cy="356.0" r="3" fill="#7FA8FF"/>
+    <!-- Memory (Tamper-Resist 0.9 will be highlighted) -->
+    <circle cx="450.0" cy="356.0" r="3" fill="#B48BFF"/>
+    <circle cx="657.8" cy="260.0" r="3" fill="#B48BFF"/>
+    <circle cx="533.1" cy="428.0" r="3" fill="#B48BFF"/>
+    <circle cx="450.0" cy="620.0" r="3" fill="#B48BFF"/>
+    <circle cx="346.1" cy="320.0" r="3" fill="#B48BFF"/>
+  </g>
+
+  <!-- Highlighted data points (drawn last, on top of everything else) -->
+  <g>
+    <circle cx="242.2" cy="260.0" r="5" fill="#48B44A" stroke="#F2F4EA" stroke-width="2"/>
+    <circle cx="637.1" cy="488.0" r="5" fill="#E5A03B" stroke="#F2F4EA" stroke-width="2"/>
+    <circle cx="450.0" cy="596.0" r="5" fill="#E5533B" stroke="#F2F4EA" stroke-width="2"/>
+    <circle cx="450.0" cy="620.0" r="5" fill="#7FA8FF" stroke="#F2F4EA" stroke-width="2"/>
+    <circle cx="262.9" cy="488.0" r="5" fill="#B48BFF" stroke="#F2F4EA" stroke-width="2"/>
+  </g>
+
+  <!-- Legend (right side) -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#D9DCCF">
+    <rect x="780" y="100" width="16" height="16" fill="#48B44A" fill-opacity="0.30" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="804" y="113" font-weight="700">MFT / UsnJrnl</text>
+    <text x="804" y="127" font-size="9" fill="#8F8875">NTFS metadata</text>
+
+    <rect x="780" y="142" width="16" height="16" fill="#E5A03B" fill-opacity="0.30" stroke="#E5A03B" stroke-width="1.5"/>
+    <text x="804" y="155" font-weight="700">Prefetch</text>
+    <text x="804" y="169" font-size="9" fill="#8F8875">workstation only</text>
+
+    <rect x="780" y="184" width="16" height="16" fill="#D9DCCF" fill-opacity="0.20" stroke="#D9DCCF" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <text x="804" y="197" font-weight="700">ShimCache+AmCache</text>
+    <text x="804" y="211" font-size="9" fill="#8F8875">shim infrastructure</text>
+
+    <rect x="780" y="226" width="16" height="16" fill="#E5533B" fill-opacity="0.30" stroke="#E5533B" stroke-width="1.5"/>
+    <text x="804" y="239" font-weight="700">Security EVTX</text>
+    <text x="804" y="253" font-size="9" fill="#8F8875">audit policy required</text>
+
+    <rect x="780" y="268" width="16" height="16" fill="#7FA8FF" fill-opacity="0.30" stroke="#7FA8FF" stroke-width="1.5"/>
+    <text x="804" y="281" font-weight="700">Sysmon EVTX</text>
+    <text x="804" y="295" font-size="9" fill="#8F8875">install + config</text>
+
+    <rect x="780" y="310" width="16" height="16" fill="#B48BFF" fill-opacity="0.30" stroke="#B48BFF" stroke-width="1.5"/>
+    <text x="804" y="323" font-weight="700">Memory (RAM)</text>
+    <text x="804" y="337" font-size="9" fill="#8F8875">live acquisition</text>
+  </g>
+
+  <!-- Annotation box: Sysmon dependency paradox -->
+  <g>
+    <rect x="20" y="100" width="200" height="94" fill="#131210" stroke="#7FA8FF" stroke-width="1" rx="3"/>
+    <text x="120" y="118" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" font-weight="700" fill="#7FA8FF" text-anchor="middle">The Sysmon paradox</text>
+    <text x="120" y="136" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#F2F4EA" text-anchor="middle">Highest Coverage +</text>
+    <text x="120" y="149" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#F2F4EA" text-anchor="middle">highest Reliability,</text>
+    <text x="120" y="162" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#D9DCCF" text-anchor="middle">but lowest Availability.</text>
+    <text x="120" y="181" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#8F8875" text-anchor="middle">Value is conditional on</text>
+    <text x="120" y="192" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#8F8875" text-anchor="middle">pre-incident deployment.</text>
+  </g>
+
+  <!-- Annotation box: MFT balance -->
+  <g>
+    <rect x="20" y="500" width="200" height="76" fill="#131210" stroke="#48B44A" stroke-width="1" rx="3"/>
+    <text x="120" y="518" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" font-weight="700" fill="#48B44A" text-anchor="middle">MFT: the long game</text>
+    <text x="120" y="536" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#F2F4EA" text-anchor="middle">Highest Retention +</text>
+    <text x="120" y="549" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#F2F4EA" text-anchor="middle">Availability + Reliability</text>
+    <text x="120" y="565" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#D9DCCF" text-anchor="middle">but files-only Coverage.</text>
+  </g>
+
+  <!-- Bottom takeaway -->
+  <text x="475" y="712" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" fill="#F2F4EA" text-anchor="middle" font-weight="700">
+    No artifact dominates every axis. Coverage and Availability trade off systematically.
+  </text>
+  <text x="475" y="731" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#D9DCCF" text-anchor="middle">
+    The strongest telemetry (Sysmon, Memory) requires pre-incident work — the "always-on" artifacts (MFT, ShimCache) trade breadth for guaranteed presence.
+  </text>
+  <text x="475" y="754" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#615C50" text-anchor="middle">
+    Sources: Microsoft Learn · Eric Zimmerman AppCompatCacheParser · Kaspersky Securelist 2025 · Sherlock Forensics · TrustedSec Detection Foundation
+  </text>
+</svg>
