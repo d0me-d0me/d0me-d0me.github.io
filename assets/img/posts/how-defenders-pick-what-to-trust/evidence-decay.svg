@@ -1,0 +1,221 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 950 620" width="950" height="620" role="img" aria-labelledby="decay-title" preserveAspectRatio="xMidYMid meet">
+  <title id="decay-title">Windows forensic artifact evidence decay over time since incident</title>
+  <defs>
+    <marker id="decay-arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#8F8875"/>
+    </marker>
+  </defs>
+
+  <!-- Header -->
+  <text x="475" y="40" font-family="JetBrains Mono, ui-monospace, monospace" font-size="16" font-weight="700" fill="#F2F4EA" text-anchor="middle">
+    Evidence Decay: What Survives to the Next Investigation
+  </text>
+  <text x="475" y="60" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#8F8875" text-anchor="middle">
+    Probability that a given artifact still contains actionable evidence, as time from incident grows
+  </text>
+
+  <!-- Horizontal grid lines -->
+  <g stroke="#2A2620" stroke-width="1" stroke-dasharray="2 4" fill="none">
+    <line x1="120" y1="130" x2="780" y2="130"/>
+    <line x1="120" y1="212.5" x2="780" y2="212.5"/>
+    <line x1="120" y1="295" x2="780" y2="295"/>
+    <line x1="120" y1="377.5" x2="780" y2="377.5"/>
+    <line x1="120" y1="460" x2="780" y2="460"/>
+  </g>
+
+  <!-- Vertical band separators (log-scale time buckets) -->
+  <g stroke="#2A2620" stroke-width="1" stroke-dasharray="2 4" fill="none">
+    <line x1="252" y1="130" x2="252" y2="460"/>
+    <line x1="384" y1="130" x2="384" y2="460"/>
+    <line x1="516" y1="130" x2="516" y2="460"/>
+    <line x1="648" y1="130" x2="648" y2="460"/>
+  </g>
+
+  <!-- Axes -->
+  <g stroke="#8F8875" stroke-width="1.5" fill="none">
+    <line x1="120" y1="130" x2="120" y2="460"/>
+    <line x1="120" y1="460" x2="780" y2="460"/>
+  </g>
+
+  <!-- Y-axis labels -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#8F8875" text-anchor="end">
+    <text x="112" y="134">100%</text>
+    <text x="112" y="216.5">75%</text>
+    <text x="112" y="299">50%</text>
+    <text x="112" y="381.5">25%</text>
+    <text x="112" y="464">0%</text>
+  </g>
+
+  <!-- Y-axis title -->
+  <text font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" fill="#D9DCCF" text-anchor="middle" font-weight="700" transform="translate(58 295) rotate(-90)">
+    Evidence-present probability
+  </text>
+
+  <!-- X-axis tick labels -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" fill="#F2F4EA" text-anchor="middle" font-weight="700">
+    <text x="120" y="482">1 hour</text>
+    <text x="252" y="482">1 day</text>
+    <text x="384" y="482">1 week</text>
+    <text x="516" y="482">1 month</text>
+    <text x="648" y="482">3 months</text>
+    <text x="780" y="482">6 months</text>
+  </g>
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#8F8875" text-anchor="middle">
+    <text x="120" y="497">live triage</text>
+    <text x="252" y="497">same-day IR</text>
+    <text x="384" y="497">weekly SOC</text>
+    <text x="516" y="497">retro hunt</text>
+    <text x="648" y="497">audit</text>
+    <text x="780" y="497">cold case</text>
+  </g>
+
+  <!-- X-axis title -->
+  <text x="450" y="520" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" fill="#D9DCCF" text-anchor="middle" font-weight="700">
+    Time since incident (log scale)
+  </text>
+
+  <!-- Curves -->
+  <!-- Memory: sharp cliff after power-off -->
+  <path d="M 120,130.0 L 252,443.5 L 384,450.1 L 516,450.1 L 648,450.1 L 780,450.1"
+        fill="none" stroke="#B48BFF" stroke-width="2"/>
+  <!-- Security EVTX: fast rotation -->
+  <path d="M 120,136.6 L 252,179.5 L 384,328.0 L 516,410.5 L 648,443.5 L 780,450.1"
+        fill="none" stroke="#E5533B" stroke-width="2"/>
+  <!-- Sysmon EVTX: intermediate rotation -->
+  <path d="M 120,136.6 L 252,156.4 L 384,229.0 L 516,361.0 L 648,427.0 L 780,443.5"
+        fill="none" stroke="#7FA8FF" stroke-width="2"/>
+  <!-- Prefetch: gradual decay -->
+  <path d="M 120,133.3 L 252,143.2 L 384,156.4 L 516,196.0 L 648,262.0 L 780,311.5"
+        fill="none" stroke="#E5A03B" stroke-width="2"/>
+  <!-- ShimCache + AmCache: slow decay -->
+  <path d="M 120,133.3 L 252,136.6 L 384,146.5 L 516,169.6 L 648,202.6 L 780,229.0"
+        fill="none" stroke="#D9DCCF" stroke-width="2" stroke-dasharray="4 3"/>
+  <!-- MFT: near-flat -->
+  <path d="M 120,130.0 L 252,130.0 L 384,136.6 L 516,146.5 L 648,163.0 L 780,179.5"
+        fill="none" stroke="#48B44A" stroke-width="2.5"/>
+
+  <!-- Data points -->
+  <g>
+    <!-- Memory -->
+    <circle cx="120" cy="130.0" r="4" fill="#B48BFF" stroke="#F2F4EA" stroke-width="1.5"/>
+    <circle cx="252" cy="443.5" r="3" fill="#B48BFF"/>
+    <circle cx="384" cy="450.1" r="3" fill="#B48BFF"/>
+    <circle cx="516" cy="450.1" r="3" fill="#B48BFF"/>
+    <circle cx="648" cy="450.1" r="3" fill="#B48BFF"/>
+    <circle cx="780" cy="450.1" r="3" fill="#B48BFF"/>
+    <!-- Security EVTX -->
+    <circle cx="120" cy="136.6" r="3" fill="#E5533B"/>
+    <circle cx="252" cy="179.5" r="3" fill="#E5533B"/>
+    <circle cx="384" cy="328.0" r="3" fill="#E5533B"/>
+    <circle cx="516" cy="410.5" r="3" fill="#E5533B"/>
+    <circle cx="648" cy="443.5" r="3" fill="#E5533B"/>
+    <circle cx="780" cy="450.1" r="3" fill="#E5533B"/>
+    <!-- Sysmon EVTX -->
+    <circle cx="120" cy="136.6" r="3" fill="#7FA8FF"/>
+    <circle cx="252" cy="156.4" r="3" fill="#7FA8FF"/>
+    <circle cx="384" cy="229.0" r="3" fill="#7FA8FF"/>
+    <circle cx="516" cy="361.0" r="3" fill="#7FA8FF"/>
+    <circle cx="648" cy="427.0" r="3" fill="#7FA8FF"/>
+    <circle cx="780" cy="443.5" r="3" fill="#7FA8FF"/>
+    <!-- Prefetch -->
+    <circle cx="120" cy="133.3" r="3" fill="#E5A03B"/>
+    <circle cx="252" cy="143.2" r="3" fill="#E5A03B"/>
+    <circle cx="384" cy="156.4" r="3" fill="#E5A03B"/>
+    <circle cx="516" cy="196.0" r="3" fill="#E5A03B"/>
+    <circle cx="648" cy="262.0" r="3" fill="#E5A03B"/>
+    <circle cx="780" cy="311.5" r="3" fill="#E5A03B"/>
+    <!-- ShimCache + AmCache -->
+    <circle cx="120" cy="133.3" r="3" fill="#D9DCCF"/>
+    <circle cx="252" cy="136.6" r="3" fill="#D9DCCF"/>
+    <circle cx="384" cy="146.5" r="3" fill="#D9DCCF"/>
+    <circle cx="516" cy="169.6" r="3" fill="#D9DCCF"/>
+    <circle cx="648" cy="202.6" r="3" fill="#D9DCCF"/>
+    <circle cx="780" cy="229.0" r="6" fill="#D9DCCF" stroke="#F2F4EA" stroke-width="2"/>
+    <!-- MFT -->
+    <circle cx="120" cy="130.0" r="3" fill="#48B44A"/>
+    <circle cx="252" cy="130.0" r="3" fill="#48B44A"/>
+    <circle cx="384" cy="136.6" r="3" fill="#48B44A"/>
+    <circle cx="516" cy="146.5" r="3" fill="#48B44A"/>
+    <circle cx="648" cy="163.0" r="3" fill="#48B44A"/>
+    <circle cx="780" cy="179.5" r="6" fill="#48B44A" stroke="#F2F4EA" stroke-width="2"/>
+  </g>
+
+  <!-- Right-side labels with 6-month endpoint values -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" font-weight="700">
+    <text x="792" y="184" fill="#48B44A">MFT / UsnJrnl</text>
+    <text x="792" y="197" font-size="9" fill="#8F8875" font-weight="400">85% at 6mo</text>
+
+    <text x="792" y="233" fill="#D9DCCF">ShimCache+AmCache</text>
+    <text x="792" y="246" font-size="9" fill="#8F8875" font-weight="400">70% at 6mo</text>
+
+    <text x="792" y="316" fill="#E5A03B">Prefetch</text>
+    <text x="792" y="329" font-size="9" fill="#8F8875" font-weight="400">45% at 6mo</text>
+
+    <text x="792" y="436" fill="#7FA8FF">Sysmon EVTX</text>
+    <text x="792" y="449" font-size="9" fill="#8F8875" font-weight="400">5% at 6mo</text>
+
+    <text x="792" y="462" fill="#E5533B">Security EVTX</text>
+    <text x="792" y="475" font-size="9" fill="#8F8875" font-weight="400">3% at 6mo</text>
+
+    <text x="792" y="488" fill="#B48BFF">Memory (RAM)</text>
+    <text x="792" y="501" font-size="9" fill="#8F8875" font-weight="400">lost at shutdown</text>
+  </g>
+
+  <!-- Annotation: the survivor asymmetry -->
+  <g>
+    <rect x="410" y="90" width="290" height="72" fill="#131210" stroke="#48B44A" stroke-width="1" rx="3"/>
+    <text x="555" y="108" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" font-weight="700" fill="#48B44A" text-anchor="middle">
+      Sherlock Forensics observation
+    </text>
+    <text x="555" y="126" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#F2F4EA" text-anchor="middle">
+      "When investigations open weeks or months after activity,
+    </text>
+    <text x="555" y="140" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#F2F4EA" text-anchor="middle">
+      ShimCache + AmCache often provide the only surviving
+    </text>
+    <text x="555" y="154" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#D9DCCF" text-anchor="middle">
+      execution evidence — Security + Sysmon logs have rolled off."
+    </text>
+  </g>
+  <!-- Arrow from annotation to ShimCache endpoint -->
+  <path d="M 700 155 Q 745 190, 780 226" fill="none" stroke="#D9DCCF" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#decay-arrow)" opacity="0.7"/>
+
+  <!-- Annotation: memory cliff -->
+  <g>
+    <rect x="130" y="260" width="180" height="76" fill="#131210" stroke="#B48BFF" stroke-width="1" rx="3"/>
+    <text x="220" y="278" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" font-weight="700" fill="#B48BFF" text-anchor="middle">
+      The memory cliff
+    </text>
+    <text x="220" y="296" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#F2F4EA" text-anchor="middle">
+      Shutdown = 0.
+    </text>
+    <text x="220" y="311" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#D9DCCF" text-anchor="middle">
+      Content overwrites within
+    </text>
+    <text x="220" y="325" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#D9DCCF" text-anchor="middle">
+      hours even while live.
+    </text>
+  </g>
+  <!-- Arrow to memory drop -->
+  <path d="M 220 260 Q 200 195, 130 160" fill="none" stroke="#B48BFF" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#decay-arrow)" opacity="0.7"/>
+
+  <!-- Sweet-spot band highlight for 6mo -->
+  <rect x="720" y="130" width="60" height="120" fill="#48B44A" fill-opacity="0.05" stroke="none"/>
+  <text x="750" y="270" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#48B44A" text-anchor="middle" font-weight="700">
+    long-tail
+  </text>
+  <text x="750" y="282" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#48B44A" text-anchor="middle" font-weight="700">
+    survivors
+  </text>
+
+  <!-- Bottom takeaway -->
+  <text x="475" y="558" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" fill="#F2F4EA" text-anchor="middle" font-weight="700">
+    The strongest telemetry decays fastest.
+  </text>
+  <text x="475" y="577" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#D9DCCF" text-anchor="middle">
+    Sysmon and Security event logs give the richest picture — for a window measured in days, not months.
+  </text>
+  <text x="475" y="596" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#D9DCCF" text-anchor="middle">
+    For long-tail investigations, MFT and the ShimCache/AmCache pair are what survive.
+  </text>
+</svg>
