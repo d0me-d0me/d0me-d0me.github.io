@@ -3,7 +3,6 @@ title: Reconnaissance Time Budget — What to Decide Before Running Scans
 date: 2026-07-16 00:00:00 +0000
 categories: [Offensive, Reconnaissance]
 tags: [reconnaissance, methodology, nmap, osint]
-mermaid: true
 description: Recon quality is decided in the design phase, before any tool runs. Four axes govern every scan — coverage, depth, noise, time — and time is the only one you can't substitute for.
 ---
 
@@ -84,28 +83,8 @@ Once you see the curve, the choices become clear. Single CTF box: full range is 
 
 **Passive → active**: Shodan, Censys, and ZoomEye maintain databases of what everyone else has observed when scanning the same IP space. You extract intelligence about the target without sending a single packet. Noise is literally zero. Query these first, then use what's already visible to narrow your active scan scope. Result: narrower active coverage, comparable effective coverage. Caveat: passive database entries can be days to weeks stale, so treat them as leads to verify, not conclusions to rely on.
 
-```mermaid
-flowchart TD
-    Start([Start])
-    Passive["Phase 1 — Passive · noise ≈ 0<br/>crt.sh CT logs<br/>Shodan / Censys / ZoomEye<br/>Wayback / GitHub dorks<br/>SecurityTrails DNS history"]
-    D1{"Passive coverage<br/>sufficient?"}
-    Low["Phase 2 — Low-noise active<br/>Nmap top 1000 SYN sweep<br/>Subdomain wordlist 110k<br/>dig + CDN triage"]
-    D2{"Interesting<br/>responses?"}
-    High["Phase 3 — High-noise active · selective<br/>Nmap -sV -sC on selected<br/>Full range on selected<br/>ffuf raft-medium + extensions"]
-    Rank[Rank services by attack value]
-    Down["Downstream: vuln probing · credential targeting"]
-
-    Start --> Passive
-    Passive --> D1
-    D1 -->|Yes| Rank
-    D1 -->|No| Low
-    Low --> D2
-    D2 -->|Yes| High
-    D2 -->|No| Rank
-    High --> Rank
-    Rank --> Down
-```
-_Passive-first flow structured as 3 phases with increasing noise cost. Escalation between phases is gated by explicit decisions — coverage sufficiency after passive, and response quality after low-noise active. Skipping straight to Phase 3 is what CTF habits produce; Phase 3 activity should always be scoped by what earlier phases surfaced._
+![Passive-first reconnaissance flow with three phases](/assets/img/posts/recon-time-budget/flow-passive-first.svg){: width="720" height="830" }
+_Passive-first flow structured as 3 phases with increasing noise cost — green (passive) through amber (low-noise active) to red (high-noise active, selective). Solid arrows trace the main sequential path; dashed arrows are early-exit skip paths gated by the two decisions. Skipping straight to Phase 3 is what CTF habits produce; Phase 3 activity should always be scoped by what earlier phases surfaced._
 
 ## Example: Subdomain Enumeration
 
