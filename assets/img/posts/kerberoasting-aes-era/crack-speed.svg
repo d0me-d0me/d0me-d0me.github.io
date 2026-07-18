@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420" width="720" height="420" role="img" aria-labelledby="cs-title" preserveAspectRatio="xMidYMid meet">
+  <title id="cs-title">hashcat crack speed: RC4 (mode 13100) vs AES256 (mode 19700)</title>
+
+  <!-- Grid horizontal (log decades) -->
+  <g stroke="#2A2620" stroke-width="1" stroke-dasharray="2 4" fill="none">
+    <line x1="120" y1="330" x2="660" y2="330"/>
+    <line x1="120" y1="270" x2="660" y2="270"/>
+    <line x1="120" y1="210" x2="660" y2="210"/>
+    <line x1="120" y1="150" x2="660" y2="150"/>
+    <line x1="120" y1="90"  x2="660" y2="90"/>
+  </g>
+
+  <!-- Axes -->
+  <g stroke="#8F8875" stroke-width="1.5" fill="none">
+    <line x1="120" y1="60" x2="120" y2="330"/>
+    <line x1="120" y1="330" x2="660" y2="330"/>
+  </g>
+
+  <!-- Y labels (log H/s) -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#8F8875" text-anchor="end">
+    <text x="112" y="334">100 kH/s</text>
+    <text x="112" y="274">1 MH/s</text>
+    <text x="112" y="214">10 MH/s</text>
+    <text x="112" y="154">100 MH/s</text>
+    <text x="112" y="94">1 GH/s+</text>
+  </g>
+
+  <!-- Y axis title -->
+  <text font-family="Zen Kaku Gothic New, sans-serif" font-size="11" fill="#D9DCCF" text-anchor="middle" transform="translate(40 195) rotate(-90)">Crack speed (log scale, single high-end GPU)</text>
+
+  <!-- AES256 bar (mode 19700) ~500 kH/s → y around 300 -->
+  <rect x="200" y="300" width="120" height="30" fill="#48B44A" fill-opacity="0.25" stroke="#48B44A" stroke-width="1.8"/>
+  <text x="260" y="292" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#48B44A" text-anchor="middle" font-weight="700">~500 kH/s</text>
+  <text x="260" y="352" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#D9DCCF" text-anchor="middle">AES256</text>
+  <text x="260" y="368" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#8F8875" text-anchor="middle">mode 19700 · etype 18</text>
+
+  <!-- RC4 bar (mode 13100) ~1.5-2.5 GH/s → y around 78 -->
+  <rect x="460" y="78" width="120" height="252" fill="#E5533B" fill-opacity="0.25" stroke="#E5533B" stroke-width="1.8"/>
+  <text x="520" y="70" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#E5533B" text-anchor="middle" font-weight="700">~1.5–2.5 GH/s</text>
+  <text x="520" y="352" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#D9DCCF" text-anchor="middle">RC4</text>
+  <text x="520" y="368" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#8F8875" text-anchor="middle">mode 13100 · etype 23</text>
+
+  <!-- Delta annotation -->
+  <g>
+    <line x1="320" y1="200" x2="460" y2="200" stroke="#E5A03B" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <rect x="330" y="160" width="120" height="34" fill="#131210" stroke="#E5A03B" stroke-width="1" rx="2"/>
+    <text x="390" y="175" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#F2F4EA" text-anchor="middle" font-weight="700">~3 orders</text>
+    <text x="390" y="188" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#D9DCCF" text-anchor="middle">of magnitude</text>
+  </g>
+
+  <!-- Bottom note -->
+  <text x="390" y="404" font-family="Zen Kaku Gothic New, sans-serif" font-size="10" fill="#615C50" text-anchor="middle">AES buys ~1000× more time to crack — but time bought is not the same as prevention.</text>
+</svg>
