@@ -1,0 +1,170 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 700" width="900" height="700" role="img" aria-labelledby="radar-title" preserveAspectRatio="xMidYMid meet">
+  <title id="radar-title">Five-axis initial access framework: five techniques compared</title>
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#8F8875"/>
+    </marker>
+  </defs>
+
+  <!-- Header block -->
+  <text x="450" y="42" font-family="JetBrains Mono, ui-monospace, monospace" font-size="16" font-weight="700" fill="#F2F4EA" text-anchor="middle">
+    Five-Axis Initial Access Framework
+  </text>
+  <text x="450" y="62" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#8F8875" text-anchor="middle">
+    Score: 0.0 (weakest) → 1.0 (strongest) · outer edge = attacker-favorable
+  </text>
+
+  <!-- Concentric grid rings (5 levels, labeled) -->
+  <g fill="none" stroke="#2A2620" stroke-width="1" stroke-dasharray="2 4">
+    <circle cx="410" cy="340" r="44"/>
+    <circle cx="410" cy="340" r="88"/>
+    <circle cx="410" cy="340" r="132"/>
+    <circle cx="410" cy="340" r="176"/>
+    <circle cx="410" cy="340" r="220" stroke="#615C50" stroke-dasharray="none"/>
+  </g>
+
+  <!-- Ring value labels (along the top axis for reference) -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#615C50" text-anchor="middle">
+    <text x="418" y="298">0.2</text>
+    <text x="418" y="254">0.4</text>
+    <text x="418" y="210">0.6</text>
+    <text x="418" y="166">0.8</text>
+    <text x="418" y="122">1.0</text>
+  </g>
+
+  <!-- Radial axes -->
+  <g stroke="#8F8875" stroke-width="1.2" fill="none">
+    <line x1="410" y1="340" x2="410.0" y2="120.0"/>
+    <line x1="410" y1="340" x2="619.2" y2="272.0"/>
+    <line x1="410" y1="340" x2="539.3" y2="518.0"/>
+    <line x1="410" y1="340" x2="280.7" y2="518.0"/>
+    <line x1="410" y1="340" x2="200.8" y2="272.0"/>
+  </g>
+
+  <!-- Axis labels (bold, English only) -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" fill="#F2F4EA" text-anchor="middle" font-weight="700">
+    <text x="410" y="98" font-size="14">Stealth</text>
+    <text x="410" y="113" font-size="10" fill="#8F8875" font-weight="400">low telemetry footprint</text>
+
+    <text x="668" y="272" font-size="14">Low Cost</text>
+    <text x="668" y="287" font-size="10" fill="#8F8875" font-weight="400">cheap to prepare</text>
+
+    <text x="569" y="540" font-size="14">Persistence</text>
+    <text x="569" y="555" font-size="10" fill="#8F8875" font-weight="400">access survives rotation</text>
+
+    <text x="251" y="540" font-size="14">Auth Bypass</text>
+    <text x="251" y="555" font-size="10" fill="#8F8875" font-weight="400">defeats MFA / CA</text>
+
+    <text x="152" y="272" font-size="14">Maturity Tolerance</text>
+    <text x="152" y="287" font-size="10" fill="#8F8875" font-weight="400">holds vs mature defenders</text>
+  </g>
+
+  <!-- Polygons (fill + stroke) -->
+  <polygon points="410.0,252.0 598.3,278.8 461.7,411.2 332.4,446.8 305.4,306.0"
+           fill="#E5533B" fill-opacity="0.10" stroke="#E5533B" stroke-width="1.8"/>
+  <polygon points="410.0,164.0 556.5,292.4 526.4,500.2 358.3,411.2 305.4,306.0"
+           fill="#E5A03B" fill-opacity="0.10" stroke="#E5A03B" stroke-width="1.8"/>
+  <polygon points="410.0,208.0 493.7,312.8 487.6,446.8 293.6,500.2 263.5,292.4"
+           fill="#48B44A" fill-opacity="0.10" stroke="#48B44A" stroke-width="1.8"/>
+  <polygon points="410.0,274.0 598.3,278.8 487.6,446.8 358.3,411.2 368.2,326.4"
+           fill="#7FA8FF" fill-opacity="0.10" stroke="#7FA8FF" stroke-width="1.8"/>
+  <polygon points="410.0,142.0 451.8,326.4 539.3,518.0 280.7,518.0 221.7,278.8"
+           fill="#D9DCCF" fill-opacity="0.08" stroke="#D9DCCF" stroke-width="1.8" stroke-dasharray="4 3"/>
+
+  <!-- Data points at every vertex (small filled circles) -->
+  <g>
+    <!-- Phishing -->
+    <circle cx="410.0" cy="252.0" r="3" fill="#E5533B"/>
+    <circle cx="598.3" cy="278.8" r="3" fill="#E5533B"/>
+    <circle cx="461.7" cy="411.2" r="3" fill="#E5533B"/>
+    <circle cx="332.4" cy="446.8" r="3" fill="#E5533B"/>
+    <circle cx="305.4" cy="306.0" r="3" fill="#E5533B"/>
+    <!-- Valid Accounts -->
+    <circle cx="410.0" cy="164.0" r="3" fill="#E5A03B"/>
+    <circle cx="556.5" cy="292.4" r="3" fill="#E5A03B"/>
+    <circle cx="526.4" cy="500.2" r="3" fill="#E5A03B"/>
+    <circle cx="358.3" cy="411.2" r="3" fill="#E5A03B"/>
+    <circle cx="305.4" cy="306.0" r="3" fill="#E5A03B"/>
+    <!-- Public-Facing App -->
+    <circle cx="410.0" cy="208.0" r="3" fill="#48B44A"/>
+    <circle cx="493.7" cy="312.8" r="3" fill="#48B44A"/>
+    <circle cx="487.6" cy="446.8" r="3" fill="#48B44A"/>
+    <circle cx="293.6" cy="500.2" r="4" fill="#48B44A" stroke="#F2F4EA" stroke-width="1.5"/>
+    <circle cx="263.5" cy="292.4" r="3" fill="#48B44A"/>
+    <!-- External Remote Services -->
+    <circle cx="410.0" cy="274.0" r="3" fill="#7FA8FF"/>
+    <circle cx="598.3" cy="278.8" r="3" fill="#7FA8FF"/>
+    <circle cx="487.6" cy="446.8" r="3" fill="#7FA8FF"/>
+    <circle cx="358.3" cy="411.2" r="3" fill="#7FA8FF"/>
+    <circle cx="368.2" cy="326.4" r="4" fill="#7FA8FF" stroke="#F2F4EA" stroke-width="1.5"/>
+    <!-- Supply Chain -->
+    <circle cx="410.0" cy="142.0" r="3" fill="#D9DCCF"/>
+    <circle cx="451.8" cy="326.4" r="3" fill="#D9DCCF"/>
+    <circle cx="539.3" cy="518.0" r="3" fill="#D9DCCF"/>
+    <circle cx="280.7" cy="518.0" r="3" fill="#D9DCCF"/>
+    <circle cx="221.7" cy="278.8" r="3" fill="#D9DCCF"/>
+  </g>
+
+  <!-- Legend (right side, English only, with tech IDs) -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#D9DCCF">
+    <rect x="720" y="98" width="16" height="16" fill="#E5533B" fill-opacity="0.30" stroke="#E5533B" stroke-width="1.5"/>
+    <text x="744" y="111" font-weight="700">Phishing</text>
+    <text x="744" y="125" font-size="9" fill="#8F8875">T1566</text>
+
+    <rect x="720" y="140" width="16" height="16" fill="#E5A03B" fill-opacity="0.30" stroke="#E5A03B" stroke-width="1.5"/>
+    <text x="744" y="153" font-weight="700">Valid Accounts</text>
+    <text x="744" y="167" font-size="9" fill="#8F8875">T1078</text>
+
+    <rect x="720" y="182" width="16" height="16" fill="#48B44A" fill-opacity="0.30" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="744" y="195" font-weight="700">Public-Facing App</text>
+    <text x="744" y="209" font-size="9" fill="#8F8875">T1190</text>
+
+    <rect x="720" y="224" width="16" height="16" fill="#7FA8FF" fill-opacity="0.30" stroke="#7FA8FF" stroke-width="1.5"/>
+    <text x="744" y="237" font-weight="700">External Remote Svcs</text>
+    <text x="744" y="251" font-size="9" fill="#8F8875">T1133</text>
+
+    <rect x="720" y="266" width="16" height="16" fill="#D9DCCF" fill-opacity="0.20" stroke="#D9DCCF" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <text x="744" y="279" font-weight="700">Supply Chain</text>
+    <text x="744" y="293" font-size="9" fill="#8F8875">T1195</text>
+  </g>
+
+  <!-- Annotation box: key observation about Public-Facing App -->
+  <g>
+    <rect x="720" y="320" width="160" height="88" fill="#131210" stroke="#48B44A" stroke-width="1" rx="3"/>
+    <text x="800" y="338" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" font-weight="700" fill="#48B44A" text-anchor="middle">Key observation</text>
+    <text x="800" y="358" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#F2F4EA" text-anchor="middle">Public-Facing App</text>
+    <text x="800" y="371" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#D9DCCF" text-anchor="middle">is the only profile</text>
+    <text x="800" y="384" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#D9DCCF" text-anchor="middle">high on both</text>
+    <text x="800" y="397" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#48B44A" text-anchor="middle">Auth Bypass + Maturity</text>
+  </g>
+
+  <!-- Annotation arrow from box to Public-Facing App auth-bypass vertex (293.6, 500.2) -->
+  <path d="M 720 400 Q 500 470, 305 495" fill="none" stroke="#8F8875" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#arrowhead)"/>
+
+  <!-- Annotation box: Supply Chain cost tradeoff -->
+  <g>
+    <rect x="20" y="380" width="160" height="88" fill="#131210" stroke="#D9DCCF" stroke-width="1" rx="3"/>
+    <text x="100" y="398" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" font-weight="700" fill="#D9DCCF" text-anchor="middle">Cost tradeoff</text>
+    <text x="100" y="418" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#F2F4EA" text-anchor="middle">Supply Chain</text>
+    <text x="100" y="431" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#D9DCCF" text-anchor="middle">dominates 4 axes</text>
+    <text x="100" y="444" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#D9DCCF" text-anchor="middle">but fails on cost →</text>
+    <text x="100" y="457" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#8F8875" text-anchor="middle">APT-only economics</text>
+  </g>
+
+  <!-- Arrow from cost box to Supply Chain Low Cost vertex (451.8, 326.4) -->
+  <path d="M 180 400 Q 300 350, 445 328" fill="none" stroke="#8F8875" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#arrowhead)"/>
+
+  <!-- Bottom prose (English only) -->
+  <text x="450" y="620" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#F2F4EA" text-anchor="middle" font-weight="700">
+    No profile wins all five axes.
+  </text>
+  <text x="450" y="640" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#D9DCCF" text-anchor="middle">
+    Technique selection is a tradeoff against the target's defensive posture, not a search for the "strongest" option.
+  </text>
+  <text x="450" y="660" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#8F8875" text-anchor="middle">
+    Attackers optimize for the combination that fits the target — same actor, different targets, different techniques.
+  </text>
+  <text x="450" y="682" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#615C50" text-anchor="middle">
+    Sources: MITRE ATT&amp;CK TA0001 · Verizon DBIR 2025/2026 · Mandiant M-Trends 2026 · Google TIG 2025
+  </text>
+</svg>

@@ -1,0 +1,197 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" width="900" height="600" role="img" aria-labelledby="ms-title" preserveAspectRatio="xMidYMid meet">
+  <title id="ms-title">Initial access technique effectiveness across defender maturity levels</title>
+  <defs>
+    <marker id="ms-arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#8F8875"/>
+    </marker>
+  </defs>
+
+  <!-- Header -->
+  <text x="450" y="40" font-family="JetBrains Mono, ui-monospace, monospace" font-size="16" font-weight="700" fill="#F2F4EA" text-anchor="middle">
+    Defender Maturity Shift: Which Technique Wins Where
+  </text>
+  <text x="450" y="60" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#8F8875" text-anchor="middle">
+    Effectiveness curves across five defender maturity bands
+  </text>
+
+  <!-- Horizontal grid lines at 25% intervals -->
+  <g stroke="#2A2620" stroke-width="1" stroke-dasharray="2 4" fill="none">
+    <line x1="110" y1="110" x2="720" y2="110"/>
+    <line x1="110" y1="195" x2="720" y2="195"/>
+    <line x1="110" y1="280" x2="720" y2="280"/>
+    <line x1="110" y1="365" x2="720" y2="365"/>
+    <line x1="110" y1="450" x2="720" y2="450"/>
+  </g>
+
+  <!-- Vertical band separators -->
+  <g stroke="#2A2620" stroke-width="1" stroke-dasharray="2 4" fill="none">
+    <line x1="262.5" y1="110" x2="262.5" y2="450"/>
+    <line x1="415" y1="110" x2="415" y2="450"/>
+    <line x1="567.5" y1="110" x2="567.5" y2="450"/>
+  </g>
+
+  <!-- Axes -->
+  <g stroke="#8F8875" stroke-width="1.5" fill="none">
+    <line x1="110" y1="110" x2="110" y2="450"/>
+    <line x1="110" y1="450" x2="720" y2="450"/>
+  </g>
+
+  <!-- Y-axis labels (percentage) -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#8F8875" text-anchor="end">
+    <text x="100" y="114">100%</text>
+    <text x="100" y="199">75%</text>
+    <text x="100" y="284">50%</text>
+    <text x="100" y="369">25%</text>
+    <text x="100" y="454">0%</text>
+  </g>
+
+  <!-- Y-axis title (rotated, English) -->
+  <text font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" fill="#D9DCCF" text-anchor="middle" font-weight="700" transform="translate(48 280) rotate(-90)">
+    Attacker success probability
+  </text>
+
+  <!-- X-axis tick labels (English only) -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" fill="#F2F4EA" text-anchor="middle" font-weight="700">
+    <text x="110" y="472">Baseline</text>
+    <text x="262.5" y="472">Basic</text>
+    <text x="415" y="472">Standard</text>
+    <text x="567.5" y="472">Advanced</text>
+    <text x="720" y="472">Frontier</text>
+  </g>
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#8F8875" text-anchor="middle">
+    <text x="110" y="487">no MFA</text>
+    <text x="262.5" y="487">SMS MFA</text>
+    <text x="415" y="487">push + patch</text>
+    <text x="567.5" y="487">FIDO2 + CA</text>
+    <text x="720" y="487">zero-trust</text>
+  </g>
+
+  <!-- X-axis title -->
+  <text x="415" y="510" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" fill="#D9DCCF" text-anchor="middle" font-weight="700">
+    Defender maturity: identity controls + patch cadence + telemetry depth
+  </text>
+
+  <!-- =============== Curves =============== -->
+  <!-- Phishing -->
+  <path d="M 110.0,212.0 L 262.5,229.0 L 415.0,263.0 L 567.5,297.0 L 720.0,314.0" fill="none" stroke="#E5533B" stroke-width="2"/>
+  <!-- Valid Accounts -->
+  <path d="M 110.0,161.0 L 262.5,195.0 L 415.0,263.0 L 567.5,331.0 L 720.0,382.0" fill="none" stroke="#E5A03B" stroke-width="2"/>
+  <!-- Public-Facing App (highlighted, thicker) -->
+  <path d="M 110.0,195.0 L 262.5,212.0 L 415.0,229.0 L 567.5,246.0 L 720.0,263.0" fill="none" stroke="#48B44A" stroke-width="2.8"/>
+  <!-- External Remote Services -->
+  <path d="M 110.0,178.0 L 262.5,246.0 L 415.0,348.0 L 567.5,399.0 L 720.0,422.8" fill="none" stroke="#7FA8FF" stroke-width="2"/>
+  <!-- Supply Chain (dashed) -->
+  <path d="M 110.0,246.0 L 262.5,246.0 L 415.0,252.8 L 567.5,263.0 L 720.0,273.2" fill="none" stroke="#D9DCCF" stroke-width="2" stroke-dasharray="4 3"/>
+
+  <!-- =============== Data points at every band =============== -->
+  <g>
+    <!-- Phishing -->
+    <circle cx="110.0" cy="212.0" r="3" fill="#E5533B"/>
+    <circle cx="262.5" cy="229.0" r="3" fill="#E5533B"/>
+    <circle cx="415.0" cy="263.0" r="3" fill="#E5533B"/>
+    <circle cx="567.5" cy="297.0" r="3" fill="#E5533B"/>
+    <circle cx="720.0" cy="314.0" r="3" fill="#E5533B"/>
+    <!-- Valid Accounts -->
+    <circle cx="110.0" cy="161.0" r="3" fill="#E5A03B"/>
+    <circle cx="262.5" cy="195.0" r="3" fill="#E5A03B"/>
+    <circle cx="415.0" cy="263.0" r="3" fill="#E5A03B"/>
+    <circle cx="567.5" cy="331.0" r="3" fill="#E5A03B"/>
+    <circle cx="720.0" cy="382.0" r="3" fill="#E5A03B"/>
+    <!-- Public-Facing App (highlighted endpoints) -->
+    <circle cx="110.0" cy="195.0" r="4" fill="#48B44A" stroke="#F2F4EA" stroke-width="1.5"/>
+    <circle cx="262.5" cy="212.0" r="3" fill="#48B44A"/>
+    <circle cx="415.0" cy="229.0" r="3" fill="#48B44A"/>
+    <circle cx="567.5" cy="246.0" r="3" fill="#48B44A"/>
+    <circle cx="720.0" cy="263.0" r="6" fill="#48B44A" stroke="#F2F4EA" stroke-width="2"/>
+    <!-- External Remote Services -->
+    <circle cx="110.0" cy="178.0" r="3" fill="#7FA8FF"/>
+    <circle cx="262.5" cy="246.0" r="3" fill="#7FA8FF"/>
+    <circle cx="415.0" cy="348.0" r="3" fill="#7FA8FF"/>
+    <circle cx="567.5" cy="399.0" r="3" fill="#7FA8FF"/>
+    <circle cx="720.0" cy="422.8" r="3" fill="#7FA8FF"/>
+    <!-- Supply Chain -->
+    <circle cx="110.0" cy="246.0" r="3" fill="#D9DCCF"/>
+    <circle cx="262.5" cy="246.0" r="3" fill="#D9DCCF"/>
+    <circle cx="415.0" cy="252.8" r="3" fill="#D9DCCF"/>
+    <circle cx="567.5" cy="263.0" r="3" fill="#D9DCCF"/>
+    <circle cx="720.0" cy="273.2" r="3" fill="#D9DCCF"/>
+  </g>
+
+  <!-- =============== Endpoint value labels (Baseline + Frontier) =============== -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" font-weight="700">
+    <!-- Baseline endpoints (left side, moved to fit) -->
+    <text x="103" y="164" fill="#E5A03B" text-anchor="end">85</text>
+    <text x="103" y="181" fill="#7FA8FF" text-anchor="end">80</text>
+    <text x="103" y="198" fill="#48B44A" text-anchor="end">75</text>
+    <text x="103" y="215" fill="#E5533B" text-anchor="end">70</text>
+    <text x="103" y="249" fill="#D9DCCF" text-anchor="end">60</text>
+  </g>
+
+  <!-- =============== Right-side labels with delta values =============== -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" font-weight="700">
+    <text x="732" y="260" fill="#48B44A">Public-Facing App</text>
+    <text x="732" y="273" font-size="9" fill="#8F8875" font-weight="400">55% at Frontier · Δ −20</text>
+
+    <text x="732" y="292" fill="#D9DCCF">Supply Chain</text>
+    <text x="732" y="305" font-size="9" fill="#8F8875" font-weight="400">52% at Frontier · Δ −8</text>
+
+    <text x="732" y="322" fill="#E5533B">Phishing</text>
+    <text x="732" y="335" font-size="9" fill="#8F8875" font-weight="400">40% at Frontier · Δ −30</text>
+
+    <text x="732" y="384" fill="#E5A03B">Valid Accounts</text>
+    <text x="732" y="397" font-size="9" fill="#8F8875" font-weight="400">20% at Frontier · Δ −65</text>
+
+    <text x="732" y="424" fill="#7FA8FF">Remote Services</text>
+    <text x="732" y="437" font-size="9" fill="#8F8875" font-weight="400">8% at Frontier · Δ −72</text>
+  </g>
+
+  <!-- =============== TTE annotation box =============== -->
+  <g>
+    <rect x="290" y="90" width="240" height="60" fill="#131210" stroke="#48B44A" stroke-width="1" rx="3"/>
+    <text x="410" y="108" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" font-weight="700" fill="#48B44A" text-anchor="middle">
+      Google TIG mean time-to-exploit
+    </text>
+    <text x="410" y="124" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#F2F4EA" text-anchor="middle" font-weight="700">
+      63d (2018) → −1d (2024) → −7d (2025)
+    </text>
+    <text x="410" y="140" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#D9DCCF" text-anchor="middle">
+      exploit deploys before patch exists → Public-Facing App stays flat
+    </text>
+  </g>
+
+  <!-- Arrow from TTE box to Public-Facing App curve endpoint -->
+  <path d="M 530 130 Q 620 180, 710 259" fill="none" stroke="#48B44A" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#ms-arrow)" opacity="0.7"/>
+
+  <!-- =============== Collapse annotation for Remote Services =============== -->
+  <g>
+    <rect x="285" y="378" width="180" height="52" fill="#131210" stroke="#7FA8FF" stroke-width="1" rx="3"/>
+    <text x="375" y="395" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" font-weight="700" fill="#7FA8FF" text-anchor="middle">
+      Steepest collapse
+    </text>
+    <text x="375" y="410" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#F2F4EA" text-anchor="middle">
+      Remote Services: 80% → 8%
+    </text>
+    <text x="375" y="423" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#D9DCCF" text-anchor="middle">
+      cheap defensive controls suffice
+    </text>
+  </g>
+  <!-- Arrow from collapse box to Remote Services at Advanced -->
+  <path d="M 465 400 Q 520 400, 562 399" fill="none" stroke="#7FA8FF" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#ms-arrow)" opacity="0.7"/>
+
+  <!-- =============== Sweet spot band highlight for Public-Facing App vs Supply Chain =============== -->
+  <rect x="580" y="255" width="140" height="24" fill="#48B44A" fill-opacity="0.08" stroke="none"/>
+  <text x="650" y="270" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#48B44A" text-anchor="middle" font-weight="700">
+    both hold above 50%
+  </text>
+
+  <!-- =============== Bottom takeaway (English only) =============== -->
+  <text x="450" y="545" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#F2F4EA" text-anchor="middle" font-weight="700">
+    Two curves stay above 50% even at Frontier maturity: Public-Facing App and Supply Chain.
+  </text>
+  <text x="450" y="562" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#D9DCCF" text-anchor="middle">
+    Both exploit trust relationships that cannot be fully removed by target-side controls.
+  </text>
+  <text x="450" y="582" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#615C50" text-anchor="middle">
+    Sources: Mandiant M-Trends 2026 · Google TIG 2025 · Verizon DBIR 2025 (baseline effectiveness estimates)
+  </text>
+</svg>
