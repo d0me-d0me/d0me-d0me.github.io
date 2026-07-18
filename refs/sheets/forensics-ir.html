@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forensics &amp; IR — d0me</title>
+<meta name="description" content="Windows フォレンジック・インシデントレスポンスの実務チートシート。ライブトリアージからタイムライン統合まで。">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/sheet.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">索引</span></div>
+    <button class="nav-toggle" aria-label="メニュー">≡</button>
+    <nav class="nav"><a href="../all.html">索引</a><a href="../index.html#certs">資格</a><a href="#" data-gh-url>github</a></nav>
+  </div>
+</header>
+
+<main>
+<section class="sheet-hero">
+  <div class="wrap">
+    <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>Forensics &amp; IR</div>
+    <h1>Forensics &amp; IR</h1>
+    <p class="lede">Windows-first incident response and host forensics — from live triage to super timeline. Anchored to PICERL and Eric Zimmerman / Volatility / plaso tooling.<span class="jp">Windows を主軸にした IR 実務。ライブトリアージからスーパータイムラインまでを PICERL と公開ツールで揃える。</span></p>
+  </div>
+</section>
+
+<section class="attack-flow">
+  <div class="wrap">
+    <div class="flow-head">
+      <span class="hx">##</span>
+      <span class="label">IR Flow</span>
+      <span class="jp">対応フロー</span>
+      <span class="rt">SANS PICERL — 6 phase</span>
+    </div>
+    <div class="flow-chain">
+      <div class="phase"><span class="ph-num">01</span><b>Prepare</b><span class="ph-jp">準備</span><span class="ph-note">プレイブック / ツール整備 / トリアージ手順</span></div>
+      <div class="phase"><span class="ph-num">02</span><b>Identify</b><span class="ph-jp">検知</span><span class="ph-note">アラート起点 / スコープ確定 / IOC 抽出</span></div>
+      <div class="phase"><span class="ph-num">03</span><b>Triage</b><span class="ph-jp">トリアージ</span><span class="ph-note">揮発性データ収集 / KAPE / 優先度判定</span></div>
+      <div class="phase"><span class="ph-num">04</span><b>Contain</b><span class="ph-jp">封じ込め</span><span class="ph-note">隔離 / 認証情報無効化 / 横展開遮断</span></div>
+      <div class="phase"><span class="ph-num">05</span><b>Eradicate</b><span class="ph-jp">根絶</span><span class="ph-note">永続化除去 / 侵害範囲確定 / 復元不能化</span></div>
+      <div class="phase"><span class="ph-num">06</span><b>Recover</b><span class="ph-jp">復旧</span><span class="ph-note">クリーン再構成 / 監視強化 / 教訓化</span></div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap">
+<div class="sheet-layout">
+  <aside class="toc">
+    <div class="toc-label">目次</div>
+    <ul>
+      <li><a href="#s01">01 初動トリアージ</a></li>
+      <li><a href="#s02">02 メモリ解析</a></li>
+      <li><a href="#s03">03 イベントログ</a></li>
+      <li><a href="#s04">04 ファイルシステム痕跡</a></li>
+      <li><a href="#s05">05 レジストリ解析</a></li>
+      <li><a href="#s06">06 タイムライン統合</a></li>
+      <li><a href="#s07">07 永続化ハンティング</a></li>
+      <li><a href="#s08">08 アンチフォレンジック</a></li>
+      <li><a href="#ref">09 参照</a></li>
+    </ul>
+  </aside>
+
+  <article class="doc">
+
+    <!-- ============ s01: Live Triage ============ -->
+    <section id="s01" class="reveal">
+      <h2><span class="num">01</span>初動トリアージ<span class="jp">Live Response Triage</span></h2>
+      <p>侵害の疑いがある端末を最初に触るときの原則は「揮発性の高いものから、書き換えを最小に」。プロセス・ネットワーク接続・ログオンセッションはシャットダウンで失われるため、電源を落とす前に取得する。KAPE と Velociraptor が Windows ライブトリアージの事実上の標準になっている。</p>
+
+      <h3 id="s01-1">揮発性データの取得順序</h3>
+      <p>RFC 3227 の Order of Volatility に沿う。上位ほど先に取る。</p>
+      <ul>
+        <li>CPU レジスタ・キャッシュ (取得不可、諦める)</li>
+        <li>RAM (memory dump)</li>
+        <li>プロセス / ネットワーク / ARP / ログオンセッション</li>
+        <li>ディスク上の一時ファイル / ページファイル</li>
+        <li>ファイルシステム (MFT / USN / レジストリ / イベントログ)</li>
+        <li>リモートログ / バックアップ</li>
+      </ul>
+
+      <h3 id="s01-2">KAPE トリアージ収集</h3>
+      <p>KAPE (Kroll Artifact Parser and Extractor) は Target (収集) と Module (解析) の 2 段構成。まず Target で必要成果物を一括取得。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div><pre><code><span class="c">:: 基本的なトリアージ収集 (KapeTriage は必要成果物をまとめた target)</span>
+kape.exe --tsource C: --tdest <span class="v">&lt;OUT_DIR&gt;</span>\triage --target KapeTriage --vhdx triage
+
+<span class="c">:: 収集 → 解析まで一気通貫 (Module: !EZParser で EZ tools 全体を実行)</span>
+kape.exe --tsource C: --tdest <span class="v">&lt;OUT_DIR&gt;</span>\triage --target KapeTriage ^
+  --mdest <span class="v">&lt;OUT_DIR&gt;</span>\parsed --module !EZParser --mflush</code></pre></div>
+
+      <div class="note"><span class="lbl">tip</span>
+      <code>--vhdx</code> で VHDX にまとめると事後解析側で仮想マウントできる。取得側 (被害端末) にはできる限りツール本体だけを置き、成果物は共有先や外付けメディアへ書き出す。</div>
+
+      <h3 id="s01-3">Velociraptor による群制御</h3>
+      <p>複数ホストを跨いだトリアージなら Velociraptor。VQL でクエリを書き、Windows.KapeFiles.Targets のようなアーティファクトを配布して並列収集できる。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># オフライン (単独ホスト) 収集: KAPE 相当のトリアージパッケージを生成</span>
+velociraptor.exe --config <span class="v">&lt;CLIENT_CONFIG.yaml&gt;</span> \
+  artifacts collect Windows.KapeFiles.Targets \
+  --args Device=C: --args _SANS_Triage=Y \
+  --output <span class="v">&lt;OUT_DIR&gt;</span>\triage.zip</code></pre></div>
+
+      <h3 id="s01-4">最小構成のワンライナー系</h3>
+      <p>KAPE も Velociraptor も持ち込めない場面用の最低限。順序を崩さないこと。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># ネットワーク接続 + プロセスの相関</span>
+Get-NetTCPConnection | Where-Object State -eq Established |
+  Select-Object LocalAddress,LocalPort,RemoteAddress,RemotePort,OwningProcess,
+    @{n=<span class="s">'Process'</span>;e={(Get-Process -Id $_.OwningProcess).Path}}
+
+<span class="c"># ログオンセッション (対話・ネットワーク・キャッシュ含む)</span>
+qwinsta ; query user
+Get-CimInstance Win32_LogonSession | Select LogonId,LogonType,StartTime
+
+<span class="c"># 直近スケジューラ実行 / サービス状態</span>
+Get-ScheduledTask | Where-Object State -eq Ready |
+  Select TaskName,TaskPath,@{n=<span class="s">'LastRun'</span>;e={($_ | Get-ScheduledTaskInfo).LastRunTime}}</code></pre></div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+      <ul>
+        <li>取得順序は Order of Volatility。RAM を後回しにしない。</li>
+        <li>ライブでもディスク書き込みは最小に。ツールと成果物は別領域。</li>
+        <li>1 台なら KAPE、複数台なら Velociraptor が現実解。</li>
+      </ul></div>
+    </section>
+
+    <!-- ============ s02: Memory ============ -->
+    <section id="s02" class="reveal">
+      <h2><span class="num">02</span>メモリ解析<span class="jp">Memory Forensics</span></h2>
+      <p>ディスクに残らない痕跡 — 復号された文字列、注入コード、reflectively loaded assembly、消えたプロセスの子孫関係 — はメモリにしか無い。取得と解析を分けて考える。</p>
+
+      <h3 id="s02-1">メモリ取得</h3>
+      <p>winpmem / DumpIt / Magnet RAM Capture のいずれか。raw または AFF4 で保存。取得は必ず外部媒体へ書き出す。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div><pre><code><span class="c">:: winpmem: raw 形式で外付けメディアへ</span>
+winpmem_mini.exe <span class="v">&lt;EXTERNAL_DRIVE&gt;</span>\<span class="v">&lt;HOST&gt;</span>.raw
+
+<span class="c">:: DumpIt: プロンプト無しで実行</span>
+DumpIt.exe /Q /O <span class="v">&lt;EXTERNAL_DRIVE&gt;</span>\<span class="v">&lt;HOST&gt;</span>.dmp</code></pre></div>
+
+      <h3 id="s02-2">Volatility 3</h3>
+      <p>Volatility 3 はプロファイル指定が不要になった。頻用プラグイン。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># プロセスツリー</span>
+vol -f <span class="v">&lt;MEMORY.raw&gt;</span> windows.pstree
+
+<span class="c"># DLL 一覧 (特定 PID)</span>
+vol -f <span class="v">&lt;MEMORY.raw&gt;</span> windows.dlllist --pid <span class="v">&lt;PID&gt;</span>
+
+<span class="c"># 隠しプロセス / unlinked / EPROCESS 差分</span>
+vol -f <span class="v">&lt;MEMORY.raw&gt;</span> windows.psscan
+vol -f <span class="v">&lt;MEMORY.raw&gt;</span> windows.psxview
+
+<span class="c"># 注入コード検出 (RWX / private memory + executable など)</span>
+vol -f <span class="v">&lt;MEMORY.raw&gt;</span> windows.malfind
+
+<span class="c"># ネットワーク接続</span>
+vol -f <span class="v">&lt;MEMORY.raw&gt;</span> windows.netscan
+
+<span class="c"># コマンドライン (プロセス起動引数)</span>
+vol -f <span class="v">&lt;MEMORY.raw&gt;</span> windows.cmdline
+
+<span class="c"># 資格情報関連 (LSA secrets / hashes / cachedump)</span>
+vol -f <span class="v">&lt;MEMORY.raw&gt;</span> windows.hashdump
+vol -f <span class="v">&lt;MEMORY.raw&gt;</span> windows.lsadump
+
+<span class="c"># プロセス実行イメージのダンプ (二次解析用: 逆アセンブラ / strings)</span>
+vol -f <span class="v">&lt;MEMORY.raw&gt;</span> -o <span class="v">&lt;OUT&gt;</span> windows.pslist --pid <span class="v">&lt;PID&gt;</span> --dump
+
+<span class="c"># プロセスがオープンしているファイル (DLL / 開いたドキュメント等)</span>
+vol -f <span class="v">&lt;MEMORY.raw&gt;</span> -o <span class="v">&lt;OUT&gt;</span> windows.dumpfiles --pid <span class="v">&lt;PID&gt;</span></code></pre></div>
+
+      <h3 id="s02-3">MemProcFS</h3>
+      <p>メモリイメージを FUSE / ドライブレターとしてマウントし、ファイルシステム的にアクセスできる。ad-hoc 探索と grep の併用が強い。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div><pre><code><span class="c">:: メモリを M: にマウント</span>
+MemProcFS.exe -device <span class="v">&lt;MEMORY.raw&gt;</span> -mount M:
+
+<span class="c">:: プロセスごとに /pid/&lt;PID&gt;/ 以下でツリー展開される</span>
+dir M:\name\lsass.exe
+type M:\registry\hive_list.txt</code></pre></div>
+
+      <h3 id="s02-4">読み方の指針</h3>
+      <ul>
+        <li><strong>親子関係の異常</strong>: <code>svchost.exe</code> の親が <code>services.exe</code> でない、<code>rundll32.exe</code> が Office から派生している、など。</li>
+        <li><strong>署名無し + 高権限</strong>: NT AUTHORITY\SYSTEM で動く非署名モジュール、想定外の <code>lsass.exe</code> 内 DLL。</li>
+        <li><strong>ネットワーク + 短命プロセス</strong>: netscan で外向き接続を持つが pstree で見えない → psscan で拾い直す。</li>
+        <li><strong>malfind の false positive</strong>: JIT (Chrome / .NET) は通常 RWX を持つ。文字列 / import / エントリポイント命令列で切り分ける。</li>
+      </ul>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+      <ul>
+        <li>取得と解析は分離。取得は最短時間で、解析は複製で。</li>
+        <li>pslist / psscan / psxview の差分こそがメモリ解析の意義。</li>
+        <li>malfind は起点、結論ではない。文字列と挙動で裏を取る。</li>
+      </ul></div>
+    </section>
+
+    <!-- ============ s03: Event Log ============ -->
+    <section id="s03" class="reveal">
+      <h2><span class="num">03</span>イベントログ &amp; Sysmon<span class="jp">Windows Event Log Analysis</span></h2>
+      <p>Windows イベントログは <code>%SystemRoot%\System32\winevt\Logs\*.evtx</code>。Security / System / Application に加え、Sysmon と PowerShell の Operational チャネルが実務では主戦場になる。</p>
+
+      <h3 id="s03-1">重要な Event ID</h3>
+      <table>
+        <thead><tr><th>チャネル</th><th>Event ID</th><th>意味</th></tr></thead>
+        <tbody>
+          <tr><td>Security</td><td><code>4624</code></td><td>ログオン成功 (LogonType で対話/ネットワーク/RDP を判別)</td></tr>
+          <tr><td>Security</td><td><code>4625</code></td><td>ログオン失敗</td></tr>
+          <tr><td>Security</td><td><code>4672</code></td><td>特権付与 (SeDebugPrivilege 等)</td></tr>
+          <tr><td>Security</td><td><code>4688</code></td><td>プロセス生成 (コマンドライン記録が有効なら引数も)</td></tr>
+          <tr><td>Security</td><td><code>4698</code></td><td>スケジュールタスク作成</td></tr>
+          <tr><td>Security</td><td><code>4720/4728/4732</code></td><td>ユーザ作成 / グローバルグループ追加 / ローカル管理者追加</td></tr>
+          <tr><td>Security</td><td><code>4768/4769</code></td><td>Kerberos TGT / TGS 要求 (Kerberoast / AS-REP 兆候)</td></tr>
+          <tr><td>Sysmon</td><td><code>1</code></td><td>プロセス生成 (親プロセス / ハッシュ / コマンドライン)</td></tr>
+          <tr><td>Sysmon</td><td><code>3</code></td><td>ネットワーク接続</td></tr>
+          <tr><td>Sysmon</td><td><code>7</code></td><td>Image loaded (DLL ロード)</td></tr>
+          <tr><td>Sysmon</td><td><code>8</code></td><td>CreateRemoteThread (プロセス注入の代表兆候)</td></tr>
+          <tr><td>Sysmon</td><td><code>10</code></td><td>Process access (lsass.exe が対象なら要注視)</td></tr>
+          <tr><td>Sysmon</td><td><code>11</code></td><td>File create</td></tr>
+          <tr><td>Sysmon</td><td><code>13</code></td><td>Registry value set</td></tr>
+          <tr><td>Sysmon</td><td><code>22</code></td><td>DNS query</td></tr>
+          <tr><td>PowerShell</td><td><code>4104</code></td><td>ScriptBlock logging (難読化スクリプトを平文で記録)</td></tr>
+          <tr><td>PowerShell</td><td><code>4103</code></td><td>Module logging (パイプライン)</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="s03-2">EvtxECmd による正規化</h3>
+      <p>Eric Zimmerman の EvtxECmd は evtx を CSV / JSON に平坦化。Timeline Explorer や後段の SIEM に流し込むための基本前処理。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div><pre><code><span class="c">:: 単一ファイル → CSV</span>
+EvtxECmd.exe -f <span class="v">&lt;EVTX_FILE&gt;</span> --csv <span class="v">&lt;OUT&gt;</span> --csvf events.csv
+
+<span class="c">:: フォルダ再帰 + Map (Sysmon / PS など既知イベントを構造化)</span>
+EvtxECmd.exe -d <span class="v">&lt;EVTX_DIR&gt;</span> --csv <span class="v">&lt;OUT&gt;</span> --csvf all.csv</code></pre></div>
+
+      <h3 id="s03-3">chainsaw / hayabusa による Sigma スイープ</h3>
+      <p>Sigma ルールを evtx に直接ぶつけて既知パターンを一気に検出する。ハントの初手として費用対効果が高い。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># chainsaw: Sigma + built-in ハンティング</span>
+chainsaw hunt <span class="v">&lt;EVTX_DIR&gt;</span> -s sigma/ --mapping mappings/sigma-event-logs-all.yml \
+  --output results.csv --csv
+
+<span class="c"># hayabusa: 日本製、独自 Yaml ルールを組み込み</span>
+hayabusa csv-timeline -d <span class="v">&lt;EVTX_DIR&gt;</span> -o timeline.csv</code></pre></div>
+
+      <h3 id="s03-4">読み方の指針</h3>
+      <ul>
+        <li><strong>4624 は LogonType で分ける</strong>: 2=対話, 3=ネットワーク, 10=RemoteInteractive (RDP), 9=NewCredentials (runas /netonly, 横展開兆候)。</li>
+        <li><strong>4688 はコマンドライン記録の有効化が前提</strong>。無効なら Sysmon 1 で補う。</li>
+        <li><strong>PowerShell 4104 はスクリプト難読化の平文化に効く</strong>。Base64 でも復号済み文字列がここに残ることが多い。</li>
+        <li><strong>Sysmon 10 の対象が lsass.exe</strong>: 資格情報窃取 (mimikatz 系) の代表兆候。</li>
+      </ul>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+      <ul>
+        <li>Security チャネル単独では見えない挙動が Sysmon で埋まる。</li>
+        <li>evtx はまず正規化 (EvtxECmd) → Sigma スイープ (chainsaw) の順で費用対効果を最大化。</li>
+        <li>4624 LogonType と 4688 CommandLine の 2 つが読めれば大半のシナリオは追える。</li>
+      </ul></div>
+    </section>
+
+    <!-- ============ s04: Filesystem ============ -->
+    <section id="s04" class="reveal">
+      <h2><span class="num">04</span>ファイルシステム痕跡<span class="jp">Filesystem Artifacts</span></h2>
+      <p>ディスクは削除されても消えない情報の宝庫。NTFS の <code>$MFT</code> / <code>$LogFile</code> / <code>$UsnJrnl</code>、Windows 実行痕跡の Prefetch / ShimCache / AmCache を押さえる。</p>
+
+      <h3 id="s04-1">MFT: ファイルの母台帳</h3>
+      <p><code>$MFT</code> はボリューム上の全ファイルのメタデータを持つ。削除ファイルもエントリが再利用されるまで残る。MFTECmd で解析。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div><pre><code><span class="c">:: $MFT を CSV に</span>
+MFTECmd.exe -f <span class="v">&lt;PATH&gt;</span>\$MFT --csv <span class="v">&lt;OUT&gt;</span> --csvf mft.csv
+
+<span class="c">:: $J (USN Journal) — ファイルの変更ログ (作成/削除/リネーム)</span>
+MFTECmd.exe -f <span class="v">&lt;PATH&gt;</span>\$J --csv <span class="v">&lt;OUT&gt;</span> --csvf usn.csv</code></pre></div>
+
+      <p>MFT レコードには <code>$STANDARD_INFORMATION (SI)</code> と <code>$FILE_NAME (FN)</code> の 2 種類のタイムスタンプがある。SI はユーザ空間から書き換え可能、FN はカーネル空間で更新される。SI と FN の乖離は timestomping の代表兆候。</p>
+
+      <h3 id="s04-2">Prefetch: 実行された事実</h3>
+      <p><code>%SystemRoot%\Prefetch\*.pf</code> に、実行された EXE のメタデータと参照ファイル一覧が記録される。「実行された」という事実の一次証拠。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div><pre><code>PECmd.exe -d C:\Windows\Prefetch --csv <span class="v">&lt;OUT&gt;</span> --csvf prefetch.csv</code></pre></div>
+
+      <p>取れる情報: 実行回数、最終 8 回分の実行時刻、参照した DLL / ファイル、実行元パス。Windows Server では既定で無効なので注意。</p>
+
+      <h3 id="s04-3">ShimCache (AppCompatCache)</h3>
+      <p>アプリ互換性のためのキャッシュだが、EXE のフルパスとタイムスタンプが残る。実行された事実の記録ではないが「システムが認識した」証跡になる。<code>SYSTEM</code> ハイブに格納。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div><pre><code>AppCompatCacheParser.exe -f <span class="v">&lt;PATH&gt;</span>\SYSTEM --csv <span class="v">&lt;OUT&gt;</span> --csvf shimcache.csv</code></pre></div>
+
+      <h3 id="s04-4">AmCache</h3>
+      <p><code>%SystemRoot%\AppCompat\Programs\Amcache.hve</code>。実行された EXE のフルパス、SHA1、コンパイル時刻、初回実行時刻を含む。ShimCache より情報量が多い。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div><pre><code>AmcacheParser.exe -f <span class="v">&lt;PATH&gt;</span>\Amcache.hve --csv <span class="v">&lt;OUT&gt;</span></code></pre></div>
+
+      <h3 id="s04-5">その他の実行痕跡</h3>
+      <ul>
+        <li><strong>UserAssist</strong> (NTUSER): GUI から起動されたプログラム。実行回数と最終実行時刻。</li>
+        <li><strong>BAM/DAM</strong> (SYSTEM): Background Activity Moderator。バックグラウンド実行の記録。</li>
+        <li><strong>RecentDocs / OpenSaveMRU</strong> (NTUSER): 開かれたドキュメント。</li>
+        <li><strong>LNK / JumpList</strong>: <code>LECmd</code> / <code>JLECmd</code> で解析。参照先ファイルの元パス、ボリューム情報。</li>
+        <li><strong>ShellBags</strong> (NTUSER / UsrClass): エクスプローラで開いたフォルダ。削除フォルダの存在証拠にもなる。</li>
+      </ul>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+      <ul>
+        <li>「実行された」の証拠は Prefetch &gt; AmCache &gt; UserAssist の順で強い。</li>
+        <li>ShimCache は「システムが見た」レベル。実行の証明にはならない。</li>
+        <li>MFT の SI / FN 乖離、USN Journal の削除記録が anti-forensics 発見の起点。</li>
+      </ul></div>
+    </section>
+
+    <!-- ============ s05: Registry ============ -->
+    <section id="s05" class="reveal">
+      <h2><span class="num">05</span>レジストリ解析<span class="jp">Registry Forensics</span></h2>
+      <p>Windows のレジストリはハイブファイルとしてディスクに存在する。オンライン端末での <code>reg query</code> ではなく、コピーしたハイブをオフラインで解析するのがフォレンジックの原則。</p>
+
+      <h3 id="s05-1">ハイブの所在</h3>
+      <table>
+        <thead><tr><th>ハイブ</th><th>パス</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td>SYSTEM</td><td><code>%SystemRoot%\System32\config\SYSTEM</code></td><td>サービス, ShimCache, USBSTOR, ComputerName</td></tr>
+          <tr><td>SOFTWARE</td><td><code>%SystemRoot%\System32\config\SOFTWARE</code></td><td>インストール済み / Run キー / OS 情報</td></tr>
+          <tr><td>SAM</td><td><code>%SystemRoot%\System32\config\SAM</code></td><td>ローカルアカウント</td></tr>
+          <tr><td>SECURITY</td><td><code>%SystemRoot%\System32\config\SECURITY</code></td><td>LSA secrets / ポリシー</td></tr>
+          <tr><td>NTUSER.DAT</td><td><code>%UserProfile%\NTUSER.DAT</code></td><td>ユーザ固有 (Run, UserAssist, RecentDocs)</td></tr>
+          <tr><td>UsrClass.dat</td><td><code>%UserProfile%\AppData\Local\Microsoft\Windows\UsrClass.dat</code></td><td>ShellBags, COM 関連</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="s05-2">RegRipper</h3>
+      <p>プラグイン式のハイブ解析ツール。ハイブごとに <code>-p</code> でプラグイン指定、<code>-a</code> で全プラグイン一括。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 全プラグイン一括 (SOFTWARE ハイブ)</span>
+rip.pl -r <span class="v">&lt;PATH&gt;</span>/SOFTWARE -a > software_all.txt
+
+<span class="c"># プロファイル指定 (定型プラグイン群)</span>
+rip.pl -r <span class="v">&lt;PATH&gt;</span>/SYSTEM -f system
+
+<span class="c"># 単発: Run キーだけ</span>
+rip.pl -r <span class="v">&lt;PATH&gt;</span>/SOFTWARE -p run</code></pre></div>
+
+      <h3 id="s05-3">RECmd (Eric Zimmerman)</h3>
+      <p>Batch file (YAML) で複数キーを一括抽出。KAPE から呼ぶ場合の標準。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div><pre><code>RECmd.exe --f <span class="v">&lt;PATH&gt;</span>\SOFTWARE --bn BatchExamples\Kroll_Batch.reb ^
+  --csv <span class="v">&lt;OUT&gt;</span> --csvf software.csv</code></pre></div>
+
+      <h3 id="s05-4">頻用キー</h3>
+      <ul>
+        <li><code>SOFTWARE\Microsoft\Windows\CurrentVersion\Run|RunOnce</code>: 起動時実行 (機械単位)。</li>
+        <li><code>NTUSER.DAT\Software\...\Run</code>: 起動時実行 (ユーザ単位)。</li>
+        <li><code>SYSTEM\CurrentControlSet\Services</code>: サービス定義。<code>ImagePath</code> と <code>Start=2 (Auto)</code> を注視。</li>
+        <li><code>SYSTEM\Select\Current</code>: どの ControlSet が現行か。</li>
+        <li><code>SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\Userinit|Shell</code>: ログオン時実行の書き換え。</li>
+        <li><code>SYSTEM\ControlSet001\Enum\USBSTOR</code>: USB 接続履歴。</li>
+        <li><code>SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\&lt;exe&gt;</code>: Debugger 値による永続化 (Sticky keys 系)。</li>
+      </ul>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+      <ul>
+        <li>解析は常にオフラインハイブで。オンラインの reg query は書き換えを混入させる。</li>
+        <li>SYSTEM の Select を読まないと ControlSet を取り違える。</li>
+        <li>Run / Services / Winlogon / IFEO の 4 箇所は必ず舐める。</li>
+      </ul></div>
+    </section>
+
+    <!-- ============ s06: Timeline ============ -->
+    <section id="s06" class="reveal">
+      <h2><span class="num">06</span>タイムライン統合<span class="jp">Super Timeline</span></h2>
+      <p>個別成果物の解析結果を時系列に統合する工程。侵入起点 (patient zero) と横展開の順序が可視化される。plaso / log2timeline が事実上の標準。</p>
+
+      <h3 id="s06-1">plaso による super timeline</h3>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 収集 (mount 済みイメージ or ライブディスクを解析)</span>
+log2timeline.py --storage-file <span class="v">&lt;OUT&gt;</span>/timeline.plaso <span class="v">&lt;MOUNTED_IMAGE&gt;</span>
+
+<span class="c"># CSV (l2tcsv) 出力</span>
+psort.py -o l2tcsv -w <span class="v">&lt;OUT&gt;</span>/timeline.csv <span class="v">&lt;OUT&gt;</span>/timeline.plaso
+
+<span class="c"># 期間絞り (2026-07-01 〜 2026-07-10)</span>
+psort.py -o l2tcsv -w <span class="v">&lt;OUT&gt;</span>/timeline_slice.csv <span class="v">&lt;OUT&gt;</span>/timeline.plaso \
+  "date > '2026-07-01 00:00:00' AND date < '2026-07-10 23:59:59'"</code></pre></div>
+
+      <h3 id="s06-2">Timeline Explorer での読み方</h3>
+      <p>Eric Zimmerman の Timeline Explorer は CSV を高速に絞り込む閲覧環境。plaso / EvtxECmd / MFTECmd の CSV を同じインタフェースで扱える。</p>
+      <ul>
+        <li>疑わしい 1 事象を起点に前後 5 分を精読 (前後関係で因果を推定)。</li>
+        <li>ホスト単位の色分けを維持し、複数ホストの CSV を統合しない。</li>
+        <li>タグ付け (フラグ列) で「確定」「疑い」「除外」を分けて減衰させる。</li>
+      </ul>
+
+      <h3 id="s06-3">タイムライン整形の要点</h3>
+      <ul>
+        <li><strong>TZ の一貫化</strong>: 収集元はローカル TZ、解析側で UTC に正規化。log2timeline / psort ともに TZ 指定を明示 (出力モジュールにより <code>--output-time-zone</code> 等)。</li>
+        <li><strong>タイムスタンプの種類</strong>: MFT SI / FN、Prefetch 実行時刻、EventRecord の TimeCreated は意味が違う。混ぜない。</li>
+        <li><strong>ノイズ削減</strong>: OS 更新や Defender スキャンは大量イベントを生む。ブラックリストで抑える。</li>
+      </ul>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+      <ul>
+        <li>super timeline はゴールではなく作業台。読み方が全て。</li>
+        <li>TZ を先に決める。混在は後戻り不能なコストになる。</li>
+        <li>タイムスタンプの意味を混ぜない (書換可 SI と不変 FN、実行時刻とファイル時刻)。</li>
+      </ul></div>
+    </section>
+
+    <!-- ============ s07: Persistence Hunting ============ -->
+    <section id="s07" class="reveal">
+      <h2><span class="num">07</span>永続化ハンティング<span class="jp">Persistence Hunting</span></h2>
+      <p>侵害端末で「排除しきれたか」を判断する最終フェーズ。MITRE ATT&amp;CK の TA0003 (Persistence) を網羅的に確認する。オフラインハイブでの照合が原則。</p>
+
+      <h3 id="s07-1">確認すべき箇所 (優先順)</h3>
+      <ol>
+        <li><strong>Run / RunOnce キー</strong> (HKLM / HKCU)</li>
+        <li><strong>Services</strong> (<code>ImagePath</code>, <code>ServiceDLL</code>, Start=2)</li>
+        <li><strong>Scheduled Tasks</strong> (<code>%SystemRoot%\System32\Tasks\*</code> の XML)</li>
+        <li><strong>WMI Event Subscription</strong> (<code>ROOT\subscription</code>: __EventFilter, EventConsumer, FilterToConsumerBinding)</li>
+        <li><strong>Winlogon</strong> (<code>Userinit</code>, <code>Shell</code>, <code>Notify</code>)</li>
+        <li><strong>IFEO Debugger</strong> (<code>Image File Execution Options\&lt;exe&gt;\Debugger</code>)</li>
+        <li><strong>COM Hijacking</strong> (<code>HKCU\Software\Classes\CLSID</code>)</li>
+        <li><strong>AppInit_DLLs</strong> / <strong>LSA Provider</strong> / <strong>Netsh Helper</strong></li>
+        <li><strong>Startup フォルダ</strong> (<code>%AppData%\...\Startup</code>, <code>%ProgramData%\...\Startup</code>)</li>
+        <li><strong>Print Monitor</strong> / <strong>SSP</strong> (資格情報経路の乗っ取り)</li>
+      </ol>
+
+      <h3 id="s07-2">Autoruns (オフライン)</h3>
+      <p>Autoruns は <code>-z</code> でオフラインシステムを解析できる。ライブでは書き換え混入があるため IR 目的ではオフラインを推奨。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">cmd</span><button class="copy">copy</button></div><pre><code><span class="c">:: オフライン: 収集済みディスクをマウントして指定</span>
+autorunsc.exe -z <span class="v">&lt;MOUNTED_WIN_DIR&gt;</span> <span class="v">&lt;USER_PROFILE_DIR&gt;</span> -a * -c -h -s -nobanner > autoruns.csv</code></pre></div>
+
+      <h3 id="s07-3">Scheduled Tasks の解析</h3>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># ライブ (念のため):</span>
+Get-ScheduledTask | ForEach-Object {
+  [PSCustomObject]@{
+    TaskName = $_.TaskName
+    Path     = $_.TaskPath
+    Author   = $_.Author
+    RunAs    = $_.Principal.UserId
+    Command  = ($_.Actions | Select-Object -First 1).Execute
+    Args     = ($_.Actions | Select-Object -First 1).Arguments
+  }
+} | Export-Csv scheduled_tasks.csv -NoTypeInformation
+
+<span class="c"># オフライン: Tasks フォルダ配下の XML を直接パース</span>
+Get-ChildItem <span class="v">&lt;MOUNTED_WIN_DIR&gt;</span>\System32\Tasks -Recurse -File |
+  ForEach-Object { [xml]$x = Get-Content $_.FullName;
+    [PSCustomObject]@{ Name=$_.Name; Exec=$x.Task.Actions.Exec.Command; Args=$x.Task.Actions.Exec.Arguments } }</code></pre></div>
+
+      <h3 id="s07-4">WMI Event Subscription</h3>
+      <p>WMI 永続化は再起動を跨ぐ、ファイルレス、Autoruns では見落とされやすい。オフラインでは <code>OBJECTS.DATA</code> を解析する。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># ライブ確認 (要ローカル admin)</span>
+Get-CimInstance -Namespace root\subscription -ClassName __EventFilter
+Get-CimInstance -Namespace root\subscription -ClassName __EventConsumer
+Get-CimInstance -Namespace root\subscription -ClassName __FilterToConsumerBinding
+
+<span class="c"># オフライン (PyWMIPersistenceFinder 等): OBJECTS.DATA を直接パース</span>
+<span class="c"># %SystemRoot%\System32\wbem\Repository\OBJECTS.DATA</span></code></pre></div>
+
+      <div class="note warn"><span class="lbl">warning</span>
+      Autoruns は WMI Event Subscription の <em>一部</em> しか見せないケースがある。WMI 永続化は必ず個別確認する。</div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+      <ul>
+        <li>永続化確認はオフラインで。ライブは補助。</li>
+        <li>WMI / COM Hijacking / IFEO は Autoruns 単体では取りこぼしうる。</li>
+        <li>「見つけた」で止めず、同じ手口の全展開先を潰す (単一ホストで終わらない前提)。</li>
+      </ul></div>
+    </section>
+
+    <!-- ============ s08: Anti-Forensics ============ -->
+    <section id="s08" class="reveal">
+      <h2><span class="num">08</span>アンチフォレンジック<span class="jp">Anti-Forensics Awareness</span></h2>
+      <p>攻撃側が痕跡を消しにかかる前提で防御側は動く。何が消され、何が残るかを知っておくことが早期発見につながる。</p>
+
+      <h3 id="s08-1">タイムスタンプ改ざん (Timestomping)</h3>
+      <p>SI (StandardInformation) は書換可能。<code>SetFileTime</code> API や <code>timestomp</code> 系ツールで秒未満まで自然な値に改ざんできる。ただし FN (FileName) はカーネルが更新するため一般ユーザ空間からは触れない。</p>
+      <ul>
+        <li><strong>兆候</strong>: SI と FN の乖離、SI の秒以下が <code>.0000000</code> (改ざんツールが精度を落とすことがある)、フォルダの MFT エントリの Modified が子ファイルより古い。</li>
+        <li><strong>検出</strong>: MFTECmd 出力で SI0/FN0 列を比較。差分ソートで一気にリスト化できる。</li>
+      </ul>
+
+      <h3 id="s08-2">ログ改ざん / 消去</h3>
+      <ul>
+        <li><strong>evtx 全消去</strong>: <code>wevtutil cl &lt;channel&gt;</code>。この操作自体が Security 1102 として記録される。</li>
+        <li><strong>個別イベントの選択削除</strong>: 通常は不可 (evtx はレコード単位で書き換えると破損)。DanderSpritz / 3gstudent 系の PoC は存在するが、破損検知で概ね見抜ける。</li>
+        <li><strong>Sysmon の一時停止</strong>: Service 停止は System 7036 に記録される。設定書き換えは Sysmon 16。</li>
+      </ul>
+
+      <h3 id="s08-3">ファイル削除・上書き</h3>
+      <ul>
+        <li><strong>単純削除</strong>: MFT エントリは残る (再利用されるまで)。$UsnJrnl に削除記録が残る。</li>
+        <li><strong>SDelete 系</strong>: セクタ上書き。MFT エントリ・$UsnJrnl・親フォルダのタイムスタンプに痕跡は残る。</li>
+        <li><strong>USN Journal のクリア</strong>: <code>fsutil usn deletejournal</code>。この操作の実行痕跡が Prefetch / AmCache / ShimCache に残ることがある。</li>
+      </ul>
+
+      <h3 id="s08-4">ファイルレス・インメモリ手法</h3>
+      <ul>
+        <li>ディスクに落ちないため MFT / Prefetch / AmCache には残らない。</li>
+        <li>残るのは <strong>PowerShell 4104 (ScriptBlock)</strong>, <strong>Sysmon 1/7/8/10</strong>, <strong>WMI event subscription</strong>, メモリダンプ。</li>
+        <li>再起動で消失する痕跡が多いため、疑わしい端末の即時電源断は原則避ける。</li>
+      </ul>
+
+      <div class="note"><span class="lbl">tip</span>
+      アンチフォレンジックが疑われる時こそ、複数の独立した情報源を突き合わせる (ディスク・メモリ・ネットワーク・別ホスト側のログ)。単一ソースで結論しない。</div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+      <ul>
+        <li>SI は書換可、FN は不変。この非対称性が timestomping 検出の梃子。</li>
+        <li>ログ全消去は静かではない。1102 / 7036 / Sysmon 16 で必ず何か残る。</li>
+        <li>インメモリは強いが「再起動しない」IR 判断が成立の前提。</li>
+      </ul></div>
+    </section>
+
+    <!-- ============ ref ============ -->
+    <section id="ref" class="reveal">
+      <h2><span class="num">09</span>参照<span class="jp">References</span></h2>
+      <ul>
+        <li>KAPE (Kroll) — <a href="https://www.kroll.com/en/services/cyber/incident-response-litigation-support/kroll-artifact-parser-extractor-kape" target="_blank" rel="noopener">kroll.com/kape</a></li>
+        <li>Eric Zimmerman's Tools — <a href="https://ericzimmerman.github.io/" target="_blank" rel="noopener">ericzimmerman.github.io</a></li>
+        <li>Volatility 3 — <a href="https://volatility3.readthedocs.io/" target="_blank" rel="noopener">volatility3.readthedocs.io</a></li>
+        <li>MemProcFS — <a href="https://github.com/ufrisk/MemProcFS" target="_blank" rel="noopener">github.com/ufrisk/MemProcFS</a></li>
+        <li>Velociraptor — <a href="https://docs.velociraptor.app/" target="_blank" rel="noopener">docs.velociraptor.app</a></li>
+        <li>plaso / log2timeline — <a href="https://plaso.readthedocs.io/" target="_blank" rel="noopener">plaso.readthedocs.io</a></li>
+        <li>chainsaw — <a href="https://github.com/WithSecureLabs/chainsaw" target="_blank" rel="noopener">github.com/WithSecureLabs/chainsaw</a></li>
+        <li>hayabusa — <a href="https://github.com/Yamato-Security/hayabusa" target="_blank" rel="noopener">github.com/Yamato-Security/hayabusa</a></li>
+        <li>Sysmon 設定 (SwiftOnSecurity) — <a href="https://github.com/SwiftOnSecurity/sysmon-config" target="_blank" rel="noopener">github.com/SwiftOnSecurity/sysmon-config</a></li>
+        <li>SANS DFIR Cheat Sheets — <a href="https://www.sans.org/posters/?focus-area=digital-forensics" target="_blank" rel="noopener">sans.org/posters</a></li>
+        <li>MITRE ATT&amp;CK Persistence (TA0003) — <a href="https://attack.mitre.org/tactics/TA0003/" target="_blank" rel="noopener">attack.mitre.org/tactics/TA0003</a></li>
+      </ul>
+    </section>
+
+  </article>
+</div>
+</div>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · Forensics &amp; IR</span></div>
+    <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>GitHub</a></div>
+    <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
+  </div>
+</footer>
+
+<script src="../content.js"></script>
+<script src="../assets/js/sheet.js"></script>
+</body>
+</html>

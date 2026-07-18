@@ -81,6 +81,10 @@ window.CONTENT = {
       keywords: ["sysctl","syncookies","pam_faillock","pam_pwquality","auditd","aide","unattended-upgrades","limits.conf","sshd_config","permitrootlogin","maxauthtries","server_tokens","log_format","bind-address","listen_addresses","mynetworks","nginx","apache","mariadb","postgresql","unbound","postfix","proftpd","memcached","tomcat","groupsession","wordpress","wp-cli","eccube","phpmyadmin"],
       tags: ["hardening", "defensive", "linux", "web-stack"], status: "ready" },
 
+    { domain: "defensive", slug: "forensics-ir", title: "Forensics & IR", jp: "フォレンジック・IR",
+      topics: "triage · memory · timeline · registry · event log",
+      keywords: ["kape","velociraptor","volatility","memprocfs","winpmem","dumpit","mftecmd","recmd","evtxecmd","pecmd","appcompatcacheparser","amcacheparser","regripper","plaso","log2timeline","chainsaw","hayabusa","sysmon","event id","prefetch","shimcache","amcache","usn journal","autoruns","live response","memory forensics","super timeline","picerl","persistence","anti-forensics"],
+      tags: ["forensics", "ir", "memory", "timeline", "windows"], status: "ready" },
     // ---- other ----
   ],
 };
