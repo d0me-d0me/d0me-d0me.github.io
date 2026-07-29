@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 860" width="1000" height="860" role="img" aria-labelledby="casc-title" preserveAspectRatio="xMidYMid meet">
+  <title id="casc-title">The anti-forensic cleanup cascade: each removal creates a new artifact</title>
+  <defs>
+    <marker id="c-red" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#E5533B"/></marker>
+    <marker id="c-grn" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#48B44A"/></marker>
+  </defs>
+  <text x="500" y="40" font-family="JetBrains Mono, ui-monospace, monospace" font-size="16" font-weight="700" fill="#F2F4EA" text-anchor="middle">The Cleanup Cascade</text>
+  <text x="500" y="60" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#8F8875" text-anchor="middle">Every act of removal is itself an event the file system records somewhere else</text>
+  <text x="235" y="100" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" font-weight="700" fill="#E5533B" text-anchor="middle">ATTACKER ACTION</text>
+  <text x="765" y="100" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" font-weight="700" fill="#48B44A" text-anchor="middle">ARTIFACT IT CREATES</text>
+  <rect x="55" y="126" width="360" height="84" fill="#E5533B" fill-opacity="0.10" stroke="#E5533B" stroke-width="1.5" rx="3"/>
+  <rect x="55" y="126" width="360" height="20" fill="#E5533B" fill-opacity="0.15" stroke="none"/>
+  <text x="67" y="141" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" font-weight="700" fill="#E5533B">STEP 1</text>
+  <text x="235" y="171" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="700" fill="#F2F4EA" text-anchor="middle">Timestomp $SI</text>
+  <text x="235" y="194" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#D9DCCF" text-anchor="middle">SetFileTime via API. Fast, no privilege beyond write access.</text>
+  <rect x="585" y="126" width="360" height="84" fill="#48B44A" fill-opacity="0.10" stroke="#48B44A" stroke-width="1.5" rx="3"/>
+  <rect x="585" y="126" width="360" height="20" fill="#48B44A" fill-opacity="0.15" stroke="none"/>
+  <text x="597" y="141" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" font-weight="700" fill="#48B44A">RESIDUE 1</text>
+  <text x="765" y="171" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" font-weight="700" fill="#F2F4EA" text-anchor="middle">$UsnJrnl records BASIC_INFO_CHANGE</text>
+  <text x="765" y="194" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#D9DCCF" text-anchor="middle">Stamped with real wall-clock time, not the forged one.</text>
+  <line x1="421" y1="168" x2="575" y2="168" stroke="#E5533B" stroke-width="1.5" marker-end="url(#c-red)"/>
+  <text x="500" y="159" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#8F8875" text-anchor="middle">generates</text>
+  <text x="500" y="222" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#48B44A" text-anchor="middle">must also be removed</text>
+  <path d="M 765 213 L 765 234 L 235 234 L 235 241" fill="none" stroke="#48B44A" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#c-grn)"/>
+  <rect x="55" y="250" width="360" height="84" fill="#E5533B" fill-opacity="0.10" stroke="#E5533B" stroke-width="1.5" rx="3"/>
+  <rect x="55" y="250" width="360" height="20" fill="#E5533B" fill-opacity="0.15" stroke="none"/>
+  <text x="67" y="265" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" font-weight="700" fill="#E5533B">STEP 2</text>
+  <text x="235" y="295" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="700" fill="#F2F4EA" text-anchor="middle">Delete the change journal</text>
+  <text x="235" y="318" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#D9DCCF" text-anchor="middle">fsutil usn deletejournal. Removes the record above wholesale.</text>
+  <rect x="585" y="250" width="360" height="84" fill="#48B44A" fill-opacity="0.10" stroke="#48B44A" stroke-width="1.5" rx="3"/>
+  <rect x="585" y="250" width="360" height="20" fill="#48B44A" fill-opacity="0.15" stroke="none"/>
+  <text x="597" y="265" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" font-weight="700" fill="#48B44A">RESIDUE 2</text>
+  <text x="765" y="295" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" font-weight="700" fill="#F2F4EA" text-anchor="middle">Event 3079 fires in Application log</text>
+  <text x="765" y="318" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#D9DCCF" text-anchor="middle">$LogFile still holds the originating transaction.</text>
+  <line x1="421" y1="292" x2="575" y2="292" stroke="#E5533B" stroke-width="1.5" marker-end="url(#c-red)"/>
+  <text x="500" y="283" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#8F8875" text-anchor="middle">generates</text>
+  <text x="500" y="346" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#48B44A" text-anchor="middle">must also be removed</text>
+  <path d="M 765 337 L 765 358 L 235 358 L 235 365" fill="none" stroke="#48B44A" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#c-grn)"/>
+  <rect x="55" y="374" width="360" height="84" fill="#E5533B" fill-opacity="0.10" stroke="#E5533B" stroke-width="1.5" rx="3"/>
+  <rect x="55" y="374" width="360" height="20" fill="#E5533B" fill-opacity="0.15" stroke="none"/>
+  <text x="67" y="389" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" font-weight="700" fill="#E5533B">STEP 3</text>
+  <text x="235" y="419" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="700" fill="#F2F4EA" text-anchor="middle">Flood $LogFile</text>
+  <text x="235" y="442" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#D9DCCF" text-anchor="middle">Cycle writes until the circular log wraps past the evidence.</text>
+  <rect x="585" y="374" width="360" height="84" fill="#48B44A" fill-opacity="0.10" stroke="#48B44A" stroke-width="1.5" rx="3"/>
+  <rect x="585" y="374" width="360" height="20" fill="#48B44A" fill-opacity="0.15" stroke="none"/>
+  <text x="597" y="389" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" font-weight="700" fill="#48B44A">RESIDUE 3</text>
+  <text x="765" y="419" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" font-weight="700" fill="#F2F4EA" text-anchor="middle">Churn rate itself becomes anomalous</text>
+  <text x="765" y="442" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#D9DCCF" text-anchor="middle">Shadow copies may retain the pre-flood state.</text>
+  <line x1="421" y1="416" x2="575" y2="416" stroke="#E5533B" stroke-width="1.5" marker-end="url(#c-red)"/>
+  <text x="500" y="407" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#8F8875" text-anchor="middle">generates</text>
+  <text x="500" y="470" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#48B44A" text-anchor="middle">must also be removed</text>
+  <path d="M 765 461 L 765 482 L 235 482 L 235 489" fill="none" stroke="#48B44A" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#c-grn)"/>
+  <rect x="55" y="498" width="360" height="84" fill="#E5533B" fill-opacity="0.10" stroke="#E5533B" stroke-width="1.5" rx="3"/>
+  <rect x="55" y="498" width="360" height="20" fill="#E5533B" fill-opacity="0.15" stroke="none"/>
+  <text x="67" y="513" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" font-weight="700" fill="#E5533B">STEP 4</text>
+  <text x="235" y="543" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="700" fill="#F2F4EA" text-anchor="middle">Clear the event log</text>
+  <text x="235" y="566" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#D9DCCF" text-anchor="middle">wevtutil cl. Removes 3079 and the surrounding record set.</text>
+  <rect x="585" y="498" width="360" height="84" fill="#48B44A" fill-opacity="0.10" stroke="#48B44A" stroke-width="1.5" rx="3"/>
+  <rect x="585" y="498" width="360" height="20" fill="#48B44A" fill-opacity="0.15" stroke="none"/>
+  <text x="597" y="513" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" font-weight="700" fill="#48B44A">RESIDUE 4</text>
+  <text x="765" y="543" font-family="JetBrains Mono, ui-monospace, monospace" font-size="12" font-weight="700" fill="#F2F4EA" text-anchor="middle">Event 104 records the clearing</text>
+  <text x="765" y="566" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#D9DCCF" text-anchor="middle">An empty log on a busy host is its own signal.</text>
+  <line x1="421" y1="540" x2="575" y2="540" stroke="#E5533B" stroke-width="1.5" marker-end="url(#c-red)"/>
+  <text x="500" y="531" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#8F8875" text-anchor="middle">generates</text>
+  <text x="500" y="596" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#48B44A" text-anchor="middle">and so on</text>
+  <path d="M 765 585 L 765 608 L 500 608 L 500 617" fill="none" stroke="#48B44A" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#c-grn)"/>
+  <rect x="180" y="626" width="640" height="104" fill="#131210" stroke="#7FA8FF" stroke-width="1.5" rx="4"/>
+  <text x="500" y="654" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="700" fill="#7FA8FF" text-anchor="middle">The cascade does not terminate</text>
+  <text x="500" y="680" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#F2F4EA" text-anchor="middle">Each layer of cleanup is cheap for the attacker in isolation.</text>
+  <text x="500" y="698" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#F2F4EA" text-anchor="middle">What is expensive is knowing every layer exists, and reaching all of them</text>
+  <text x="500" y="716" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#D9DCCF" text-anchor="middle">before telemetry leaves the host. Detection lives in the gap.</text>
+  <text x="500" y="818" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#F2F4EA" text-anchor="middle" font-weight="700">Complete cleanup requires perfect knowledge. Partial cleanup is the norm.</text>
+  <text x="500" y="842" font-family="JetBrains Mono, ui-monospace, monospace" font-size="9" fill="#615C50" text-anchor="middle">Sources: Palmbach &amp; Breitinger DFRWS EU 2020 &#183; Microsoft Learn &#183; Elastic detection rules &#183; MITRE ATT&amp;CK T1070</text>
+</svg>
