@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 640" width="900" height="640" role="img" aria-label="Matrix of telemetry source visibility against five evasion approach profiles">
+  <text x="450" y="32" text-anchor="middle" font-family="Zen Kaku Gothic New, sans-serif" font-size="17" font-weight="700" fill="#F2F4EA">Which Telemetry Source Sees Which Approach</text>
+  <text x="450" y="54" text-anchor="middle" font-family="Zen Kaku Gothic New, sans-serif" font-size="12" fill="#D9DCCF">Rows are collection points. Columns are technique profiles grouped by ATT&amp;CK v19 tactic.</text>
+
+  <rect x="258" y="72" width="354" height="18" rx="2" fill="#48B44A" fill-opacity="0.10" stroke="#48B44A" stroke-width="1"/>
+  <text x="435" y="85" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" font-weight="700" fill="#48B44A">Stealth (TA0005)</text>
+  <rect x="618" y="72" width="234" height="18" rx="2" fill="#B48BFF" fill-opacity="0.10" stroke="#B48BFF" stroke-width="1"/>
+  <text x="735" y="85" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" font-weight="700" fill="#B48BFF">Defense Impairment (TA0112)</text>
+
+  <line x1="615" y1="68" x2="615" y2="530" stroke="#8F8875" stroke-width="1.2" stroke-dasharray="6 5"/>
+
+  <g font-family="JetBrains Mono, ui-monospace, monospace" fill="#F2F4EA" text-anchor="middle">
+    <text x="315" y="110" font-size="11" font-weight="700">Binary Proxy</text>
+    <text x="435" y="110" font-size="11" font-weight="700">Dev Utility</text>
+    <text x="555" y="110" font-size="11" font-weight="700">Reflective</text>
+    <text x="675" y="110" font-size="11" font-weight="700">Trust</text>
+    <text x="795" y="110" font-size="11" font-weight="700">Sensor</text>
+  </g>
+  <g font-family="JetBrains Mono, ui-monospace, monospace" fill="#8F8875" text-anchor="middle" font-size="10.5">
+    <text x="315" y="125">T1218</text>
+    <text x="435" y="125">T1127</text>
+    <text x="555" y="125">Load T1620</text>
+    <text x="675" y="125">Subversion T1553</text>
+    <text x="795" y="125">Disablement T1687</text>
+  </g>
+
+  <g font-family="Zen Kaku Gothic New, sans-serif" font-size="12" fill="#D9DCCF" text-anchor="end">
+    <text x="242" y="162">Process Creation</text>
+    <text x="242" y="211">Image / Driver Load</text>
+    <text x="242" y="260">AMSI Scan Buffer</text>
+    <text x="242" y="309">ETW Providers</text>
+    <text x="242" y="358">Kernel Callbacks</text>
+    <text x="242" y="407">Windows Event Log</text>
+    <text x="242" y="456">Signature / Trust Validation</text>
+    <text x="242" y="505">EDR Agent Heartbeat</text>
+  </g>
+
+  <g font-family="JetBrains Mono, ui-monospace, monospace">
+    <rect x="258" y="136" width="114" height="44" rx="2" fill="#48B44A" fill-opacity="0.16" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="315.0" y="161.5" text-anchor="middle" font-size="10.5" fill="#48B44A">full</text>
+    <rect x="378" y="136" width="114" height="44" rx="2" fill="#48B44A" fill-opacity="0.16" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="435.0" y="161.5" text-anchor="middle" font-size="10.5" fill="#48B44A">full</text>
+    <rect x="498" y="136" width="114" height="44" rx="2" fill="#E5A03B" fill-opacity="0.16" stroke="#E5A03B" stroke-width="1.5"/>
+    <text x="555.0" y="161.5" text-anchor="middle" font-size="10.5" fill="#E5A03B">partial</text>
+    <rect x="618" y="136" width="114" height="44" rx="2" fill="#E5A03B" fill-opacity="0.16" stroke="#E5A03B" stroke-width="1.5"/>
+    <text x="675.0" y="161.5" text-anchor="middle" font-size="10.5" fill="#E5A03B">partial</text>
+    <rect x="738" y="136" width="114" height="44" rx="2" fill="#48B44A" fill-opacity="0.16" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="795.0" y="161.5" text-anchor="middle" font-size="10.5" fill="#48B44A">full</text>
+    <rect x="258" y="185" width="114" height="44" rx="2" fill="#48B44A" fill-opacity="0.16" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="315.0" y="210.5" text-anchor="middle" font-size="10.5" fill="#48B44A">full</text>
+    <rect x="378" y="185" width="114" height="44" rx="2" fill="#48B44A" fill-opacity="0.16" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="435.0" y="210.5" text-anchor="middle" font-size="10.5" fill="#48B44A">full</text>
+    <rect x="498" y="185" width="114" height="44" rx="2" fill="#E5A03B" fill-opacity="0.16" stroke="#E5A03B" stroke-width="1.5"/>
+    <text x="555.0" y="210.5" text-anchor="middle" font-size="10.5" fill="#E5A03B">partial</text>
+    <rect x="618" y="185" width="114" height="44" rx="2" fill="#48B44A" fill-opacity="0.16" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="675.0" y="210.5" text-anchor="middle" font-size="10.5" fill="#48B44A">full</text>
+    <rect x="738" y="185" width="114" height="44" rx="2" fill="#48B44A" fill-opacity="0.16" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="795.0" y="210.5" text-anchor="middle" font-size="10.5" fill="#48B44A">full</text>
+    <rect x="258" y="234" width="114" height="44" rx="2" fill="#E5A03B" fill-opacity="0.16" stroke="#E5A03B" stroke-width="1.5"/>
+    <text x="315.0" y="259.5" text-anchor="middle" font-size="10.5" fill="#E5A03B">partial</text>
+    <rect x="378" y="234" width="114" height="44" rx="2" fill="#E5A03B" fill-opacity="0.16" stroke="#E5A03B" stroke-width="1.5"/>
+    <text x="435.0" y="259.5" text-anchor="middle" font-size="10.5" fill="#E5A03B">partial</text>
+    <rect x="498" y="234" width="114" height="44" rx="2" fill="#48B44A" fill-opacity="0.16" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="555.0" y="259.5" text-anchor="middle" font-size="10.5" fill="#48B44A">full</text>
+    <rect x="618" y="234" width="114" height="44" rx="2" fill="none" stroke="#2A2620" stroke-width="1"/>
+    <text x="675.0" y="259.5" text-anchor="middle" font-size="10.5" fill="#615C50">none</text>
+    <rect x="738" y="234" width="114" height="44" rx="2" fill="none" stroke="#2A2620" stroke-width="1"/>
+    <text x="795.0" y="259.5" text-anchor="middle" font-size="10.5" fill="#615C50">none</text>
+    <rect x="258" y="283" width="114" height="44" rx="2" fill="#48B44A" fill-opacity="0.16" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="315.0" y="308.5" text-anchor="middle" font-size="10.5" fill="#48B44A">full</text>
+    <rect x="378" y="283" width="114" height="44" rx="2" fill="#48B44A" fill-opacity="0.16" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="435.0" y="308.5" text-anchor="middle" font-size="10.5" fill="#48B44A">full</text>
+    <rect x="498" y="283" width="114" height="44" rx="2" fill="#48B44A" fill-opacity="0.16" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="555.0" y="308.5" text-anchor="middle" font-size="10.5" fill="#48B44A">full</text>
+    <rect x="618" y="283" width="114" height="44" rx="2" fill="#E5A03B" fill-opacity="0.16" stroke="#E5A03B" stroke-width="1.5"/>
+    <text x="675.0" y="308.5" text-anchor="middle" font-size="10.5" fill="#E5A03B">partial</text>
+    <rect x="738" y="283" width="114" height="44" rx="2" fill="#E5533B" fill-opacity="0.20" stroke="#E5533B" stroke-width="1.5"/>
+    <text x="795.0" y="308.5" text-anchor="middle" font-size="10.5" fill="#E5533B">target</text>
+    <rect x="258" y="332" width="114" height="44" rx="2" fill="#48B44A" fill-opacity="0.16" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="315.0" y="357.5" text-anchor="middle" font-size="10.5" fill="#48B44A">full</text>
+    <rect x="378" y="332" width="114" height="44" rx="2" fill="#48B44A" fill-opacity="0.16" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="435.0" y="357.5" text-anchor="middle" font-size="10.5" fill="#48B44A">full</text>
+    <rect x="498" y="332" width="114" height="44" rx="2" fill="#48B44A" fill-opacity="0.16" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="555.0" y="357.5" text-anchor="middle" font-size="10.5" fill="#48B44A">full</text>
+    <rect x="618" y="332" width="114" height="44" rx="2" fill="#E5A03B" fill-opacity="0.16" stroke="#E5A03B" stroke-width="1.5"/>
+    <text x="675.0" y="357.5" text-anchor="middle" font-size="10.5" fill="#E5A03B">partial</text>
+    <rect x="738" y="332" width="114" height="44" rx="2" fill="#E5533B" fill-opacity="0.20" stroke="#E5533B" stroke-width="1.5"/>
+    <text x="795.0" y="357.5" text-anchor="middle" font-size="10.5" fill="#E5533B">target</text>
+    <rect x="258" y="381" width="114" height="44" rx="2" fill="#E5A03B" fill-opacity="0.16" stroke="#E5A03B" stroke-width="1.5"/>
+    <text x="315.0" y="406.5" text-anchor="middle" font-size="10.5" fill="#E5A03B">partial</text>
+    <rect x="378" y="381" width="114" height="44" rx="2" fill="#E5A03B" fill-opacity="0.16" stroke="#E5A03B" stroke-width="1.5"/>
+    <text x="435.0" y="406.5" text-anchor="middle" font-size="10.5" fill="#E5A03B">partial</text>
+    <rect x="498" y="381" width="114" height="44" rx="2" fill="none" stroke="#2A2620" stroke-width="1"/>
+    <text x="555.0" y="406.5" text-anchor="middle" font-size="10.5" fill="#615C50">none</text>
+    <rect x="618" y="381" width="114" height="44" rx="2" fill="#E5A03B" fill-opacity="0.16" stroke="#E5A03B" stroke-width="1.5"/>
+    <text x="675.0" y="406.5" text-anchor="middle" font-size="10.5" fill="#E5A03B">partial</text>
+    <rect x="738" y="381" width="114" height="44" rx="2" fill="#E5533B" fill-opacity="0.20" stroke="#E5533B" stroke-width="1.5"/>
+    <text x="795.0" y="406.5" text-anchor="middle" font-size="10.5" fill="#E5533B">target</text>
+    <rect x="258" y="430" width="114" height="44" rx="2" fill="none" stroke="#2A2620" stroke-width="1"/>
+    <text x="315.0" y="455.5" text-anchor="middle" font-size="10.5" fill="#615C50">none</text>
+    <rect x="378" y="430" width="114" height="44" rx="2" fill="none" stroke="#2A2620" stroke-width="1"/>
+    <text x="435.0" y="455.5" text-anchor="middle" font-size="10.5" fill="#615C50">none</text>
+    <rect x="498" y="430" width="114" height="44" rx="2" fill="none" stroke="#2A2620" stroke-width="1"/>
+    <text x="555.0" y="455.5" text-anchor="middle" font-size="10.5" fill="#615C50">none</text>
+    <rect x="618" y="430" width="114" height="44" rx="2" fill="#E5533B" fill-opacity="0.20" stroke="#E5533B" stroke-width="1.5"/>
+    <text x="675.0" y="455.5" text-anchor="middle" font-size="10.5" fill="#E5533B">target</text>
+    <rect x="738" y="430" width="114" height="44" rx="2" fill="#E5A03B" fill-opacity="0.16" stroke="#E5A03B" stroke-width="1.5"/>
+    <text x="795.0" y="455.5" text-anchor="middle" font-size="10.5" fill="#E5A03B">partial</text>
+    <rect x="258" y="479" width="114" height="44" rx="2" fill="none" stroke="#2A2620" stroke-width="1"/>
+    <text x="315.0" y="504.5" text-anchor="middle" font-size="10.5" fill="#615C50">none</text>
+    <rect x="378" y="479" width="114" height="44" rx="2" fill="none" stroke="#2A2620" stroke-width="1"/>
+    <text x="435.0" y="504.5" text-anchor="middle" font-size="10.5" fill="#615C50">none</text>
+    <rect x="498" y="479" width="114" height="44" rx="2" fill="none" stroke="#2A2620" stroke-width="1"/>
+    <text x="555.0" y="504.5" text-anchor="middle" font-size="10.5" fill="#615C50">none</text>
+    <rect x="618" y="479" width="114" height="44" rx="2" fill="none" stroke="#2A2620" stroke-width="1"/>
+    <text x="675.0" y="504.5" text-anchor="middle" font-size="10.5" fill="#615C50">none</text>
+    <rect x="738" y="479" width="114" height="44" rx="2" fill="#E5533B" fill-opacity="0.20" stroke="#E5533B" stroke-width="1.5"/>
+    <text x="795.0" y="504.5" text-anchor="middle" font-size="10.5" fill="#E5533B">target</text>
+  </g>
+
+  <line x1="24" y1="540" x2="876" y2="540" stroke="#2A2620" stroke-width="1"/>
+
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#D9DCCF">
+    <rect x="24" y="550" width="14" height="14" rx="2" fill="#48B44A" fill-opacity="0.16" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="46" y="561">Records the act</text>
+    <rect x="175" y="550" width="14" height="14" rx="2" fill="#E5A03B" fill-opacity="0.16" stroke="#E5A03B" stroke-width="1.5"/>
+    <text x="197" y="561">Partial or config dependent</text>
+    <rect x="405" y="550" width="14" height="14" rx="2" fill="none" stroke="#2A2620" stroke-width="1"/>
+    <text x="427" y="561">No visibility</text>
+    <rect x="543" y="550" width="14" height="14" rx="2" fill="#E5533B" fill-opacity="0.20" stroke="#E5533B" stroke-width="1.5"/>
+    <text x="565" y="561">The source is the target</text>
+  </g>
+
+  <text x="24" y="590" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10.5" fill="#8F8875">Visibility is scored at the moment of the act. After a successful impairment the affected rows stop producing signal.</text>
+  <text x="24" y="610" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10.5" fill="#E5533B">Every cell where the source itself becomes the target sits in the Defense Impairment columns.</text>
+</svg>
