@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" width="900" height="600" role="img" aria-label="Coverage curve showing cumulative ATT&amp;CK detection strategy coverage against number of log sources">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#615C50"/>
+    </marker>
+  </defs>
+  <text x="450" y="32" text-anchor="middle" font-family="Zen Kaku Gothic New, sans-serif" font-size="17" font-weight="700" fill="#F2F4EA">Detection Strategy Coverage Against Log Source Count</text>
+  <text x="450" y="54" text-anchor="middle" font-family="Zen Kaku Gothic New, sans-serif" font-size="12" fill="#D9DCCF">ATT&amp;CK v19 Enterprise, greedy set cover over 697 detection strategies. Coverage is corpus authorship, not detection efficacy.</text>
+  <text x="46" y="290" text-anchor="middle" font-family="Zen Kaku Gothic New, sans-serif" font-size="11" fill="#8F8875" transform="rotate(-90 46 290)">Cumulative coverage</text>
+  <text x="864" y="290" text-anchor="middle" font-family="Zen Kaku Gothic New, sans-serif" font-size="11" fill="#8F8875" transform="rotate(90 864 290)">Marginal gain (points)</text>
+  <g stroke="#2A2620" stroke-width="1" stroke-dasharray="2 4">
+    <line x1="92" y1="480.0" x2="808" y2="480.0"/>
+    <line x1="92" y1="402.4" x2="808" y2="402.4"/>
+    <line x1="92" y1="324.8" x2="305" y2="324.8"/>
+    <line x1="535" y1="324.8" x2="570" y2="324.8"/>
+    <line x1="92" y1="247.2" x2="305" y2="247.2"/>
+    <line x1="519" y1="247.2" x2="808" y2="247.2"/>
+    <line x1="92" y1="169.6" x2="808" y2="169.6"/>
+    <line x1="92" y1="92.0" x2="808" y2="92.0"/>
+  </g>
+  <line x1="92" y1="92" x2="92" y2="480" stroke="#8F8875" stroke-width="1.5"/>
+  <line x1="808" y1="92" x2="808" y2="480" stroke="#8F8875" stroke-width="1.5"/>
+  <line x1="92" y1="480" x2="808" y2="480" stroke="#8F8875" stroke-width="1.5"/>
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#615C50" text-anchor="end">
+    <text x="84" y="483.5">0%</text>
+    <text x="84" y="405.9">20%</text>
+    <text x="84" y="328.3">40%</text>
+    <text x="84" y="250.7">60%</text>
+    <text x="84" y="173.1">80%</text>
+    <text x="84" y="95.5">100%</text>
+  </g>
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#615C50" text-anchor="start">
+    <text x="816" y="483.5">+0</text>
+    <text x="816" y="428.1">+10</text>
+    <text x="816" y="372.6">+20</text>
+    <text x="816" y="317.2">+30</text>
+    <text x="816" y="261.8">+40</text>
+    <text x="816" y="206.4">+50</text>
+    <text x="816" y="150.9">+60</text>
+    <text x="816" y="95.5">+70</text>
+  </g>
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="9.5" fill="#8F8875">
+    <text x="92.0" y="496" text-anchor="end" transform="rotate(-40 92.0 496)">Sysmon</text>
+    <text x="157.1" y="496" text-anchor="end" transform="rotate(-40 157.1 496)">+macOS log</text>
+    <text x="222.2" y="496" text-anchor="end" transform="rotate(-40 222.2 496)">+CloudTrail</text>
+    <text x="287.3" y="496" text-anchor="end" transform="rotate(-40 287.3 496)">+Inet Scan</text>
+    <text x="352.4" y="496" text-anchor="end" transform="rotate(-40 352.4 496)">+auditd</text>
+    <text x="417.5" y="496" text-anchor="end" transform="rotate(-40 417.5 496)">+NSM Flow</text>
+    <text x="482.5" y="496" text-anchor="end" transform="rotate(-40 482.5 496)">+Net Traf</text>
+    <text x="547.6" y="496" text-anchor="end" transform="rotate(-40 547.6 496)">+Win Security</text>
+    <text x="612.7" y="496" text-anchor="end" transform="rotate(-40 612.7 496)">+Mal Repo</text>
+    <text x="677.8" y="496" text-anchor="end" transform="rotate(-40 677.8 496)">+m365</text>
+    <text x="742.9" y="496" text-anchor="end" transform="rotate(-40 742.9 496)">+k8s</text>
+    <text x="808.0" y="496" text-anchor="end" transform="rotate(-40 808.0 496)">+netdevice</text>
+  </g>
+  <polyline points="92.0,120.3 157.1,417.4 222.2,445.6 287.3,457.3 352.4,465.6 417.5,466.1 482.5,468.4 547.6,472.2 612.7,475.6 677.8,476.7 742.9,476.7 808.0,477.8" fill="none" stroke="#E5A03B" stroke-width="1.8" stroke-dasharray="5 4"/>
+    <circle cx="92.0" cy="120.3" r="3" fill="#E5A03B"/>
+    <circle cx="157.1" cy="417.4" r="3" fill="#E5A03B"/>
+    <circle cx="222.2" cy="445.6" r="3" fill="#E5A03B"/>
+    <circle cx="287.3" cy="457.3" r="3" fill="#E5A03B"/>
+    <circle cx="352.4" cy="465.6" r="3" fill="#E5A03B"/>
+    <circle cx="417.5" cy="466.1" r="3" fill="#E5A03B"/>
+    <circle cx="482.5" cy="468.4" r="3" fill="#E5A03B"/>
+    <circle cx="547.6" cy="472.2" r="3" fill="#E5A03B"/>
+    <circle cx="612.7" cy="475.6" r="3" fill="#E5A03B"/>
+    <circle cx="677.8" cy="476.7" r="3" fill="#E5A03B"/>
+    <circle cx="742.9" cy="476.7" r="3" fill="#E5A03B"/>
+    <circle cx="808.0" cy="477.8" r="3" fill="#E5A03B"/>
+  <polyline points="92.0,133.9 157.1,97.8 222.2,96.3 287.3,94.3 352.4,93.6 417.5,92.8 482.5,92.0" fill="none" stroke="#7FA8FF" stroke-width="2.2"/>
+  <polyline points="92.0,228.2 157.1,184.3 222.2,160.3 287.3,144.4 352.4,134.3 417.5,124.6 482.5,116.4 547.6,111.0 612.7,107.9 677.8,105.6 742.9,103.3 808.0,101.7" fill="none" stroke="#48B44A" stroke-width="2.5"/>
+  <g stroke-width="2" fill="#F2F4EA">
+    <circle cx="92.0" cy="133.9" r="4" stroke="#7FA8FF"/>
+    <circle cx="157.1" cy="97.8" r="4" stroke="#7FA8FF"/>
+    <circle cx="222.2" cy="96.3" r="4" stroke="#7FA8FF"/>
+    <circle cx="287.3" cy="94.3" r="4" stroke="#7FA8FF"/>
+    <circle cx="352.4" cy="93.6" r="4" stroke="#7FA8FF"/>
+    <circle cx="417.5" cy="92.8" r="4" stroke="#7FA8FF"/>
+    <circle cx="482.5" cy="92.0" r="4" stroke="#7FA8FF"/>
+  </g>
+  <g stroke-width="2" fill="#F2F4EA">
+    <circle cx="92.0" cy="228.2" r="4" stroke="#48B44A"/>
+    <circle cx="157.1" cy="184.3" r="4" stroke="#48B44A"/>
+    <circle cx="222.2" cy="160.3" r="4" stroke="#48B44A"/>
+    <circle cx="287.3" cy="144.4" r="4" stroke="#48B44A"/>
+    <circle cx="352.4" cy="134.3" r="4" stroke="#48B44A"/>
+    <circle cx="417.5" cy="124.6" r="4" stroke="#48B44A"/>
+    <circle cx="482.5" cy="116.4" r="4" stroke="#48B44A"/>
+    <circle cx="547.6" cy="111.0" r="4" stroke="#48B44A"/>
+    <circle cx="612.7" cy="107.9" r="4" stroke="#48B44A"/>
+    <circle cx="677.8" cy="105.6" r="4" stroke="#48B44A"/>
+    <circle cx="742.9" cy="103.3" r="4" stroke="#48B44A"/>
+    <circle cx="808.0" cy="101.7" r="4" stroke="#48B44A"/>
+  </g>
+  <g fill="#48B44A" stroke="#F2F4EA" stroke-width="2">
+    <circle cx="92.0" cy="228.2" r="6"/>
+    <circle cx="547.6" cy="111.0" r="6"/>
+  </g>
+  <g fill="#7FA8FF" stroke="#F2F4EA" stroke-width="2">
+    <circle cx="92.0" cy="133.9" r="6"/>
+    <circle cx="157.1" cy="97.8" r="6"/>
+  </g>
+
+  <rect x="305" y="214" width="214" height="46" rx="3" fill="#131210" stroke="#7FA8FF" stroke-width="1"/>
+  <text x="316" y="233" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10.5" fill="#D9DCCF">Windows: two sources reach</text>
+  <text x="316" y="248" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10.5" fill="#D9DCCF">98.5% of reachable strategies.</text>
+  <line x1="157.1" y1="97.8" x2="305" y2="223" stroke="#615C50" stroke-width="1.2" marker-end="url(#ah)"/>
+
+  <rect x="305" y="286" width="230" height="46" rx="3" fill="#131210" stroke="#48B44A" stroke-width="1"/>
+  <text x="316" y="305" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10.5" fill="#D9DCCF">Enterprise: one source covers</text>
+  <text x="316" y="320" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10.5" fill="#D9DCCF">64.9% before any others help.</text>
+  <line x1="92" y1="228.2" x2="305" y2="305" stroke="#615C50" stroke-width="1.2" marker-end="url(#ah)"/>
+
+  <rect x="570" y="286" width="238" height="46" rx="3" fill="#131210" stroke="#E5A03B" stroke-width="1"/>
+  <text x="581" y="305" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10.5" fill="#D9DCCF">Marginal gain falls below two</text>
+  <text x="581" y="320" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10.5" fill="#D9DCCF">points after the eighth source.</text>
+  <line x1="548" y1="472" x2="640" y2="332" stroke="#615C50" stroke-width="1.2" marker-end="url(#ah)"/>
+
+  <line x1="92" y1="540" x2="808" y2="540" stroke="#2A2620" stroke-width="1"/>
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#D9DCCF">
+    <line x1="100" y1="560" x2="132" y2="560" stroke="#48B44A" stroke-width="2.5"/>
+    <circle cx="116" cy="560" r="4" fill="#F2F4EA" stroke="#48B44A" stroke-width="2"/>
+    <text x="142" y="564">Enterprise cumulative (left axis)</text>
+    <line x1="400" y1="560" x2="432" y2="560" stroke="#7FA8FF" stroke-width="2.2"/>
+    <circle cx="416" cy="560" r="4" fill="#F2F4EA" stroke="#7FA8FF" stroke-width="2"/>
+    <text x="442" y="564">Windows cumulative (left axis)</text>
+    <line x1="100" y1="582" x2="132" y2="582" stroke="#E5A03B" stroke-width="1.8" stroke-dasharray="5 4"/>
+    <circle cx="116" cy="582" r="3" fill="#E5A03B"/>
+    <text x="142" y="586">Marginal gain per source (right axis)</text>
+    <circle cx="474" cy="582" r="6" fill="#48B44A" stroke="#F2F4EA" stroke-width="2"/>
+    <text x="488" y="586">Highlighted threshold point</text>
+  </g>
+
+</svg>
