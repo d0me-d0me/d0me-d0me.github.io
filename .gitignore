@@ -38,3 +38,6 @@ sanitize.py
 *.local.*
 .obsidian/
 *.bak
+
+# Drafts (unpublished, not tracked)
+_drafts/
