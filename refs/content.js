@@ -28,14 +28,14 @@ window.CONTENT = {
     { id: "other",     label: "Other",     jp: "その他", glyph: "雑" },
   ],
 
-  // 保有資格
+  // 保有資格。url は発行元の公式資格ページ(検証/シェアページではない。OPSEC 参照)。
   certs: [
-    { code: "OSCP",  issuer: "OffSec",       img: "oscp.png" },
-    { code: "OSEP",  issuer: "OffSec",       img: "osep.png" },
-    { code: "CPTS",  issuer: "Hack The Box", img: "cpts.png" },
-    { code: "SAL1",  issuer: "TryHackMe",    img: "sal1.png" },
-    { code: "CySA+", issuer: "CompTIA",      img: "cysa.png" },
-    { code: "CCNA",  issuer: "Cisco",        img: "ccna.png" },
+    { code: "OSCP",  issuer: "OffSec",       img: "oscp.png", url: "https://www.offsec.com/courses/pen-200/" },
+    { code: "OSEP",  issuer: "OffSec",       img: "osep.png", url: "https://www.offsec.com/courses/pen-300/" },
+    { code: "CPTS",  issuer: "Hack The Box", img: "cpts.png", url: "https://academy.hackthebox.com/preview/certifications/htb-certified-penetration-testing-specialist" },
+    { code: "SAL1",  issuer: "TryHackMe",    img: "sal1.png", url: "https://tryhackme.com/certification/security-analyst-level-1" },
+    { code: "CySA+", issuer: "CompTIA",      img: "cysa.png", url: "https://www.comptia.org/en-us/certifications/cybersecurity-analyst/" },
+    { code: "CCNA",  issuer: "Cisco",        img: "ccna.png", url: "https://www.cisco.com/site/us/en/learn/training-certifications/exams/ccna.html" },
   ],
 
   // チートシート。slug が永続キー(URL anchor)、domain が主分類、tags が横断属性。
