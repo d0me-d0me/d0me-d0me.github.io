@@ -282,7 +282,7 @@ To publish hand-written HTML pages outside Jekyll's rendering pipeline (a refere
 
 Two constraints apply:
 
-- **No front matter** on HTML files inside the passthrough directory. Front matter triggers Liquid rendering, which will misinterpret raw `{{ }}` inside inline JavaScript.
+- **No front matter** on HTML files inside the passthrough directory. Front matter triggers Liquid rendering, which will misinterpret raw `{% raw %}{{ }}{% endraw %}` inside inline JavaScript.
 - **No same-named tab file**. Creating `_tabs/refs.md` while `refs/index.html` exists causes both to emit `/refs/index.html`, and they collide.
 
 Exclude the passthrough from the PWA cache in `_config.yml`:
@@ -296,7 +296,7 @@ pwa:
 
 This prevents the Chirpy-registered service worker from caching stale versions of your hand-written pages.
 
-Jekyll はソースルート配下を既定で全て `_site` に転写するため、`/refs/` などのサブディレクトリに静的 HTML を置くだけでパススルーとして機能する。制約は2点:(1)配下 HTML に front matter を付けない — Liquid が JS 内の `{{ }}` を誤処理する。(2)同名の `_tabs/<name>.md` を作らない — 生成される index が実体ファイルと衝突する。PWA の Service Worker が古いバージョンをキャッシュに残すのを防ぐため `pwa.cache.deny_paths` で明示的に除外する。
+Jekyll はソースルート配下を既定で全て `_site` に転写するため、`/refs/` などのサブディレクトリに静的 HTML を置くだけでパススルーとして機能する。制約は2点:(1)配下 HTML に front matter を付けない — Liquid が JS 内の `{% raw %}{{ }}{% endraw %}` を誤処理する。(2)同名の `_tabs/<name>.md` を作らない — 生成される index が実体ファイルと衝突する。PWA の Service Worker が古いバージョンをキャッシュに残すのを防ぐため `pwa.cache.deny_paths` で明示的に除外する。
 
 ## Step 8: Customize the theme (optional)
 
@@ -329,6 +329,7 @@ Chirpy's default home is a paginated post list. To use a fixed landing page inst
 
 1. Move the post list to a tab. Create `_tabs/posts.md`:
 
+   {% raw %}
    ```markdown
    ---
    layout: page
@@ -346,6 +347,7 @@ Chirpy's default home is a paginated post list. To use a fixed landing page inst
    {% endfor %}
    </ul>
    ```
+   {% endraw %}
 
 2. Replace `index.html` at the repository root with landing content, using `layout: default`.
 
