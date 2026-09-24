@@ -6,7 +6,7 @@ Terminal-mono(近黒地 × 近白フォスファーの無彩)で統一した静�
 - 大項目: Offensive(攻)/ Defensive(守)/ Other(雑)の3軸。
 - トップ(`index.html`): 各大項目の**最新3件をプレビュー**表示(煩雑さ回避)。`date`(任意)降順、無ければ記載順。
 - 全索引(`all.html`): 全巻を大項目ごとに一覧+**キーワード検索**(title・日本語・topics・slug を横断。`/` でフォーカス, `Esc` で消去)。
-- Sheets(Offensive, 全6巻): Active Directory / Evasion / Lateral Movement / Command & Control / Web / Tooling。Defensive / Other は枠を用意(準備中)。各手法に防御/検知を併記。
+- Sheets(Offensive, 全9巻): Situational Awareness / Reconnaissance / Active Directory Compromise / Evasion / Lateral Movement / Linux Privilege Escalation / Command & Control / Web / File Transfer。Defensive(全2巻): Linux Hardening / Forensics & IR。Other は未着手。各手法に防御/検知を併記。
 - 全内容はラボ・CTF・公開 CVE 前提のプレースホルダ表記。実関与データなし。
 
 ## セットアップ(2手)
@@ -39,9 +39,10 @@ Terminal-mono(近黒地 × 近白フォスファーの無彩)で統一した静�
 │   ├── img/favicon.svg
 │   └── badges/*.png         # 資格バッジ（同名で公式PNGに差し替え可）
 └── sheets/
-    ├── active-directory.html
+    ├── ad-compromise.html
     ├── evasion.html
     ├── lateral-movement.html
+    ├── …                    # 他 offensive/defensive 巻
     └── template.html        # 新規シートのひな形
 ```
 
