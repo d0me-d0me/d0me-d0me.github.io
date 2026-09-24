@@ -36,12 +36,16 @@
   // --- cert wall ---
   const wall = $("#cert-wall");
   if (wall) {
-    wall.innerHTML = certs.map(c => `
-      <figure class="badge">
-        <img src="assets/badges/${esc(c.img)}" alt="${esc(c.code)} — ${esc(c.issuer)}" decoding="async"
+    wall.innerHTML = certs.map(c => {
+      const img = `<img src="assets/badges/${esc(c.img)}" alt="${esc(c.code)} — ${esc(c.issuer)}" decoding="async"
              onerror="this.hidden=true;this.nextElementSibling.hidden=false">
-        <figcaption class="fb" hidden><b>${esc(c.code)}</b><span>${esc(c.issuer)}</span></figcaption>
-      </figure>`).join("");
+        <figcaption class="fb" hidden><b>${esc(c.code)}</b><span>${esc(c.issuer)}</span></figcaption>`;
+      return c.url
+        ? `<figure class="badge">
+        <a href="${esc(c.url)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(c.code)} — ${esc(c.issuer)} 公式ページ">${img}</a>
+      </figure>`
+        : `<figure class="badge">${img}</figure>`;
+    }).join("");
   }
 
   // --- sort: date desc first, undated keep authored order ---
