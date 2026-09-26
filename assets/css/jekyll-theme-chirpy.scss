@@ -85,3 +85,12 @@ $body:   "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu
   overflow: visible !important;
   text-overflow: clip !important;
 }
+
+/* Blog search removed: the theme's bundled JS still references these
+   elements, so they stay in the DOM (to avoid a null addEventListener)
+   but are hidden. search-loader is overridden to a no-op. */
+#search-trigger,
+#search,
+#search-cancel {
+  display: none !important;
+}
