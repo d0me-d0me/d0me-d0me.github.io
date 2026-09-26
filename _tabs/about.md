@@ -23,10 +23,11 @@ No client data, private tooling, proprietary research, or functional exploit pay
 
 This site has two complementary surfaces.
 
-- **blog** (`/`) — longer articles exploring why a technique matters, where it works, its limitations, and how it compares with alternatives.
+- **blog** (`/`) — longer articles exploring why a technique matters, where it works, its limitations, and how it compares with alternatives. Hands-on lab and CTF writeups and disclosed-CVE reproductions also live here, under the `Writeups` and `CVEs` categories.
 - **refs** (`/refs/`) — concise terminal-style cheat sheets optimized for quick lookup during practice.
 
 blog は「なぜその手法なのか」を、refs は「どう使うか」を扱う。
+ラボ/CTF の writeup と公開 CVE の再現も blog 側に `Writeups` / `CVEs` カテゴリとして置く。
 記事から cheat sheet へ、そして cheat sheet から背景記事へ行き来できる構成にしている。
 
 [**Security Field Refs →**](/refs/)
