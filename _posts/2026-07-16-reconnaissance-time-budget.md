@@ -8,7 +8,7 @@ description: Recon quality is decided in the design phase, before any tool runs.
 
 ## 概要
 
-偵察の質はツールの熟達ではなく、事前設計で決まる — という前提から出発し、あらゆる reconnaissance ではっきり現れる 4 つの軸 (カバレッジ / 深さ / ノイズ / 時間) を整理した記事。この 4 軸は同時に最大化できず、常に 2 つを取って 2 つを諦めるトレードオフになる。時間予算が他 3 軸の起点になる理由、CTF / ペンテスト / レッドチーム / バグバウンティで最適解が桁単位に変わる話、そして同じフレームを反転させると防御側の監視設計に応用できる話を書いた。具体的なコマンドや wordlist は `/refs/reconnaissance` にまとめてある。
+偵察の質はツールの熟達ではなく、事前設計で決まる — という前提から出発し、あらゆる reconnaissance ではっきり現れる 4 つの軸 (カバレッジ / 深さ / ノイズ / 時間) を整理した記事。この 4 軸は同時に最大化できず、常に 2 つを取って 2 つを諦めるトレードオフになる。時間予算が他 3 軸の起点になる理由、CTF / ペンテスト / レッドチーム / バグバウンティで最適解が桁単位に変わる話、そして同じフレームを反転させると防御側の監視設計に応用できる話を書いた。具体的なコマンドや wordlist は `/refs/sheets/reconnaissance.html` にまとめてある。
 
 ## Introduction
 
@@ -18,7 +18,7 @@ CTF veterans in particular tend to overlook this gap. In a CTF, scope is small a
 
 That model doesn't survive contact with real environments. Time is scarce, scope shifts, detection is live. Running CTF-grade scans against every host in scope means the engagement window closes before you finish the interesting work. On a red team, leaving traces is the failure mode, not missing a service. On bug bounty, you're racing other hunters and the calculus of coverage-versus-speed inverts again.
 
-Reconnaissance quality gets decided in the design phase, before any command runs. This piece is about how to think through that design. The actual commands and wordlists live in `/refs/reconnaissance`.
+Reconnaissance quality gets decided in the design phase, before any command runs. This piece is about how to think through that design. The actual commands and wordlists live in `/refs/sheets/reconnaissance.html`.
 
 ## The Four Axes
 
