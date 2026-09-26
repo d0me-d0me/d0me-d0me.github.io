@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reporting — d0me</title>
+<meta name="description" content="ペンテスト/評価レポートの実務ノート — 構成、深刻度スコアリング、指摘の書き方、証跡の扱い、改善提案の言語化。">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/sheet.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">索引</span></div>
+    <button class="nav-toggle" aria-label="メニュー">≡</button>
+    <nav class="nav"><a href="../all.html">索引</a><a href="../index.html#certs">資格</a><a href="#" data-gh-url>github</a></nav>
+  </div>
+</header>
+
+<main>
+<section class="sheet-hero">
+  <div class="wrap">
+    <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>Reporting</div>
+    <h1>Reporting</h1>
+    <p class="lede">The deliverable is the report, not the shell. A field checklist for turning findings into something a reader can act on — structure, severity scoring, the anatomy of a single finding, evidence handling, and remediation language.<span class="jp">成果物は shell ではなくレポートである。指摘を「読み手が行動できる形」に変えるための実務チェックリスト — 構成・深刻度・指摘の書き方・証跡・改善提案までを扱う。</span></p>
+  </div>
+</section>
+
+<div class="wrap">
+<div class="sheet-layout">
+  <aside class="toc">
+    <div class="toc-label">目次</div>
+    <ul>
+      <li><a href="#s01">01 Report anatomy</a></li>
+      <li><a href="#s02">02 Severity &amp; scoring</a></li>
+      <li><a href="#s03">03 Anatomy of a finding</a></li>
+      <li><a href="#s04">04 Evidence &amp; handling</a></li>
+      <li><a href="#s05">05 Remediation language</a></li>
+      <li><a href="#ref">06 References</a></li>
+    </ul>
+  </aside>
+
+  <article class="doc">
+    <section id="s01" class="reveal">
+      <h2><span class="num">01</span>Report anatomy<span class="jp">構成</span></h2>
+      <p>A report serves two readers at once: the decision-maker who funds the fix and the engineer who applies it. Structure it so each finds their layer without reading the other's.</p>
+      <table>
+        <thead><tr><th>Section</th><th>Audience</th><th>Answers</th></tr></thead>
+        <tbody>
+          <tr><td>Executive summary</td><td>Leadership</td><td>What is the business risk, in one page, no jargon</td></tr>
+          <tr><td>Scope &amp; rules</td><td>All</td><td>What was tested, what was off-limits, when</td></tr>
+          <tr><td>Methodology</td><td>Technical / assurance</td><td>How coverage was achieved; what a gap means</td></tr>
+          <tr><td>Findings</td><td>Engineers</td><td>Each issue, ranked, with proof and fix</td></tr>
+          <tr><td>Remediation plan</td><td>Owners</td><td>What to do first, and by when</td></tr>
+          <tr><td>Appendix</td><td>Reference</td><td>Raw output, tool versions, full host/port lists</td></tr>
+        </tbody>
+      </table>
+      <div class="note"><span class="lbl">rule of thumb</span>
+        The executive summary is written last and read first. If a reader stops after page one, they should still know the risk and the top three actions.</div>
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>Two readers, two layers: business risk on top, reproducible detail below.</li>
+          <li>Scope and rules-of-engagement are part of the finding's meaning — an untested area is not a clean bill.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s02" class="reveal">
+      <h2><span class="num">02</span>Severity &amp; scoring<span class="jp">深刻度</span></h2>
+      <p>Score consistently so findings rank against each other, not against mood. CVSS gives a defensible baseline; risk is that base adjusted for this environment's likelihood and business impact.</p>
+      <table>
+        <thead><tr><th>Band</th><th>CVSS v3.1</th><th>Typical meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>Critical</code></td><td>9.0–10.0</td><td>Unauth remote to full compromise; fix now</td></tr>
+          <tr><td><code>High</code></td><td>7.0–8.9</td><td>Significant exposure, limited pre-conditions</td></tr>
+          <tr><td><code>Medium</code></td><td>4.0–6.9</td><td>Requires chaining or local access</td></tr>
+          <tr><td><code>Low</code></td><td>0.1–3.9</td><td>Hardening / defense-in-depth</td></tr>
+          <tr><td><code>Info</code></td><td>0.0</td><td>Observation, no direct risk</td></tr>
+        </tbody>
+      </table>
+      <p>Record the full vector, not just the number — it shows the reasoning and lets the reader re-score for their context.</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">text</span><button class="copy">copy</button></div><pre><code><span class="c"># CVSS v3.1 base vector (example: unauth RCE over network)</span>
+CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H  <span class="c"># => 9.8 Critical</span>
+
+<span class="c"># CVSS v4.0 adds Attack Requirements (AT) and split user interaction</span>
+CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N</code></pre></div>
+      <div class="note warn"><span class="lbl">watch</span>
+        A CVSS base score is environment-agnostic. A "High" on an internet-facing auth endpoint and the same "High" on an isolated lab host are not the same risk — say so in the finding, do not let the number stand alone.</div>
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>Risk = base severity adjusted for exploitability and business impact in <em>this</em> environment.</li>
+          <li>Always publish the vector string; a bare number is not reviewable.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s03" class="reveal">
+      <h2><span class="num">03</span>Anatomy of a finding<span class="jp">指摘の書き方</span></h2>
+      <p>One issue per finding. Each should stand alone: a reader jumping straight to it must understand what, why it matters, how it was proven, and what to do.</p>
+      <div class="code"><div class="code-bar"><span class="code-lang">markdown</span><button class="copy">copy</button></div><pre><code><span class="c">## &lt;Concise, neutral title — what, where&gt;</span>
+<span class="c"># Severity</span>  &lt;Critical|High|Medium|Low|Info&gt;  (CVSS:3.1/AV:.../ =&gt; &lt;score&gt;)
+<span class="c"># Affected</span>  &lt;host / endpoint / component / version&gt;
+
+<span class="c">### Description</span>
+&lt;What the weakness is, in plain terms.&gt;
+
+<span class="c">### Impact</span>
+&lt;What an attacker gains; tie to a business consequence.&gt;
+
+<span class="c">### Evidence</span>
+&lt;Redacted request/response or screenshot ref; enough to believe it,
+ not a weaponised recipe.&gt;
+
+<span class="c">### Reproduction</span>
+&lt;Numbered steps at a level a defender can verify and re-test.&gt;
+
+<span class="c">### Remediation</span>
+&lt;Specific, prioritised fix + a durable control.&gt;
+
+<span class="c">### References</span>
+&lt;CWE / vendor advisory / standard.&gt;</code></pre></div>
+      <div class="note"><span class="lbl">titles</span>
+        Neutral and specific beats dramatic. "Session cookie missing <code>HttpOnly</code> on /app" ages better and searches better than "Critical cookie flaw!".</div>
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>One issue per finding; each is self-contained.</li>
+          <li>Evidence proves the issue without shipping an operational exploit.</li>
+          <li>Reproduction is written for the person who has to re-test the fix.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s04" class="reveal">
+      <h2><span class="num">04</span>Evidence &amp; handling<span class="jp">証跡</span></h2>
+      <p>Evidence has to be believable and safe. It substantiates the finding while carrying no more sensitive data than proof requires.</p>
+      <div class="defense"><span class="lbl">handling / countermeasures</span>
+        <ul>
+          <li>Redact secrets, tokens, PII and full credentials — show enough to prove, mask the rest.</li>
+          <li>Timestamp captures and note the source host; keep a private, access-controlled master set.</li>
+          <li>Prefer scoped proof (one record, one account) over mass extraction.</li>
+          <li>Store the report and its evidence encrypted; agree a retention and deletion window with the client.</li>
+        </ul>
+      </div>
+      <div class="note warn"><span class="lbl">watch</span>
+        A report is itself sensitive: it is a map of how to break in. Treat drafts, screenshots and appendices as client-confidential from the first capture, not just at delivery.</div>
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>Prove, don't hoard: minimal evidence, redacted.</li>
+          <li>The deliverable and its working files are confidential end to end.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="s05" class="reveal">
+      <h2><span class="num">05</span>Remediation language<span class="jp">改善提案</span></h2>
+      <p>The fix section is where a report earns its cost. Make it actionable, prioritised, and owned.</p>
+      <table>
+        <thead><tr><th>Instead of</th><th>Write</th></tr></thead>
+        <tbody>
+          <tr><td>"Improve security"</td><td>"Set <code>SameSite=Lax</code> and <code>HttpOnly</code> on the session cookie in <code>/app</code>"</td></tr>
+          <tr><td>"Patch the server"</td><td>"Upgrade component X to ≥ v1.2.4; the fix addresses CVE-YYYY-NNNNN"</td></tr>
+          <tr><td>"Use strong passwords"</td><td>"Enforce a 14-char minimum + breached-password check at the IdP"</td></tr>
+        </tbody>
+      </table>
+      <p>Separate the immediate fix from the durable control: patch this host now (tactical), and add the missing detection or process so it does not recur (strategic).</p>
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>Specific, verifiable actions — a reader should know exactly what to change.</li>
+          <li>Prioritise, and name an owner where possible.</li>
+          <li>Pair the point fix with a control that prevents the class of issue.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="ref" class="reveal">
+      <h2><span class="num">06</span>参照<span class="jp">References</span></h2>
+      <ul>
+        <li>CVSS v4.0 Specification — <a href="https://www.first.org/cvss/v4-0/specification-document" target="_blank" rel="noopener">first.org</a></li>
+        <li>CVSS v3.1 Specification — <a href="https://www.first.org/cvss/v3-1/specification-document" target="_blank" rel="noopener">first.org</a></li>
+        <li>NIST SP 800-115, Technical Guide to Information Security Testing — <a href="https://csrc.nist.gov/pubs/sp/800/115/final" target="_blank" rel="noopener">csrc.nist.gov</a></li>
+        <li>OWASP WSTG — Reporting — <a href="https://owasp.org/www-project-web-security-testing-guide/" target="_blank" rel="noopener">owasp.org</a></li>
+        <li>MITRE CWE — Common Weakness Enumeration — <a href="https://cwe.mitre.org/" target="_blank" rel="noopener">cwe.mitre.org</a></li>
+      </ul>
+    </section>
+  </article>
+</div>
+</div>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · Reporting</span></div>
+    <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>GitHub</a></div>
+    <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
+  </div>
+</footer>
+
+<script src="../content.js"></script>
+<script src="../assets/js/sheet.js"></script>
+</body>
+</html>
