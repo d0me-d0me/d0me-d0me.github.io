@@ -94,3 +94,29 @@ $body:   "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu
 #search-cancel {
   display: none !important;
 }
+
+/* Further Reading (related posts) fixes.
+   1) The card's hover overlay (.post-preview::before) is position:absolute;
+      height:100%. The card was position:static, so the overlay resolved
+      against #main-wrapper and inflated the page to ~2x its height, leaving a
+      large blank area below the footer. Make the card the containing block. */
+.post-preview {
+  position: relative;
+}
+/* 2) Cards blended into the background (--card-bg #1e1e1e vs body #0B0B0C),
+      so the individual related posts were hard to tell apart. Give each a
+      clear boundary and a bit more breathing room. */
+#related-posts .post-preview {
+  height: auto;
+  border: 1px solid rgba(217, 220, 207, .22);
+  border-left: 3px solid #48B44A;
+}
+#related-posts .post-preview:hover {
+  border-color: rgba(72, 180, 74, .55);
+}
+#related-posts .post-preview .card-body {
+  padding: 1rem 1.15rem;
+}
+#related-posts .post-preview h4 {
+  color: #F2F4EA;
+}
