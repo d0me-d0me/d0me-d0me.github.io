@@ -90,5 +90,9 @@ window.CONTENT = {
       keywords: ["kape","velociraptor","volatility","memprocfs","winpmem","dumpit","mftecmd","recmd","evtxecmd","pecmd","appcompatcacheparser","amcacheparser","regripper","plaso","log2timeline","chainsaw","hayabusa","sysmon","event id","prefetch","shimcache","amcache","usn journal","autoruns","live response","memory forensics","super timeline","picerl","persistence","anti-forensics"],
       tags: ["forensics", "ir", "memory", "timeline", "windows"], status: "ready" },
     // ---- other ----
+    { domain: "other", slug: "reporting", title: "Reporting", jp: "報告",
+      topics: "structure · severity · findings · evidence · remediation",
+      keywords: ["report","reporting","cvss","cvss v3.1","cvss v4.0","vector","severity","risk","finding","evidence","redaction","remediation","executive summary","scope","rules of engagement","methodology","ptes","nist 800-115","owasp wstg","cwe","retest","impact","likelihood","deliverable"],
+      tags: ["reporting", "process", "documentation"], status: "ready" },
   ],
 };
