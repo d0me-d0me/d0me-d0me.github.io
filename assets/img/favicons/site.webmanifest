@@ -1,0 +1,13 @@
+{
+  "name": "d0me",
+  "short_name": "d0me",
+  "description": "Field references and notes on offensive and defensive security — labs, CTFs, and disclosed CVEs.",
+  "icons": [
+    { "src": "/assets/img/favicons/web-app-manifest-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/img/favicons/web-app-manifest-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ],
+  "start_url": "/index.html",
+  "theme_color": "#0B0B0C",
+  "background_color": "#0B0B0C",
+  "display": "standalone"
+}
