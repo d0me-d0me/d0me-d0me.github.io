@@ -16,8 +16,11 @@
   "use strict";
 
   const STORE = "d0me:vars";
+  const COLLAPSE = "d0me:vars:collapsed";
   const load = () => { try { return JSON.parse(localStorage.getItem(STORE) || "{}"); } catch { return {}; } };
   const save = (o) => { try { localStorage.setItem(STORE, JSON.stringify(o)); } catch { /* ignore */ } };
+  const loadCollapsed = () => { try { return localStorage.getItem(COLLAPSE) === "1"; } catch { return false; } };
+  const saveCollapsed = (v) => { try { localStorage.setItem(COLLAPSE, v ? "1" : "0"); } catch { /* ignore */ } };
 
   // Example values shown as the field's placeholder (guidance only, not applied).
   const EXAMPLES = {
@@ -82,13 +85,22 @@
 
   const head = document.createElement("div");
   head.className = "var-bar-head";
-  head.innerHTML = '<span class="vb-hx">$</span> vars'
-    + '<span class="vb-note">値を入れると全コマンドに反映 · この端末内のみ保存</span>';
+  head.innerHTML = '<span class="vb-caret">▾</span><span class="vb-hx">$</span> vars'
+    + '<span class="vb-note">値を入れると全コマンドに反映 · この端末内のみ保存</span>'
+    + '<span class="vb-count"></span>';
+  const count = head.querySelector(".vb-count");
   const reset = document.createElement("button");
   reset.type = "button";
   reset.className = "vb-reset";
   reset.textContent = "reset";
   head.appendChild(reset);
+
+  // Count of currently-set variables, shown on the collapsed strip so the
+  // bar still signals state when the fields are hidden.
+  const refreshCount = () => {
+    const n = keys.filter((k) => typeof values[k] === "string" && values[k].length > 0).length;
+    count.textContent = n ? "· " + n + " set" : "· none set";
+  };
 
   const fields = document.createElement("div");
   fields.className = "var-bar-fields";
@@ -110,18 +122,28 @@
       else delete values[k];
       save(values);
       applyKey(k);
+      refreshCount();
     });
     wrap.appendChild(name);
     wrap.appendChild(inp);
     fields.appendChild(wrap);
   });
 
-  reset.addEventListener("click", () => {
+  reset.addEventListener("click", (e) => {
+    e.stopPropagation();               // don't also toggle the collapse
     keys.forEach((k) => delete values[k]);
     save(values);
     fields.querySelectorAll("input").forEach((i) => { i.value = ""; });
     keys.forEach(applyKey);
+    refreshCount();
   });
+
+  // Header toggles the fields panel; the bar stays sticky either way, so the
+  // vars are one click from anywhere on the page. State persists per browser.
+  const setCollapsed = (v) => { bar.classList.toggle("collapsed", v); saveCollapsed(v); };
+  head.addEventListener("click", () => setCollapsed(!bar.classList.contains("collapsed")));
+  if (loadCollapsed()) bar.classList.add("collapsed");
+  refreshCount();
 
   bar.appendChild(head);
   bar.appendChild(fields);
