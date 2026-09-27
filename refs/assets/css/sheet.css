@@ -104,12 +104,26 @@ a{color:var(--accent);text-decoration:none}
 .foot{border-top:1px solid var(--line);margin-top:1.4rem;padding:1.8rem 0 2.6rem;color:var(--mute);font-size:.78rem}
 .foot .wrap{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
 .foot .sig{display:flex;align-items:center;gap:.7rem}
-.foot .mini-hanko{width:30px;height:30px;border-radius:4px;display:grid;place-items:center;background:transparent;border:1px solid var(--accent-2);color:var(--accent);font-weight:700;font-size:.72rem}
+/* Footer mark: the d0me skull icon (same artwork as the favicon). The "d0"
+   text stays as a no-image fallback but is hidden once the SVG paints. */
+.foot .mini-hanko{width:30px;height:30px;border-radius:4px;display:grid;place-items:center;background:var(--code-bg) url(../img/favicon.svg) center/contain no-repeat;border:1px solid var(--accent-2);color:transparent;font-weight:700;font-size:0}
 .foot .fmeta{color:var(--mute)} .foot .fmeta b{color:var(--dim);font-weight:500}
 .foot .flinks{display:flex;gap:1.2rem}
 .foot .flinks a{color:var(--dim)} .foot .flinks a:hover{color:var(--accent)}
 
 :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
+
+/* Mobile overflow guards.
+   1) Long unbreakable inline tokens (registry paths, URLs, hashes) must wrap
+      instead of widening the whole page. pre code keeps its own scroll. */
+.doc a,
+.doc code:not(pre code){overflow-wrap:anywhere;word-break:break-word}
+/* 2) Wide tables scroll inside their own box on small screens rather than
+      forcing horizontal scroll on the document. */
+@media(max-width:768px){
+  .doc table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+}
+
 @media(max-width:860px){.sheet-layout{grid-template-columns:1fr}.toc{position:static;border:1px solid var(--line);border-radius:5px;padding:1rem;background:var(--panel);margin-bottom:1.4rem}}
 @media(max-width:620px){.nav{display:none;position:absolute;top:52px;left:0;right:0;flex-direction:column;gap:0;background:var(--panel);border-bottom:1px solid var(--line);padding:.4rem clamp(16px,4vw,40px)}.nav.open{display:flex}.nav a{padding:.7rem 0;border-bottom:1px solid var(--line)}.nav-toggle{display:grid;place-items:center}.foot .wrap{flex-direction:column;align-items:flex-start}}
 
