@@ -2,7 +2,7 @@
    候補: amber(既定) / green / cyan / vermilion / mono / ice-blue */
 :root{
   --bg:#0B0B0C; --panel:#131210; --panel-2:#1A1814; --line:#2A2620;
-  --fg:#E9E1D0; --dim:#8F8875; --mute:#615C50;
+  --fg:#E9E1D0; --dim:#8F8875; --mute:#857F6A;
   --ok:#7FC24A; --warn:#E5533B;
   --accent:#FFB000; --accent-2:#9A6E17; --accent-soft:#FFD37A;
   --mono:"JetBrains Mono",ui-monospace,monospace; --jp:"Zen Kaku Gothic New",sans-serif;
@@ -34,7 +34,7 @@ a{color:var(--accent);text-decoration:none}
 
 .hero{padding:clamp(2.4rem,6vw,4.4rem) 0 2rem}
 .frame{border:1px solid var(--line);border-radius:4px;background:linear-gradient(180deg,var(--panel),var(--bg));overflow:hidden}
-.frame .bar{display:flex;align-items:center;gap:.6rem;padding:.5rem .9rem;border-bottom:1px solid var(--line);background:var(--panel-2);font-size:.74rem;color:var(--mute)}
+.frame .bar{display:flex;align-items:center;gap:.6rem;padding:.5rem .9rem;border-bottom:1px solid var(--line);background:var(--panel-2);font-size:.74rem;color:var(--dim)}
 .frame .bar .dot{width:9px;height:9px;border-radius:50%;background:var(--line)}
 .frame .bar .dot.a{background:var(--warn)} .frame .bar .dot.b{background:var(--accent)} .frame .bar .dot.c{background:var(--ok)}
 .frame .bar .t{margin-left:.4rem}
