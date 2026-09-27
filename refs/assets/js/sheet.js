@@ -47,29 +47,46 @@
     map.forEach((_, t) => spy.observe(t));
   }
 
-  // TOC show/hide. A fixed, icon-only button (mirroring the back-to-top
-  // control) so the TOC can be toggled from any scroll position; state
-  // persists per browser.
+  // TOC show/hide via a fixed, icon-only button (mirroring back-to-top).
+  //  - Desktop: toggles the sidebar column; the hidden state persists.
+  //  - Mobile: opens the TOC as a front overlay over a dimmed backdrop
+  //    (closes on backdrop click, a link, or Escape).
   const layout = document.querySelector(".sheet-layout");
   if (layout && document.querySelector(".toc")) {
     const KEY = "d0me:toc-hidden";
+    const isMobile = () => matchMedia("(max-width:860px)").matches;
     const btn = document.createElement("button");
     btn.type = "button";
     btn.id = "toc-toggle";
     btn.textContent = "☰"; // ☰
     btn.setAttribute("aria-label", "Toggle table of contents");
+    const shown = () => isMobile() ? layout.classList.contains("toc-open") : !layout.classList.contains("toc-off");
     const sync = () => {
-      const off = layout.classList.contains("toc-off");
-      btn.classList.toggle("off", off);
-      btn.setAttribute("aria-expanded", String(!off));
-      btn.title = off ? "Show contents" : "Hide contents";
+      btn.classList.toggle("off", !shown());
+      btn.setAttribute("aria-expanded", String(shown()));
+      btn.title = shown() ? "Hide contents" : "Show contents";
     };
+    const closeOverlay = () => { if (layout.classList.contains("toc-open")) { layout.classList.remove("toc-open"); sync(); } };
     try { if (localStorage.getItem(KEY) === "1") layout.classList.add("toc-off"); } catch { /* ignore */ }
-    btn.addEventListener("click", () => {
-      const off = layout.classList.toggle("toc-off");
-      try { localStorage.setItem(KEY, off ? "1" : "0"); } catch { /* ignore */ }
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (isMobile()) {
+        layout.classList.toggle("toc-open");
+      } else {
+        const off = layout.classList.toggle("toc-off");
+        try { localStorage.setItem(KEY, off ? "1" : "0"); } catch { /* ignore */ }
+      }
       sync();
     });
+    // dismiss the mobile overlay on backdrop click, a TOC link, or Escape
+    document.addEventListener("click", (e) => {
+      if (!layout.classList.contains("toc-open")) return;
+      if (e.target === btn || e.target.closest(".toc")) return;
+      closeOverlay();
+    });
+    layout.querySelector(".toc").addEventListener("click", (e) => { if (e.target.closest("a")) closeOverlay(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeOverlay(); });
+    window.addEventListener("resize", sync);
     document.body.appendChild(btn);
     sync();
   }
