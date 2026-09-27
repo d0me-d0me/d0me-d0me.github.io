@@ -53,6 +53,12 @@ layout: default
   color:var(--ph);margin:0;
 }
 
+.dome-home .dh-title{
+  font-family:'JetBrains Mono',monospace;font-weight:700;
+  font-size:clamp(1.7rem,4.6vw,2.5rem);line-height:1.12;letter-spacing:-.01em;
+  color:var(--ph-hi);margin:.1rem 0 1.3rem;
+}
+
 .dome-home .dh-domains{
   display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin:2.3rem 0 0;
 }
@@ -115,7 +121,8 @@ layout: default
 
 .dome-home__page>*{animation:dh-rise .5s ease both;}
 .dome-home .dh-prompt{animation-delay:.02s;}
-.dome-home .dh-intro{animation-delay:.08s;}
+.dome-home .dh-title{animation-delay:.05s;}
+.dome-home .dh-intro{animation-delay:.10s;}
 .dome-home .dh-domains{animation-delay:.16s;}
 .dome-home .dh-certs{animation-delay:.22s;}
 .dome-home .dh-links{animation-delay:.28s;}
@@ -136,6 +143,8 @@ layout: default
   <div class="dome-home__page">
 
     <p class="dh-prompt"><b>d0me</b>:~$ cat intro<span class="cur"></span></p>
+
+    <h1 class="dh-title">Security Field Notes</h1>
 
     <header class="dh-intro">
       <p class="jp">攻撃と防御、双方の視点で書き留めた実務ノート。</p>
