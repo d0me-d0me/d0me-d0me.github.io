@@ -1,2 +1,7 @@
 tabs:
   posts: Posts
+# The custom home uses layout:default; Chirpy's mobile topbar shows the
+# capitalized layout name ("Default") when no locale entry exists. Give it a
+# real title. (Chirpy applies |capitalize, so this stays "Home".)
+layout:
+  default: Home
