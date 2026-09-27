@@ -60,13 +60,16 @@ layout: default
 .dome-home .dh-intro{margin:0;}
 .dome-home .dh-intro .jp{
   font-family:'Zen Kaku Gothic New',sans-serif;font-weight:500;
-  font-size:clamp(1.4rem,3.6vw,2rem);line-height:1.55;
+  font-size:clamp(1.35rem,3.3vw,1.85rem);line-height:1.5;
   color:var(--ph-hi);margin:0 0 .6rem;
+  /* Break only at the <wbr> boundaries (no mid-phrase breaks); fit on one
+     line when it fits, and balance the two lines when it wraps. */
+  word-break:keep-all;line-break:strict;text-wrap:balance;
 }
 .dome-home .dh-intro .en{
   font-family:'JetBrains Mono',monospace;
   font-size:clamp(.84rem,1.9vw,.98rem);line-height:1.55;
-  color:var(--ph);margin:0;
+  color:var(--ph);margin:0;text-wrap:pretty;
 }
 
 .dome-home .dh-title{
@@ -170,7 +173,7 @@ layout: default
         <p class="dh-prompt"><b>d0me</b>:~$ cat intro</p>
         <h1 class="dh-title">Security<br>Field Notes<span class="cur"></span></h1>
         <header class="dh-intro">
-          <p class="jp">攻撃と防御、双方の視点で書き留めた実務ノート。</p>
+          <p class="jp">攻撃と防御、<wbr>双方の視点で<wbr>書き留めた実務ノート。</p>
           <p class="en">Notes from both sides of security — offensive and defensive.</p>
         </header>
       </div>
