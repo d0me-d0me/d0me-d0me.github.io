@@ -479,8 +479,8 @@ msf &gt; run -j
 <span class="c"># socks5 127.0.0.1 1080</span>
 
 <span class="c"># proxychains 経由で転送</span>
-proxychains -q wget http://10.10.20.10/file
-proxychains -q scp file user@10.10.20.10:/tmp/</code></pre></div>
+proxychains -q wget http://<span class="v" data-var="INTERNAL_TARGET">10.10.20.10</span>/file
+proxychains -q scp file user@<span class="v" data-var="INTERNAL_TARGET">10.10.20.10</span>:/tmp/</code></pre></div>
 
       <h3>07-2. HTTP プロキシ経由 (Windows)</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
