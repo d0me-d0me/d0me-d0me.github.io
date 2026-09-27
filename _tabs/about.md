@@ -23,11 +23,11 @@ No client data, private tooling, proprietary research, or functional exploit pay
 
 This site has two complementary surfaces.
 
-- **blog** (`/`) — longer articles exploring why a technique matters, where it works, its limitations, and how it compares with alternatives. Hands-on lab and CTF writeups and disclosed-CVE reproductions also live here, under the `Writeups` and `CVEs` categories.
+- **blog** (`/`) — longer articles exploring why a technique matters, where it works, its limitations, and how it compares with alternatives. Posts share the same top-level axis as the cheat sheets — `Offensive`, `Defensive`, `Other` — each with a topical subcategory (`Active Directory`, `Reconnaissance`, `Forensics & IR`, `Detection`, and so on). Lab/CTF writeups and disclosed-CVE reproductions, when published, are filed under the same domains.
 - **refs** (`/refs/`) — concise terminal-style cheat sheets optimized for quick lookup during practice.
 
 blog は「なぜその手法なのか」を、refs は「どう使うか」を扱う。
-ラボ/CTF の writeup と公開 CVE の再現も blog 側に `Writeups` / `CVEs` カテゴリとして置く。
+blog 記事は cheat sheet と同じ `Offensive` / `Defensive` / `Other` を top-level に置き、`Active Directory`・`Reconnaissance`・`Forensics & IR`・`Detection` などのトピックを sub-category として付ける。ラボ/CTF の writeup や公開 CVE の再現も、公開する際は同じドメインの下に置く。
 記事から cheat sheet へ、そして cheat sheet から背景記事へ行き来できる構成にしている。
 
 [**Security Field Refs →**](/refs/)
@@ -59,13 +59,20 @@ There is a Japanese saying:
 If anything, I am simply a frog that knows the ocean exists.
 Trying to understand everything was never realistic. What remains is to keep climbing, one layer at a time, learning a little more than yesterday.
 
+日本の諺に「井の中の蛙、大海を知らず」がある。
+せいぜい自分は、大海の存在だけは知っている蛙にすぎない。
+すべてを理解しようとするのは初めから現実的ではなかった。
+できるのは一層ずつ登り続け、昨日より少しだけ多くを知ることだけだ。
+
 ## Certifications
 
-- **OSCP** / **OSEP** — Offensive Security
-- **CPTS** — HackTheBox
-- **SAL1** — TryHackMe
-- **CySA+** — CompTIA
-- **CCNA** — Cisco
+<!-- Single source: _data/certs.yml (also rendered as the badge wall on the home page). -->
+{% for c in site.data.certs -%}
+- **{{ c.code }}** — [{{ c.issuer }}]({{ c.url }})
+{% endfor %}
+
+*Self-asserted; each link points to the issuer's certification page, not a verification record.*
+自己申告。各リンクは発行元の資格ページであり、本人確認用の verify リンクではない。
 
 ---
 
