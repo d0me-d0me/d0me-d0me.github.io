@@ -24,15 +24,31 @@ layout: default
   border:0;
   align-self:start;
 }
-.dome-home__page{position:relative;max-width:52rem;padding-left:1.6rem;}
-.dome-home__page::before{
-  content:"";position:absolute;left:.35rem;top:.1rem;bottom:.1rem;
-  width:1px;background:var(--ph-dim);opacity:.6;
+.dome-home__page{position:relative;max-width:52rem;}
+
+/* Terminal-window hero, matching the refs "Security Field Refs" frame so the
+   two landings read as one system. */
+.dome-home .dome-frame{
+  border:1px solid var(--rule);border-radius:6px;overflow:hidden;
+  background:linear-gradient(180deg,var(--card-hi),transparent);
+  margin:0 0 2.4rem;
 }
+.dome-home .dome-bar{
+  display:flex;align-items:center;gap:.5rem;
+  padding:.5rem .85rem;border-bottom:1px solid var(--rule);
+  background:rgba(217,220,207,.045);
+  font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--ph-dim);
+}
+.dome-home .dome-bar .d{width:9px;height:9px;border-radius:50%;background:var(--rule);}
+.dome-home .dome-bar .d.a{background:#E0533B;}
+.dome-home .dome-bar .d.b{background:#E6B450;}
+.dome-home .dome-bar .d.c{background:var(--grn);}
+.dome-home .dome-bar .t{margin-left:.35rem;letter-spacing:.02em;}
+.dome-home .dome-frame-body{padding:clamp(1.5rem,4vw,2.4rem);}
 
 .dome-home .dh-prompt{
   font-family:'JetBrains Mono',monospace;color:var(--ph-dim);
-  font-size:.85rem;letter-spacing:.01em;margin:0 0 1.5rem;
+  font-size:.85rem;letter-spacing:.01em;margin:0 0 .55rem;
 }
 .dome-home .dh-prompt b{color:var(--ph-hi);font-weight:700;}
 .dome-home .dh-prompt .cur{
@@ -55,9 +71,14 @@ layout: default
 
 .dome-home .dh-title{
   font-family:'JetBrains Mono',monospace;font-weight:700;
-  font-size:clamp(1.7rem,4.6vw,2.5rem);line-height:1.12;letter-spacing:-.01em;
-  color:var(--ph-hi);margin:.1rem 0 1.3rem;
+  font-size:clamp(1.9rem,6.2vw,3.4rem);line-height:1.04;letter-spacing:-.02em;
+  color:var(--ph-hi);margin:.15rem 0 .1rem;
 }
+.dome-home .dh-title .cur{
+  display:inline-block;width:.6ch;height:.9em;background:var(--grn);
+  vertical-align:-.08em;margin-left:.12em;animation:dh-blink 1.1s steps(1) infinite;
+}
+.dome-home .dh-intro{margin:1rem 0 0;}
 
 .dome-home .dh-domains{
   display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin:2.3rem 0 0;
@@ -120,9 +141,7 @@ layout: default
 .dome-home .dh-certs-note{font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--ph-dim);margin:.7rem 0 0;}
 
 .dome-home__page>*{animation:dh-rise .5s ease both;}
-.dome-home .dh-prompt{animation-delay:.02s;}
-.dome-home .dh-title{animation-delay:.05s;}
-.dome-home .dh-intro{animation-delay:.10s;}
+.dome-home .dome-frame{animation-delay:.04s;}
 .dome-home .dh-domains{animation-delay:.16s;}
 .dome-home .dh-certs{animation-delay:.22s;}
 .dome-home .dh-links{animation-delay:.28s;}
@@ -142,14 +161,20 @@ layout: default
 <div class="dome-home">
   <div class="dome-home__page">
 
-    <p class="dh-prompt"><b>d0me</b>:~$ cat intro<span class="cur"></span></p>
-
-    <h1 class="dh-title">Security Field Notes</h1>
-
-    <header class="dh-intro">
-      <p class="jp">攻撃と防御、双方の視点で書き留めた実務ノート。</p>
-      <p class="en">Notes from both sides of security — offensive and defensive.</p>
-    </header>
+    <div class="dome-frame">
+      <div class="dome-bar">
+        <span class="d a"></span><span class="d b"></span><span class="d c"></span>
+        <span class="t">— d0me — field-notes — 80×24</span>
+      </div>
+      <div class="dome-frame-body">
+        <p class="dh-prompt"><b>d0me</b>:~$ cat intro</p>
+        <h1 class="dh-title">Security<br>Field Notes<span class="cur"></span></h1>
+        <header class="dh-intro">
+          <p class="jp">攻撃と防御、双方の視点で書き留めた実務ノート。</p>
+          <p class="en">Notes from both sides of security — offensive and defensive.</p>
+        </header>
+      </div>
+    </div>
 
     <nav class="dh-domains" aria-label="domains">
       <a class="dh-card" href="{{ '/refs/all.html#dom-offensive' | relative_url }}">
