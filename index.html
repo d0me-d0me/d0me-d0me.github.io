@@ -102,16 +102,29 @@ layout: default
   font-family:'Zen Kaku Gothic New',sans-serif;
 }
 
+.dome-home .dh-certs{margin:2.3rem 0 0;}
+.dome-home .dh-certs-h{font-family:'JetBrains Mono',monospace;font-size:.92rem;font-weight:700;color:var(--ph-hi);margin:0 0 1rem;letter-spacing:.01em;}
+.dome-home .dh-certs-h .hx{color:var(--grn);}
+.dome-home .dh-certs-h .jp{font-family:'Zen Kaku Gothic New',sans-serif;font-weight:500;color:var(--ph-dim);font-size:.8em;margin-left:.5rem;}
+.dome-home .dh-certwall{display:grid;grid-template-columns:repeat(6,1fr);gap:.6rem;}
+.dome-home .dh-badge{display:grid;place-items:center;padding:.7rem;border:1px solid var(--rule);border-radius:6px;background:var(--card);aspect-ratio:1/1;transition:border-color .16s,background .16s;}
+.dome-home .dh-badge:hover{border-color:var(--grn);background:var(--card-hi);}
+.dome-home .dh-badge:focus-visible{outline:2px solid var(--grn);outline-offset:3px;}
+.dome-home .dh-badge img{width:100%;height:auto;max-width:100%;object-fit:contain;display:block;}
+.dome-home .dh-certs-note{font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--ph-dim);margin:.7rem 0 0;}
+
 .dome-home__page>*{animation:dh-rise .5s ease both;}
 .dome-home .dh-prompt{animation-delay:.02s;}
 .dome-home .dh-intro{animation-delay:.08s;}
 .dome-home .dh-domains{animation-delay:.16s;}
-.dome-home .dh-links{animation-delay:.24s;}
-.dome-home .dh-motto{animation-delay:.30s;}
+.dome-home .dh-certs{animation-delay:.22s;}
+.dome-home .dh-links{animation-delay:.28s;}
+.dome-home .dh-motto{animation-delay:.34s;}
 @keyframes dh-rise{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
 
 @media (max-width:620px){
   .dome-home .dh-domains{grid-template-columns:1fr;}
+  .dome-home .dh-certwall{grid-template-columns:repeat(3,1fr);}
   .dome-home__page{padding-left:1.1rem;}
 }
 @media (prefers-reduced-motion:reduce){
@@ -146,6 +159,18 @@ layout: default
         <span class="sub">その他</span>
       </a>
     </nav>
+
+    <section class="dh-certs" aria-label="certifications">
+      <h2 class="dh-certs-h"><span class="hx">##</span> Certifications <span class="jp">保有資格</span></h2>
+      <div class="dh-certwall">
+        {% for c in site.data.certs %}
+        <a class="dh-badge" href="{{ c.url }}" target="_blank" rel="noopener noreferrer" aria-label="{{ c.code }} — {{ c.issuer }}">
+          <img src="{{ '/refs/assets/badges/' | append: c.img | relative_url }}" alt="{{ c.code }} — {{ c.issuer }}" loading="lazy" decoding="async">
+        </a>
+        {% endfor %}
+      </div>
+      <p class="dh-certs-note">self-asserted · no verify link</p>
+    </section>
 
     <div class="dh-links">
       <a href="{{ '/posts/' | relative_url }}">→ Posts</a>
