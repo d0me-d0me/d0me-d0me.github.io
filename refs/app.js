@@ -87,7 +87,9 @@
       return `<section class="domain" id="dom-${esc(dom.id)}">
         <div class="domain-head">
           <span class="dh-hx">##</span>
-          <span class="dh-label">${esc(dom.label)}</span>
+          ${preview > 0 && dom.id
+            ? `<a class="dh-label dh-label-link" href="${hrefBase}all.html#dom-${esc(dom.id)}">${esc(dom.label)}</a>`
+            : `<span class="dh-label">${esc(dom.label)}</span>`}
           <span class="dh-jp">${esc(dom.jp || "")}</span>
           <span class="dh-glyph" aria-hidden="true">${esc(dom.glyph || "")}</span>
           <span class="dh-ln"></span>

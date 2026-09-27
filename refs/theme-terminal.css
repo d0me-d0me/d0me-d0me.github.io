@@ -72,6 +72,8 @@ h1 .cur{display:inline-block;width:.6ch;height:1em;background:var(--accent);vert
 .domain-head{display:flex;align-items:center;gap:.7rem;margin:0 0 .9rem;color:var(--dim);font-size:.82rem}
 .domain-head .dh-hx{color:var(--accent);font-weight:700}
 .domain-head .dh-label{color:var(--fg);font-weight:500}
+.domain-head a.dh-label-link{text-decoration:none;border-bottom:1px solid transparent;transition:border-color .16s,color .16s}
+.domain-head a.dh-label-link:hover{color:var(--accent);border-bottom-color:var(--accent)}
 .domain-head .dh-jp{color:var(--mute);font-family:var(--jp)}
 .domain-head .dh-glyph{font-family:var(--jp);color:var(--accent-2);margin-left:.1rem}
 .domain-head .dh-ln{flex:1;height:1px;background:var(--line)}
