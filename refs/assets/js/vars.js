@@ -5,6 +5,11 @@
    every matching placeholder in-place (prose and code), and because the copy
    buttons read the code's text, copied commands carry the substituted values.
 
+   The typed value is written with textContent, so it is emitted verbatim as a
+   literal string — special characters in a password (e.g. < > & " ' $ ` | ; and
+   spaces) are preserved exactly and are never parsed as HTML. Only a
+   whitespace-only entry is treated as empty; the value itself is never trimmed.
+
    Values are stored in localStorage under one key, so they carry across every
    sheet in this browser. Nothing leaves the browser. */
 (() => {
@@ -13,6 +18,26 @@
   const STORE = "d0me:vars";
   const load = () => { try { return JSON.parse(localStorage.getItem(STORE) || "{}"); } catch { return {}; } };
   const save = (o) => { try { localStorage.setItem(STORE, JSON.stringify(o)); } catch { /* ignore */ } };
+
+  // Example values shown as the field's placeholder (guidance only, not applied).
+  const EXAMPLES = {
+    LHOST: "10.10.14.9", LPORT: "4444", RHOST: "10.10.10.10", RPORT: "445",
+    TARGET: "10.10.10.10", TARGET_B: "10.10.10.20", HOST_IP: "10.10.10.10",
+    INTERNAL_TARGET: "172.16.1.5", PIVOT: "10.10.14.9", CRAWLER_IP: "10.10.14.9",
+    DC_IP: "10.10.10.5", DC: "dc01", MACHINE: "WS01", HOSTNAME: "dc01",
+    CIDR: "10.10.10.0/24", INTERNAL_CIDR: "172.16.1.0/24", "TARGET_SUBNET/24": "10.10.10.0/24",
+    USER: "alice", USERNAME: "alice", LOCAL_USER: "admin", DOMAIN_USER: "alice",
+    DA_USER: "administrator", ID: "alice", SID: "S-1-5-21-…-1103",
+    PASSWORD: "P@ssw0rd!", PASS: "P@ssw0rd!", PW: "P@ssw0rd!",
+    DOMAIN: "corp.local", DOMAIN_SID: "S-1-5-21-1004336348-1177238915-682003330",
+    TARGET_FQDN: "dc01.corp.local", URL: "http://10.10.10.10/",
+    NT: "aad3b435b51404eeaad3b435b51404ee", NTLM: "31d6cfe0d16ae931b73c59d7e0c089c0",
+    NTLM_HASH: "aad3b435…:31d6cfe0…", B64: "<base64>",
+    TOOL_DIR: "/opt/tools", OUT: "/tmp/out", OUT_DIR: "/tmp/loot", PATH: "/tmp/x",
+    PAYLOAD_PATH: "/tmp/shell.exe", PID: "1337", SERVICE_NAME: "MyService",
+    SVC_TITLE: "MyService", SVC_DESC: "desc"
+  };
+  const exampleFor = (k) => EXAMPLES[k] || EXAMPLES[k.toUpperCase()] || ("<" + k + ">");
 
   const isToken = (t) => /^<[^<>]+>$/.test(t.trim());
   const keyOf = (t) => t.trim().replace(/^<|>$/g, "");
@@ -35,8 +60,9 @@
 
   const applyKey = (k) => {
     const v = values[k];
+    const hasVal = typeof v === "string" && v.length > 0;
     byKey.get(k).forEach((s) => {
-      if (v) { s.textContent = v; s.classList.add("set"); }
+      if (hasVal) { s.textContent = v; s.classList.add("set"); }
       else { s.textContent = s.dataset.ph; s.classList.remove("set"); }
     });
   };
@@ -68,11 +94,12 @@
     inp.type = "text";
     inp.autocomplete = "off";
     inp.spellcheck = false;
-    inp.placeholder = "<" + k + ">";
-    inp.value = values[k] || "";
+    inp.placeholder = exampleFor(k);
+    inp.value = (typeof values[k] === "string") ? values[k] : "";
     inp.addEventListener("input", () => {
-      const val = inp.value.trim();
-      if (val) values[k] = val; else delete values[k];
+      const raw = inp.value;             // preserve exactly, including symbols/spaces
+      if (raw.trim()) values[k] = raw;   // whitespace-only counts as empty
+      else delete values[k];
       save(values);
       applyKey(k);
     });
