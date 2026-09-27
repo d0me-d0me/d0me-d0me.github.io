@@ -46,6 +46,31 @@
     }), { rootMargin: "-20% 0px -70% 0px" });
     map.forEach((_, t) => spy.observe(t));
   }
+
+  // TOC show/hide. The toggle sits at the top of the content column so it
+  // stays visible once the TOC is hidden; state persists per browser.
+  const layout = document.querySelector(".sheet-layout");
+  const doc = document.querySelector(".doc");
+  if (layout && doc && document.querySelector(".toc")) {
+    const KEY = "d0me:toc-hidden";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "toc-toggle";
+    const sync = () => {
+      const off = layout.classList.contains("toc-off");
+      btn.innerHTML = '<span class="tt-caret">' + (off ? "▸" : "▾") + "</span> 目次";
+      btn.setAttribute("aria-expanded", String(!off));
+      btn.title = off ? "目次を表示" : "目次を隠す";
+    };
+    try { if (localStorage.getItem(KEY) === "1") layout.classList.add("toc-off"); } catch { /* ignore */ }
+    btn.addEventListener("click", () => {
+      const off = layout.classList.toggle("toc-off");
+      try { localStorage.setItem(KEY, off ? "1" : "0"); } catch { /* ignore */ }
+      sync();
+    });
+    doc.insertBefore(btn, doc.firstChild);
+    sync();
+  }
 })();
 
 /* ===== back to top (全 sheet 共通、ボタンを動的生成) ===== */
