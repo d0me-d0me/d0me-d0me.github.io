@@ -71,6 +71,9 @@ layout: default
   font-size:clamp(.84rem,1.9vw,.98rem);line-height:1.55;
   color:var(--ph);margin:0;text-wrap:pretty;
 }
+/* keep the "— offensive and defensive." clause intact so it wraps as a unit
+   (breaks before the dash) rather than mid-phrase */
+.dome-home .dh-intro .en .nb{white-space:nowrap;}
 
 .dome-home .dh-title{
   font-family:'JetBrains Mono',monospace;font-weight:700;
@@ -174,7 +177,7 @@ layout: default
         <h1 class="dh-title">Security<br>Field Notes<span class="cur"></span></h1>
         <header class="dh-intro">
           <p class="jp">攻撃と防御、<wbr>双方の視点で<wbr>書き留めた実務ノート。</p>
-          <p class="en">Notes from both sides of security — offensive and defensive.</p>
+          <p class="en">Notes from both sides of security <span class="nb">— offensive and defensive.</span></p>
         </header>
       </div>
     </div>
