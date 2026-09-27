@@ -190,7 +190,7 @@ sudo masscan -p80,443,445,3389 $RANGE --rate=1000 -oL scans/masscan_hosts.txt</c
 rustscan --accessible -a $TARGET -r 1-65535 -- -sT -sV -sC -Pn -oN scans/rustscan.txt
 
 <span class="c"># 複数ホスト並列</span>
-rustscan -a 10.10.10.10,10.10.10.20,10.10.10.30 -r 1-65535 -- -sC -sV
+rustscan -a <span class="v" data-var="TARGET">10.10.10.10</span>,<span class="v" data-var="TARGET2">10.10.10.20</span>,<span class="v" data-var="TARGET3">10.10.10.30</span> -r 1-65535 -- -sC -sV
 
 <span class="c"># ulimit 警告回避</span>
 rustscan -a $TARGET -r 1-65535 --ulimit 5000 -- -sC -sV</code></pre></div>
@@ -634,7 +634,7 @@ Invoke-Portscan -Hosts <span class="v" data-var="INTERNAL_CIDR">10.10.20.0/24</s
       <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div>
 <pre><code><span class="c"># 単一ホスト・複数ポート</span>
 1..1024 | ForEach-Object {
-    $r = Test-NetConnection -ComputerName 10.10.20.10 -Port $_ \
+    $r = Test-NetConnection -ComputerName <span class="v" data-var="INTERNAL_TARGET">10.10.20.10</span> -Port $_ \
       -WarningAction SilentlyContinue -InformationLevel Quiet
     if ($r) { "Port $_ open" }
 }

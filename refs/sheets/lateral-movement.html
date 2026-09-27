@@ -908,8 +908,8 @@ INFO[XXXX] Starting tunnel to <span class="v">&lt;USER&gt;</span>@<span class="v
 sudo ip route add <span class="v">&lt;INTERNAL_CIDR&gt;</span>/24 dev ligolo
 
 <span class="c"># 複数 CIDR (agent の ifconfig で見えた全 subnet を追加)</span>
-sudo ip route add 10.10.100.0/24 dev ligolo
-sudo ip route add 172.16.0.0/16 dev ligolo
+sudo ip route add <span class="v" data-var="INTERNAL_CIDR">10.10.100.0/24</span> dev ligolo
+sudo ip route add <span class="v" data-var="INTERNAL_CIDR2">172.16.0.0/16</span> dev ligolo
 
 <span class="c"># 現在の route 確認</span>
 ip route show | grep ligolo</code></pre></div>
@@ -960,7 +960,7 @@ INFO[XXXX] Listener created on remote agent!
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># [operator (kali)]:</span>
 sudo ip tuntap add user $(whoami) mode tun ligolo
 sudo ip link set ligolo up
-sudo ip route add 10.10.0.0/24 dev ligolo             <span class="c"># pivot1 で入る A → B</span>
+sudo ip route add <span class="v" data-var="SEGMENT_A">10.10.0.0/24</span> dev ligolo             <span class="c"># pivot1 で入る A → B</span>
 
 <span class="c"># pivot1 host が接続してくると session 1 が現れる</span>
 <span class="c"># pivot1 の内部 CIDR 経由で pivot2 host に到達可能な状態を作る</span>
@@ -971,7 +971,7 @@ sudo ip route add 10.10.0.0/24 dev ligolo             <span class="c"># pivot1 �
 <span class="c"># 別 TUN device を作成</span>
 sudo ip tuntap add user $(whoami) mode tun ligolo2
 sudo ip link set ligolo2 up
-sudo ip route add 192.168.20.0/24 dev ligolo2
+sudo ip route add <span class="v" data-var="SEGMENT_B">192.168.20.0/24</span> dev ligolo2
 
 <span class="c"># proxy CLI で pivot2 session を選択</span></code></pre></div>
       <div class="code"><div class="code-bar"><span class="code-lang">ligolo</span><button class="copy">copy</button></div><pre><code>ligolo-ng » session
