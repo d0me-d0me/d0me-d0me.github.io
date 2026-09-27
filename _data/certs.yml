@@ -1,0 +1,27 @@
+# Certifications shown on the home page (self-asserted; url = issuer's
+# official certification page, not a verify/share link — OPSEC).
+# Badge art lives in refs/assets/badges/.
+- code: OSCP
+  issuer: OffSec
+  img: oscp.png
+  url: https://www.offsec.com/courses/pen-200/
+- code: OSEP
+  issuer: OffSec
+  img: osep.png
+  url: https://www.offsec.com/courses/pen-300/
+- code: CPTS
+  issuer: Hack The Box
+  img: cpts.png
+  url: https://academy.hackthebox.com/preview/certifications/htb-certified-penetration-testing-specialist
+- code: SAL1
+  issuer: TryHackMe
+  img: sal1.png
+  url: https://tryhackme.com/certification/security-analyst-level-1
+- code: CySA+
+  issuer: CompTIA
+  img: cysa.png
+  url: https://www.comptia.org/en-us/certifications/cybersecurity-analyst/
+- code: CCNA
+  issuer: Cisco
+  img: ccna.png
+  url: https://www.cisco.com/site/us/en/learn/training-certifications/exams/ccna.html
