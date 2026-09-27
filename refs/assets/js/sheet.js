@@ -47,29 +47,31 @@
     map.forEach((_, t) => spy.observe(t));
   }
 
-  // TOC show/hide. A fixed, icon-only button (mirroring the back-to-top
-  // control) so the TOC can be toggled from any scroll position; state
-  // persists per browser.
+  // TOC overlay. A fixed, icon-only button (mirroring back-to-top) opens the
+  // TOC as a panel on top of the page over a dimmed backdrop, on every screen
+  // size. It closes on a backdrop click, a TOC link, or Escape.
   const layout = document.querySelector(".sheet-layout");
   if (layout && document.querySelector(".toc")) {
-    const KEY = "d0me:toc-hidden";
     const btn = document.createElement("button");
     btn.type = "button";
     btn.id = "toc-toggle";
     btn.textContent = "☰"; // ☰
     btn.setAttribute("aria-label", "Toggle table of contents");
     const sync = () => {
-      const off = layout.classList.contains("toc-off");
-      btn.classList.toggle("off", off);
-      btn.setAttribute("aria-expanded", String(!off));
-      btn.title = off ? "Show contents" : "Hide contents";
+      const open = layout.classList.contains("toc-open");
+      btn.classList.toggle("off", !open);
+      btn.setAttribute("aria-expanded", String(open));
+      btn.title = open ? "Hide contents" : "Show contents";
     };
-    try { if (localStorage.getItem(KEY) === "1") layout.classList.add("toc-off"); } catch { /* ignore */ }
-    btn.addEventListener("click", () => {
-      const off = layout.classList.toggle("toc-off");
-      try { localStorage.setItem(KEY, off ? "1" : "0"); } catch { /* ignore */ }
-      sync();
+    const close = () => { if (layout.classList.contains("toc-open")) { layout.classList.remove("toc-open"); sync(); } };
+    btn.addEventListener("click", (e) => { e.stopPropagation(); layout.classList.toggle("toc-open"); sync(); });
+    document.addEventListener("click", (e) => {
+      if (!layout.classList.contains("toc-open")) return;
+      if (e.target === btn || e.target.closest(".toc")) return;
+      close();
     });
+    layout.querySelector(".toc").addEventListener("click", (e) => { if (e.target.closest("a")) close(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
     document.body.appendChild(btn);
     sync();
   }
