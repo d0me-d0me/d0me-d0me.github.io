@@ -38,10 +38,8 @@
     SVC_TITLE: "MyService", SVC_DESC: "desc"
   };
   const exampleFor = (k, def) => {
-    const ex = EXAMPLES[k] || EXAMPLES[k.toUpperCase()];
-    if (ex) return ex;
-    if (def && !/^<[^<>]+>$/.test(def)) return def; // a real default value doubles as the example
-    return "<" + k + ">";
+    if (def && !/^<[^<>]+>$/.test(def)) return def; // a real default value is the truest example
+    return EXAMPLES[k] || EXAMPLES[k.toUpperCase()] || ("<" + k + ">");
   };
 
   const isToken = (t) => /^<[^<>]+>$/.test(t.trim());

