@@ -1,7 +1,11 @@
 # Copy of jekyll-theme-chirpy 7.6.0 _data/origin/cors.yml with Font
-# Awesome pinned to v6 (the theme default @7 leaves some icons, e.g. the
-# back-to-top fas fa-angle-up, not rendering). Jekyll replaces this whole
-# file, so every key from the theme is kept here. Bump with the theme.
+# Awesome self-hosted. The theme default loads Font Awesome from jsdelivr's
+# version-range path (@7 / @6); the CSS reaches the browser but the webfonts
+# it references (../webfonts/*.woff2) do not resolve, so icons render as an
+# empty frame with no glyph. Serving both the CSS and the woff2 from our own
+# origin (assets/fontawesome/, vendored from fontawesome-free 7.3.1)
+# removes that dependency entirely. Jekyll replaces this whole file, so every
+# key from the theme is kept here. Bump with the theme.
 # Resource Hints
 resource_hints:
   - url: https://fonts.googleapis.com
@@ -31,7 +35,7 @@ toc:
   js: https://cdn.jsdelivr.net/npm/tocbot@4/dist/tocbot.min.js
 
 fontawesome:
-  css: https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6/css/all.min.css
+  css: /assets/fontawesome/css/all.min.css
 
 search:
   js: https://cdn.jsdelivr.net/npm/simple-jekyll-search@1/dest/simple-jekyll-search.min.js
