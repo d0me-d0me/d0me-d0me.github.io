@@ -6,6 +6,14 @@ title: Posts
 ---
 
 <style>
+/* Keep the tab title "Posts" (short sidebar label + correct <title>), but
+   show a branded hero to match Security Field Refs / Notes. */
+.dynamic-title{display:none;}
+.dome-journal-h{
+  font-family:'JetBrains Mono',monospace;font-weight:700;letter-spacing:-.01em;
+  font-size:clamp(1.6rem,4.4vw,2.3rem);line-height:1.15;
+  color:#F2F4EA;margin:.1rem 0 1.4rem;
+}
 .dome-postlist{list-style:none;margin:1.4rem 0 0;padding:0;}
 .dome-postlist li{
   display:flex;align-items:baseline;gap:.9rem;
@@ -24,6 +32,8 @@ title: Posts
 }
 .dome-postlist-empty{color:rgba(205,211,194,.55);margin-top:1.2rem;}
 </style>
+
+<h1 class="dome-journal-h">Security Field Journal</h1>
 
 {% assign pinned = site.posts | where: "pin", true %}
 {% assign rest = site.posts | where_exp: "p", "p.pin != true" %}
