@@ -2,7 +2,7 @@
 # the default layout is 'page'
 # layout: about
 icon: fas fa-info-circle
-order: 4
+order: 5
 ---
 
 Field notes on offensive and defensive security, built through lab work, CTFs, and reproductions of publicly disclosed CVEs.
@@ -35,11 +35,11 @@ liability is accepted for misuse.
 
 This site has two complementary surfaces.
 
-- **blog** (`/`) — longer articles exploring why a technique matters, where it works, its limitations, and how it compares with alternatives. Posts share the same top-level axis as the cheat sheets — `Offensive`, `Defensive`, `Other` — each with a topical subcategory (`Active Directory`, `Reconnaissance`, `Forensics & IR`, `Detection`, and so on). Lab/CTF writeups and disclosed-CVE reproductions, when published, are filed under the same domains.
+- **Posts** (`/posts/`) — longer articles exploring why a technique matters, where it works, its limitations, and how it compares with alternatives. They share the same top-level axis as the cheat sheets — `Offensive`, `Defensive`, `Other` — each with a topical subcategory (`Active Directory`, `Reconnaissance`, `Forensics & IR`, `Detection`, and so on). Lab/CTF writeups and disclosed-CVE reproductions, when published, are filed under the same domains.
 - **refs** (`/refs/`) — concise terminal-style cheat sheets optimized for quick lookup during practice.
 
-blog は「なぜその手法なのか」を、refs は「どう使うか」を扱う。
-blog 記事は cheat sheet と同じ `Offensive` / `Defensive` / `Other` を top-level に置き、`Active Directory`・`Reconnaissance`・`Forensics & IR`・`Detection` などのトピックを sub-category として付ける。ラボ/CTF の writeup や公開 CVE の再現も、公開する際は同じドメインの下に置く。
+Posts は「なぜその手法なのか」を、refs は「どう使うか」を扱う。
+Posts の記事は cheat sheet と同じ `Offensive` / `Defensive` / `Other` を top-level に置き、`Active Directory`・`Reconnaissance`・`Forensics & IR`・`Detection` などのトピックを sub-category として付ける。ラボ/CTF の writeup や公開 CVE の再現も、公開する際は同じドメインの下に置く。
 記事から cheat sheet へ、そして cheat sheet から背景記事へ行き来できる構成にしている。
 
 [**Security Field Refs →**](/refs/)
