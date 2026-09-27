@@ -1,7 +1,7 @@
 /* sheet.css — cheat-sheet pages in terminal-mono (matches home data-accent=mono) */
 :root{
   --bg:#0B0B0C; --panel:#131210; --panel-2:#1A1814; --line:#2A2620; --code-bg:#070707;
-  --fg:#E9E1D0; --dim:#8F8875; --mute:#615C50;
+  --fg:#E9E1D0; --dim:#8F8875; --mute:#857F6A;
   --accent:#D9DCCF; --accent-2:#6E7264; --accent-soft:#F2F4EA;
   --ok:#7FC24A; --warn:#E5533B;
   --mono:"JetBrains Mono",ui-monospace,monospace; --jp:"Zen Kaku Gothic New",sans-serif;
@@ -104,12 +104,26 @@ a{color:var(--accent);text-decoration:none}
 .foot{border-top:1px solid var(--line);margin-top:1.4rem;padding:1.8rem 0 2.6rem;color:var(--mute);font-size:.78rem}
 .foot .wrap{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
 .foot .sig{display:flex;align-items:center;gap:.7rem}
-.foot .mini-hanko{width:30px;height:30px;border-radius:4px;display:grid;place-items:center;background:transparent;border:1px solid var(--accent-2);color:var(--accent);font-weight:700;font-size:.72rem}
+/* Footer mark: the d0me skull icon (same artwork as the favicon). The "d0"
+   text stays as a no-image fallback but is hidden once the SVG paints. */
+.foot .mini-hanko{width:30px;height:30px;border-radius:4px;display:grid;place-items:center;background:var(--code-bg) url(../img/favicon.svg) center/contain no-repeat;border:1px solid var(--accent-2);color:transparent;font-weight:700;font-size:0}
 .foot .fmeta{color:var(--mute)} .foot .fmeta b{color:var(--dim);font-weight:500}
 .foot .flinks{display:flex;gap:1.2rem}
 .foot .flinks a{color:var(--dim)} .foot .flinks a:hover{color:var(--accent)}
 
 :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
+
+/* Mobile overflow guards.
+   1) Long unbreakable inline tokens (registry paths, URLs, hashes) must wrap
+      instead of widening the whole page. pre code keeps its own scroll. */
+.doc a,
+.doc code:not(pre code){overflow-wrap:anywhere;word-break:break-word}
+/* 2) Wide tables scroll inside their own box on small screens rather than
+      forcing horizontal scroll on the document. */
+@media(max-width:768px){
+  .doc table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+}
+
 @media(max-width:860px){.sheet-layout{grid-template-columns:1fr}.toc{position:static;border:1px solid var(--line);border-radius:5px;padding:1rem;background:var(--panel);margin-bottom:1.4rem}}
 @media(max-width:620px){.nav{display:none;position:absolute;top:52px;left:0;right:0;flex-direction:column;gap:0;background:var(--panel);border-bottom:1px solid var(--line);padding:.4rem clamp(16px,4vw,40px)}.nav.open{display:flex}.nav a{padding:.7rem 0;border-bottom:1px solid var(--line)}.nav-toggle{display:grid;place-items:center}.foot .wrap{flex-direction:column;align-items:flex-start}}
 
@@ -158,7 +172,7 @@ a{color:var(--accent);text-decoration:none}
 #var-bar{border:1px solid var(--line);border-radius:6px;background:var(--panel);margin:0 0 1.6rem;overflow:hidden}
 #var-bar .var-bar-head{display:flex;align-items:center;gap:.6rem;padding:.55rem .8rem;background:var(--panel-2);border-bottom:1px solid var(--line);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
 #var-bar .vb-hx{color:var(--accent)}
-#var-bar .vb-note{font-size:.62rem;letter-spacing:.02em;text-transform:none;color:var(--mute)}
+#var-bar .vb-note{font-size:.62rem;letter-spacing:.02em;text-transform:none;color:var(--dim)}
 #var-bar .vb-reset{margin-left:auto;font-family:var(--mono);font-size:.64rem;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);background:transparent;border:1px solid var(--line);border-radius:3px;padding:.2rem .5rem;cursor:pointer;transition:all .18s}
 #var-bar .vb-reset:hover{color:var(--accent);border-color:var(--accent-2)}
 #var-bar .var-bar-fields{display:flex;flex-wrap:wrap;gap:.55rem .7rem;padding:.75rem .8rem}
