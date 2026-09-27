@@ -1,7 +1,7 @@
 /* sheet.css — cheat-sheet pages in terminal-mono (matches home data-accent=mono) */
 :root{
   --bg:#0B0B0C; --panel:#131210; --panel-2:#1A1814; --line:#2A2620; --code-bg:#070707;
-  --fg:#E9E1D0; --dim:#8F8875; --mute:#615C50;
+  --fg:#E9E1D0; --dim:#8F8875; --mute:#857F6A;
   --accent:#D9DCCF; --accent-2:#6E7264; --accent-soft:#F2F4EA;
   --ok:#7FC24A; --warn:#E5533B;
   --mono:"JetBrains Mono",ui-monospace,monospace; --jp:"Zen Kaku Gothic New",sans-serif;
@@ -172,7 +172,7 @@ a{color:var(--accent);text-decoration:none}
 #var-bar{border:1px solid var(--line);border-radius:6px;background:var(--panel);margin:0 0 1.6rem;overflow:hidden}
 #var-bar .var-bar-head{display:flex;align-items:center;gap:.6rem;padding:.55rem .8rem;background:var(--panel-2);border-bottom:1px solid var(--line);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
 #var-bar .vb-hx{color:var(--accent)}
-#var-bar .vb-note{font-size:.62rem;letter-spacing:.02em;text-transform:none;color:var(--mute)}
+#var-bar .vb-note{font-size:.62rem;letter-spacing:.02em;text-transform:none;color:var(--dim)}
 #var-bar .vb-reset{margin-left:auto;font-family:var(--mono);font-size:.64rem;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);background:transparent;border:1px solid var(--line);border-radius:3px;padding:.2rem .5rem;cursor:pointer;transition:all .18s}
 #var-bar .vb-reset:hover{color:var(--accent);border-color:var(--accent-2)}
 #var-bar .var-bar-fields{display:flex;flex-wrap:wrap;gap:.55rem .7rem;padding:.75rem .8rem}
