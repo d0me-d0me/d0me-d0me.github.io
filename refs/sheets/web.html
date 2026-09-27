@@ -20,7 +20,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../assets/css/sheet.css?v=1">
+<link rel="stylesheet" href="../assets/css/sheet.css?v=2">
 <style>
 /* 攻撃フロー図 (HTML) */
 .flow-section{padding-top:1.8rem}
@@ -69,14 +69,28 @@
 </style>
 </head>
 <body>
-
-<header class="topbar">
-  <div class="wrap">
-    <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">Index</span></div>
-    <button class="nav-toggle" aria-label="メニュー">≡</button>
-    <nav class="nav"><a href="/" data-blog>Home</a><a href="/posts/">Posts</a><a href="/refs/">Refs</a><a href="#" data-gh-url>GitHub</a></nav>
+<aside class="rsb" aria-label="Site navigation">
+  <a class="rsb-brand" href="/">
+    <img class="rsb-avatar" src="../assets/img/favicon.svg" alt="d0me" onerror="this.style.display='none'">
+    <span class="rsb-title">[<b data-handle>d0me</b>]</span>
+    <span class="rsb-sub">offensive &amp; defensive security</span>
+  </a>
+  <nav class="rsb-nav">
+    <a href="/" data-blog>HOME</a>
+    <a href="/posts/">POSTS</a>
+    <a href="/refs/" class="active" aria-current="page">REFS</a>
+    <a href="/categories/">CATEGORIES</a>
+    <a href="/tags/">TAGS</a>
+    <a href="/archives/">ARCHIVES</a>
+    <a href="/about/">ABOUT</a>
+  </nav>
+  <div class="rsb-social">
+    <a href="#" data-gh-url target="_blank" rel="noopener noreferrer">GitHub</a>
   </div>
-</header>
+</aside>
+<button id="rsb-toggle" type="button" aria-label="menu" aria-expanded="false">≡</button>
+<div class="rsb-backdrop"></div>
+
 
 <main>
 <section class="sheet-hero">
@@ -1274,5 +1288,6 @@ curl -s https://<span class="v" data-var="TARGET">target.example.com</span>/grap
 <script src="../content.js?v=1"></script>
 <script src="../assets/js/sheet.js?v=1"></script>
 <script src="../assets/js/vars.js?v=1"></script>
+<script src="../assets/js/refnav.js?v=1"></script>
 </body>
 </html>
