@@ -66,11 +66,13 @@ Trying to understand everything was never realistic. What remains is to keep cli
 
 ## Certifications
 
-- **OSCP** / **OSEP** — Offensive Security
-- **CPTS** — HackTheBox
-- **SAL1** — TryHackMe
-- **CySA+** — CompTIA
-- **CCNA** — Cisco
+<!-- Single source: _data/certs.yml (also rendered as the badge wall on the home page). -->
+{% for c in site.data.certs -%}
+- **{{ c.code }}** — [{{ c.issuer }}]({{ c.url }})
+{% endfor %}
+
+*Self-asserted; each link points to the issuer's certification page, not a verification record.*
+自己申告。各リンクは発行元の資格ページであり、本人確認用の verify リンクではない。
 
 ---
 
