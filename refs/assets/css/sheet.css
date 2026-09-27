@@ -134,7 +134,11 @@ a{color:var(--accent);text-decoration:none}
   .doc table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
 }
 
-@media(max-width:860px){.sheet-layout{grid-template-columns:1fr}.toc{position:static;border:1px solid var(--line);border-radius:5px;padding:1rem;background:var(--panel);margin-bottom:1.4rem}}
+@media(max-width:860px){.sheet-layout{grid-template-columns:1fr}.toc{position:static;border:1px solid var(--line);border-radius:5px;padding:1rem;background:var(--panel);margin-bottom:1.4rem}
+/* On mobile the TOC is an inline block, so the fixed toggle (which acts far
+   from it, mid-page) is confusing — hide it and keep the TOC inline. */
+#toc-toggle{display:none}
+.sheet-layout.toc-off .toc{display:block}}
 @media(max-width:620px){.nav{display:none;position:absolute;top:52px;left:0;right:0;flex-direction:column;gap:0;background:var(--panel);border-bottom:1px solid var(--line);padding:.4rem clamp(16px,4vw,40px)}.nav.open{display:flex}.nav a{padding:.7rem 0;border-bottom:1px solid var(--line)}.nav-toggle{display:grid;place-items:center}.foot .wrap{flex-direction:column;align-items:flex-start}}
 
 /* ============================================================

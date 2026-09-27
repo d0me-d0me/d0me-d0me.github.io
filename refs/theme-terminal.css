@@ -122,4 +122,6 @@ h1 .cur{display:inline-block;width:.6ch;height:1em;background:var(--accent);vert
 #domain-nav{display:flex;flex-wrap:wrap;gap:.5rem;margin:0 0 1.6rem}
 #domain-nav a{font-family:var(--mono);font-size:.76rem;color:var(--dim);border:1px solid var(--line);border-radius:4px;padding:.28rem .6rem}
 #domain-nav a:hover{color:var(--accent);border-color:var(--accent-2)}
+#domain-nav a{cursor:pointer}
+#domain-nav a.active{color:var(--accent);border-color:var(--accent);background:var(--panel)}
 #domain-nav a span{color:var(--mute);font-family:var(--jp)}
