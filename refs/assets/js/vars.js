@@ -37,22 +37,32 @@
     PAYLOAD_PATH: "/tmp/shell.exe", PID: "1337", SERVICE_NAME: "MyService",
     SVC_TITLE: "MyService", SVC_DESC: "desc"
   };
-  const exampleFor = (k) => EXAMPLES[k] || EXAMPLES[k.toUpperCase()] || ("<" + k + ">");
+  const exampleFor = (k, def) => {
+    const ex = EXAMPLES[k] || EXAMPLES[k.toUpperCase()];
+    if (ex) return ex;
+    if (def && !/^<[^<>]+>$/.test(def)) return def; // a real default value doubles as the example
+    return "<" + k + ">";
+  };
 
   const isToken = (t) => /^<[^<>]+>$/.test(t.trim());
   const keyOf = (t) => t.trim().replace(/^<|>$/g, "");
 
-  const spans = [...document.querySelectorAll(".v")].filter((s) => isToken(s.textContent));
+  // A .v is a variable when its text is a <NAME> token, or when it carries an
+  // explicit data-var (whose current text is a real default value, e.g.
+  // <span class="v" data-var="TARGET">10.10.10.10</span>).
+  const spans = [...document.querySelectorAll(".v")].filter((s) => s.dataset.var || isToken(s.textContent));
   if (!spans.length) return;
 
   const keys = [];
   const byKey = new Map();
+  const defaults = new Map(); // key -> default display when unset
   spans.forEach((s) => {
-    const ph = s.textContent.trim();
-    const k = keyOf(ph);
-    if (!s.dataset.ph) s.dataset.ph = ph;
+    const explicit = s.dataset.var && !isToken(s.textContent);
+    const k = explicit ? s.dataset.var : keyOf(s.textContent.trim());
+    const ph = explicit ? s.textContent : s.textContent.trim();
+    if (!s.dataset.ph) s.dataset.ph = ph;   // what to show when the value is empty
     s.dataset.var = k;
-    if (!byKey.has(k)) { byKey.set(k, []); keys.push(k); }
+    if (!byKey.has(k)) { byKey.set(k, []); keys.push(k); defaults.set(k, s.dataset.ph); }
     byKey.get(k).push(s);
   });
 
@@ -94,7 +104,7 @@
     inp.type = "text";
     inp.autocomplete = "off";
     inp.spellcheck = false;
-    inp.placeholder = exampleFor(k);
+    inp.placeholder = exampleFor(k, defaults.get(k));
     inp.value = (typeof values[k] === "string") ? values[k] : "";
     inp.addEventListener("input", () => {
       const raw = inp.value;             // preserve exactly, including symbols/spaces
