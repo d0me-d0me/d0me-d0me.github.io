@@ -151,4 +151,12 @@
   const layout = document.querySelector(".sheet-layout");
   if (layout && layout.parentNode) layout.parentNode.insertBefore(bar, layout);
   else (document.querySelector(".doc") || document.body).prepend(bar);
+
+  // The bar is sticky below the topbar, so a TOC jump must clear both. Expose
+  // the bar's live height as --vbar-h; the sheet CSS adds it to section
+  // scroll-margin so anchored headings land below the bar, collapsed or not.
+  const syncOffset = () => document.documentElement.style.setProperty("--vbar-h", bar.offsetHeight + "px");
+  syncOffset();
+  if (window.ResizeObserver) new ResizeObserver(syncOffset).observe(bar);
+  else window.addEventListener("resize", syncOffset);
 })();
