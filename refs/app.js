@@ -104,34 +104,58 @@
   const full = $("#index-all");
   if (full) renderGroups(full, { preview: 0 });
 
-  // --- domain quick-nav ---
+  // --- domain quick-nav + keyword search (all.html) ---
+  // The quick-nav filters the list by domain instead of scroll-jumping to an
+  // anchor: on a short page anchors bottom-out, so several domains landed at
+  // the same position. Filtering keeps each domain distinct and combines with
+  // the keyword box.
   const dnav = $("#domain-nav");
+  const box = $("#search");
+  const count = $("#search-count");
+  const activeDomains = domains.filter(d => vols.some(v => (v.domain || null) === d.id));
+  let curDom = "";
+
   if (dnav) {
-    dnav.innerHTML = domains
-      .filter(d => vols.some(v => (v.domain || null) === d.id))
-      .map(d => `<a href="#dom-${esc(d.id)}">${esc(d.label)} <span>${esc(d.jp || "")}</span></a>`).join("");
+    dnav.innerHTML =
+      '<a href="#" data-dom="">All <span>全て</span></a>'
+      + activeDomains.map(d => `<a href="#dom-${esc(d.id)}" data-dom="${esc(d.id)}">${esc(d.label)} <span>${esc(d.jp || "")}</span></a>`).join("");
+    const m = (location.hash || "").match(/^#dom-(.+)$/);
+    if (m && activeDomains.some(d => d.id === m[1])) curDom = m[1];
   }
 
-  // --- keyword search (all.html) ---
-  const box = $("#search");
-  if (box) {
-    const count = $("#search-count");
-    const apply = () => {
-      const q = box.value.trim().toLowerCase();
-      let n = 0;
-      all(".vol").forEach(el => {
-        const hit = !q || (el.dataset.search || "").includes(q);
-        el.hidden = !hit; if (hit) n++;
-      });
-      all(".domain").forEach(d => {
-        d.hidden = ![...d.querySelectorAll(".vol")].some(v => !v.hidden);
-      });
-      if (count) count.textContent = q ? `${n} 件` : "";
-    };
-    box.addEventListener("input", apply);
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "/" && document.activeElement !== box) { e.preventDefault(); box.focus(); }
-      else if (e.key === "Escape" && document.activeElement === box) { box.value = ""; apply(); box.blur(); }
+  const applyFilters = () => {
+    const q = box ? box.value.trim().toLowerCase() : "";
+    let n = 0;
+    all(".vol").forEach(el => {
+      const hit = (!curDom || (el.dataset.domain || "") === curDom)
+        && (!q || (el.dataset.search || "").includes(q));
+      el.hidden = !hit; if (hit) n++;
+    });
+    all(".domain").forEach(d => { d.hidden = ![...d.querySelectorAll(".vol")].some(v => !v.hidden); });
+    if (count) count.textContent = (q || curDom) ? `${n} 件` : "";
+    if (dnav) all("a", dnav).forEach(a => a.classList.toggle("active", (a.dataset.dom || "") === curDom));
+  };
+
+  if (dnav) {
+    dnav.addEventListener("click", (e) => {
+      const a = e.target.closest("a[data-dom]");
+      if (!a) return;
+      e.preventDefault();
+      curDom = a.dataset.dom || "";
+      history.replaceState(null, "", curDom ? "#dom-" + curDom : location.pathname + location.search);
+      applyFilters();
+      const top = $("#index-all") || document.body;
+      top.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }
+
+  if (box) {
+    box.addEventListener("input", applyFilters);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "/" && document.activeElement !== box) { e.preventDefault(); box.focus(); }
+      else if (e.key === "Escape" && document.activeElement === box) { box.value = ""; applyFilters(); box.blur(); }
+    });
+  }
+
+  if (dnav || box) applyFilters();
 })();
