@@ -47,20 +47,22 @@
     map.forEach((_, t) => spy.observe(t));
   }
 
-  // TOC show/hide. The toggle sits at the top of the content column so it
-  // stays visible once the TOC is hidden; state persists per browser.
+  // TOC show/hide. A fixed, icon-only button (mirroring the back-to-top
+  // control) so the TOC can be toggled from any scroll position; state
+  // persists per browser.
   const layout = document.querySelector(".sheet-layout");
-  const doc = document.querySelector(".doc");
-  if (layout && doc && document.querySelector(".toc")) {
+  if (layout && document.querySelector(".toc")) {
     const KEY = "d0me:toc-hidden";
     const btn = document.createElement("button");
     btn.type = "button";
     btn.id = "toc-toggle";
+    btn.textContent = "☰"; // ☰
+    btn.setAttribute("aria-label", "Toggle table of contents");
     const sync = () => {
       const off = layout.classList.contains("toc-off");
-      btn.innerHTML = '<span class="tt-caret">' + (off ? "▸" : "▾") + "</span> 目次";
+      btn.classList.toggle("off", off);
       btn.setAttribute("aria-expanded", String(!off));
-      btn.title = off ? "目次を表示" : "目次を隠す";
+      btn.title = off ? "Show contents" : "Hide contents";
     };
     try { if (localStorage.getItem(KEY) === "1") layout.classList.add("toc-off"); } catch { /* ignore */ }
     btn.addEventListener("click", () => {
@@ -68,7 +70,7 @@
       try { localStorage.setItem(KEY, off ? "1" : "0"); } catch { /* ignore */ }
       sync();
     });
-    doc.insertBefore(btn, doc.firstChild);
+    document.body.appendChild(btn);
     sync();
   }
 })();
