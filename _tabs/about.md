@@ -19,6 +19,18 @@ No client data, private tooling, proprietary research, or functional exploit pay
 手法は中立に記述し、必要に応じて検知・防御・ハードニングの観点を添える。
 実案件の情報、非公開ツール、独自研究、実用可能な exploit payload は掲載しない。
 
+## Authorized use only
+
+This material documents offensive and defensive techniques for education and
+for authorized security work. Use it only against systems you own, or ones you
+have explicit, written permission to test. What you do with it is your own
+responsibility; nothing here is an invitation to break the law, and no
+liability is accepted for misuse.
+
+掲載する手法は、学習および許可された security 業務のための情報である。
+自身が所有するシステム、または明示的な書面による許可を得た対象に対してのみ使用すること。
+利用の結果はすべて利用者の責任であり、違法行為を推奨するものではなく、悪用による一切の責任を負わない。
+
 ## Structure
 
 This site has two complementary surfaces.

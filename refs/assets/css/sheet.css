@@ -118,6 +118,7 @@ a{color:var(--accent);text-decoration:none}
 .foot .fmeta{color:var(--mute)} .foot .fmeta b{color:var(--dim);font-weight:500}
 .foot .flinks{display:flex;gap:1.2rem}
 .foot .flinks a{color:var(--dim)} .foot .flinks a:hover{color:var(--accent)}
+.foot .fnote{flex-basis:100%;order:-1;margin:0 0 .6rem;color:var(--mute);opacity:.85;line-height:1.5}
 
 :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
 
