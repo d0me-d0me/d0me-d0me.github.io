@@ -26,16 +26,9 @@
         </a>
       </li>
 
-      <!-- refs (static directory outside Jekyll tabs collection) -->
-      <li class="nav-item">
-        <a href="{{ '/refs/' | relative_url }}" class="nav-link">
-          <i class="fa-fw fas fa-terminal"></i>
-          <span>REFS</span>
-        </a>
-      </li>
-      <!-- .nav-item -->
-
-      <!-- the real tabs -->
+      <!-- the real tabs; REFS (a static directory outside the Jekyll tabs
+           collection) is injected right after Posts so the order reads
+           HOME · POSTS · REFS · CATEGORIES · … -->
       {% for tab in site.tabs %}
         <li class="nav-item{% if tab.url == page.url %}{{ " active" }}{% endif %}">
           <a href="{{ tab.url | relative_url }}" class="nav-link">
@@ -47,6 +40,16 @@
           </a>
         </li>
         <!-- .nav-item -->
+
+        {% if tab.url contains '/posts' %}
+          <li class="nav-item">
+            <a href="{{ '/refs/' | relative_url }}" class="nav-link">
+              <i class="fa-fw fas fa-terminal"></i>
+              <span>REFS</span>
+            </a>
+          </li>
+          <!-- .nav-item (refs) -->
+        {% endif %}
       {% endfor %}
     </ul>
   </nav>
