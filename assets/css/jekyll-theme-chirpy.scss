@@ -184,6 +184,13 @@ $body:   "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu
   display: none !important;
 }
 
+/* Hide the mode toggle's "System" option: the site forces dark as the default
+   regardless of the OS (assets/js/mode-default.js), so "System" would resolve
+   to dark and read as a confusing no-op. Leaves Light / Dark. */
+#sidebar .sidebar-bottom #mode-toggle + .dropdown-menu .dropdown-item[data-theme-mode="system"] {
+  display: none !important;
+}
+
 /* Further Reading (related posts): the card's hover overlay is position:absolute
    height:100%; the card was position:static, so the overlay resolved against
    #main-wrapper and inflated the page. Make the card the containing block. */
