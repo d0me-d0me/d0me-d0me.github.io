@@ -1,5 +1,9 @@
 {% comment %}
-  Chirpy's head hook (included last in <head>). Used here only to attach the
-  site-wide Content-Security-Policy. See _includes/csp-meta.html.
+  Chirpy's head hook (included last in <head>). Used here to attach the
+  site-wide Content-Security-Policy and the dark-default theme initializer.
+  The initializer loads after the theme script but before first paint, so it
+  sets dark without a flash. See _includes/csp-meta.html and
+  assets/js/mode-default.js.
 {% endcomment %}
 {% include csp-meta.html %}
+<script src="{{ '/assets/js/mode-default.js' | relative_url }}"></script>

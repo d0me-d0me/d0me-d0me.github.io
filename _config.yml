@@ -85,7 +85,9 @@ pageviews:
 #     light — Use the light color scheme
 #     dark — Use the dark color scheme
 #
-theme_mode: dark # [light | dark]
+theme_mode: # empty = light+dark with a toggle; dark is forced as the default
+            # for visitors with no stored choice via assets/js/mode-default.js
+            # (see _includes/metadata-hook.html).
 
 # The CDN endpoint for media resources.
 # Notice that once it is assigned, the CDN url

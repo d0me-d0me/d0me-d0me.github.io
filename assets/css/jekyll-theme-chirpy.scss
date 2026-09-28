@@ -2,31 +2,45 @@
 ---
 @use "main";
 
-html[data-mode="dark"],
-html:not([data-mode]),
+/* ==========================================================================
+   Theme colours are mode-aware. Dark is the site's default (see the dark-mode
+   init in _includes/mode-default.html); light reuses Chirpy's built-in light
+   theme, with only the few custom surfaces below overridden. Structural rules
+   (layout, fonts) stay mode-agnostic. Palette tokens:
+     dark  — near-black bg, light "phosphor" ink, bright green accent
+     light — Chirpy paper white, dark ink, a darkened green (AA on white)
+   ========================================================================== */
+
+// dark palette (light-on-dark "terminal" ink)
+$ph-hi:  #F2F4EA;
+$ph:     #D9DCCF;
+$ph-dim: #8F8875;
+$grn:    #48B44A;
+$rule:   rgba(217, 220, 207, .15);
+// light palette
+$l-grn:  #2E7D32; // darkened green: >= 4.5:1 on white
+$l-rule: rgba(20, 20, 15, .12);
+
+$mono:   "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+$body:   "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", #{$mono};
+
+/* ---- Dark mode: the custom near-black framework colours ---- */
 :root[data-bs-theme="dark"] {
   --main-bg: #0B0B0C !important;
   --bs-body-bg: #0B0B0C !important;
   --sidebar-bg: #0B0B0C !important;
   --topbar-bg: rgba(11, 11, 12, .64) !important;
   /* Contrast (WCAG 2.1 AA): the theme's muted text (#868686) failed 4.5:1 on
-     the category card headers (3.99:1). Lighten the token so it clears AA on
-     the cards and everywhere else it is used. */
+     the category card headers (3.99:1). Lighten the token so it clears AA. In
+     light mode Chirpy's own #757575 already passes on white, so this is
+     dark-only. */
   --text-muted-color: #9A9A9A !important;
 }
 
-$ph-hi:  #F2F4EA;
-$ph:     #D9DCCF;
-$ph-dim: #8F8875;
-$grn:    #48B44A;
-$rule:   rgba(217, 220, 207, .15);
-$mono:   "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-$body:   "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", #{$mono};
-
+/* ---- Content: structure is mode-agnostic; colour is per-mode ---- */
 .content {
   max-width: 52rem;
   margin-inline: auto;
-  color: $ph;
   font-family: $body;
   line-height: 1.85;
   overflow-wrap: break-word;
@@ -37,7 +51,6 @@ $body:   "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu
 .content h3,
 .content h4,
 .content h5 {
-  color: $ph-hi;
   font-family: $mono;
   font-weight: 700;
   letter-spacing: .01em;
@@ -46,72 +59,105 @@ $body:   "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu
 .content h2 {
   margin-top: 2.4rem;
   padding-bottom: .35rem;
-  border-bottom: 1px solid $rule;
-}
-/* In-prose links keep the green but carry a persistent, non-colour cue
-   (WCAG 1.4.1). On this dark theme colour alone cannot work: a link readable
-   on the near-black background can't also sit 3:1 away from the light body
-   text, so a link distinguished only by hue fails. A subtle always-on
-   underline (thin, offset, half-strength) solves it without loud rules and
-   reads as intentional; hover strengthens it. Image links are excluded. */
-.content a:not(.img-link) {
-  color: $grn;
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: .18em;
-  text-decoration-color: rgba(72, 180, 74, .45);
-}
-.content a:not(.img-link):hover {
-  text-decoration-color: $grn;
-}
-.content a.img-link { text-decoration: none; }
-.content strong,
-.content b { color: $ph-hi; }
-.content :not(pre) > code {
-  background: rgba(217, 220, 207, .07);
-  color: $ph-hi;
-  padding: .12em .38em;
-  border-radius: .25rem;
-  font-family: $mono;
-  font-size: .92em;
-}
-/* Plain blockquotes only. Chirpy renders prompt callouts
-   (> … {: .prompt-warning}) as class-carrying blockquotes; the muted italic
-   treatment below made prompt text fail contrast on its coloured panel
-   (e.g. #8F8875 on the amber warning bg = 2.91:1), so leave prompts to the
-   theme. */
-.content blockquote:not([class*="prompt"]) {
-  border-left: 2px solid $ph-dim;
-  color: $ph-dim;
-  padding-left: 1rem;
-  font-style: italic;
-}
-/* Image / embed captions were #6d6c6c on the page bg (3.75:1). */
-.content a.popup + em,
-.content .embed-video + em,
-.content .embed-audio + em {
-  color: $ph-dim;
 }
 .content ul,
 .content ol { padding-left: 1.5rem; }
 .content li { margin: .3rem 0; }
-.content hr { border: 0; border-top: 1px solid $rule; margin: 2.2rem 0; }
+.content hr { border: 0; margin: 2.2rem 0; }
 
-/* Breadcrumb "Home" link is set off from the current-page text only by
-   colour (< 3:1), with no other cue — axe link-in-text-block. Underline it so
-   it is distinguishable without relying on colour. */
-#breadcrumb a {
+/* In-prose links carry a persistent, non-colour cue (WCAG 1.4.1): colour alone
+   can't sit 3:1 from the body text on either background, so a subtle always-on
+   underline (thin, offset, half-strength) marks them; hover strengthens it.
+   Image links are excluded. Colour is set per mode below. */
+.content a:not(.img-link) {
   text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: .18em;
+}
+.content a.img-link { text-decoration: none; }
+
+/* Breadcrumb and /categories/ links were distinguished only by colour
+   (< 3:1) with no other cue — axe link-in-text-block. Underline them
+   (mode-agnostic). */
+#breadcrumb a,
+.card.categories a { text-decoration: underline; }
+
+/* ---- Dark-mode content colours (light ink) ---- */
+:root[data-bs-theme="dark"] {
+  .content { color: $ph; }
+  .content h1,
+  .content h2,
+  .content h3,
+  .content h4,
+  .content h5 { color: $ph-hi; }
+  .content h2 { border-bottom: 1px solid $rule; }
+  .content hr { border-top: 1px solid $rule; }
+  .content a:not(.img-link) { color: $grn; text-decoration-color: rgba(72, 180, 74, .45); }
+  .content a:not(.img-link):hover { text-decoration-color: $grn; }
+  .content strong,
+  .content b { color: $ph-hi; }
+  .content :not(pre) > code {
+    background: rgba(217, 220, 207, .07);
+    color: $ph-hi;
+    padding: .12em .38em;
+    border-radius: .25rem;
+    font-family: $mono;
+    font-size: .92em;
+  }
+  /* Plain blockquotes only — prompt callouts (class-carrying blockquotes) keep
+     the theme's treatment so their text stays readable on the coloured panel. */
+  .content blockquote:not([class*="prompt"]) {
+    border-left: 2px solid $ph-dim;
+    color: $ph-dim;
+    padding-left: 1rem;
+    font-style: italic;
+  }
+  /* Image / embed captions were #6d6c6c on the page bg (3.75:1). */
+  .content a.popup + em,
+  .content .embed-video + em,
+  .content .embed-audio + em { color: $ph-dim; }
+
+  /* Further Reading cards: give each a clear boundary against the near-black bg. */
+  #related-posts .post-preview {
+    border: 1px solid rgba(217, 220, 207, .22);
+    border-left: 3px solid $grn;
+  }
+  #related-posts .post-preview:hover { border-color: rgba(72, 180, 74, .55); }
+  #related-posts .post-preview h4 { color: $ph-hi; }
+
+  /* Mode-toggle dropdown (Light/Dark/System): Chirpy's muted item text
+     (#868686) on its highlight bg (#6b6b6b) is only 1.46:1 in our near-black
+     theme. Retint the menu tokens and lighten the item text so every state
+     clears AA (the sidebar's own muted token is left untouched). */
+  --menu-bg: #1A1814;
+  --menu-highlight-bg: #2A2620;
+  --menu-active-color: #F2F4EA;
+  #sidebar .sidebar-bottom #mode-toggle + .dropdown-menu {
+    background-color: #1A1814;
+    .dropdown-item { color: $ph; background-color: #1A1814; }
+    .dropdown-item:hover,
+    .dropdown-item:active,
+    .dropdown-item.active { background-color: #2A2620; color: $ph-hi; }
+  }
 }
 
-/* Category/sub-category links on the /categories/ index sit inline next to
-   their post counts; the green link vs the surrounding light text is only
-   1.9:1, below the 3:1 axe link-in-text-block threshold. Underline them so
-   they don't rely on colour alone. */
-.card.categories a {
-  text-decoration: underline;
+/* ---- Light-mode content colours (dark ink on Chirpy's paper white) ---- */
+:root[data-bs-theme="light"] {
+  .content h2 { border-bottom: 1px solid $l-rule; }
+  .content hr { border-top: 1px solid $l-rule; }
+  /* Green link needs darkening to clear 4.5:1 on white. */
+  .content a:not(.img-link) { color: $l-grn; text-decoration-color: rgba(46, 125, 50, .5); }
+  .content a:not(.img-link):hover { text-decoration-color: $l-grn; }
+  #related-posts .post-preview {
+    border: 1px solid $l-rule;
+    border-left: 3px solid $l-grn;
+  }
+  #related-posts .post-preview:hover { border-color: rgba(46, 125, 50, .55); }
 }
 
+/* Blogquote's blockquote font-style/border in light mode is left to Chirpy. */
+
+/* Structural sidebar tweaks (mode-agnostic). */
 #sidebar .nav,
 #sidebar .nav-item,
 #sidebar ul,
@@ -122,7 +168,6 @@ $body:   "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu
 #sidebar li::before {
   content: none !important;
 }
-
 #sidebar .site-subtitle {
   white-space: normal !important;
   overflow-wrap: break-word;
@@ -131,45 +176,20 @@ $body:   "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu
   text-overflow: clip !important;
 }
 
-/* Blog search removed: the theme's bundled JS still references these
-   elements, so they stay in the DOM (to avoid a null addEventListener)
-   but are hidden. search-loader is overridden to a no-op. */
+/* Blog search removed: the theme's bundled JS still references these elements,
+   so they stay in the DOM (to avoid a null addEventListener) but are hidden. */
 #search-trigger,
 #search,
 #search-cancel {
   display: none !important;
 }
 
-/* Further Reading (related posts) fixes.
-   1) The card's hover overlay (.post-preview::before) is position:absolute;
-      height:100%. The card was position:static, so the overlay resolved
-      against #main-wrapper and inflated the page to ~2x its height, leaving a
-      large blank area below the footer. Make the card the containing block. */
-.post-preview {
-  position: relative;
-}
-/* 2) Cards blended into the background (--card-bg #1e1e1e vs body #0B0B0C),
-      so the individual related posts were hard to tell apart. Give each a
-      clear boundary and a bit more breathing room. */
-#related-posts .post-preview {
-  height: auto;
-  border: 1px solid rgba(217, 220, 207, .22);
-  border-left: 3px solid #48B44A;
-}
-#related-posts .post-preview:hover {
-  border-color: rgba(72, 180, 74, .55);
-}
-#related-posts .post-preview .card-body {
-  padding: 1rem 1.15rem;
-}
-#related-posts .post-preview h4 {
-  color: #F2F4EA;
-}
+/* Further Reading (related posts): the card's hover overlay is position:absolute
+   height:100%; the card was position:static, so the overlay resolved against
+   #main-wrapper and inflated the page. Make the card the containing block. */
+.post-preview { position: relative; }
+#related-posts .post-preview { height: auto; }
+#related-posts .post-preview .card-body { padding: 1rem 1.15rem; }
 
-/* Mobile post TOC: Chirpy offers two entry points on small screens — an
-   inline "Contents" pill next to the title (#toc-solo-trigger) and a sticky
-   bar that slides in on scroll (#toc-bar). Both open the same popup, which
-   reads as duplicated. Keep only the sticky bar and hide the inline pill. */
-#toc-solo-trigger {
-  display: none !important;
-}
+/* Mobile post TOC: keep only the sticky bar; hide the duplicate inline pill. */
+#toc-solo-trigger { display: none !important; }
