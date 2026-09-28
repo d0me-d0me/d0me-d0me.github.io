@@ -9,6 +9,10 @@ html:not([data-mode]),
   --bs-body-bg: #0B0B0C !important;
   --sidebar-bg: #0B0B0C !important;
   --topbar-bg: rgba(11, 11, 12, .64) !important;
+  /* Contrast (WCAG 2.1 AA): the theme's muted text (#868686) failed 4.5:1 on
+     the category card headers (3.99:1). Lighten the token so it clears AA on
+     the cards and everywhere else it is used. */
+  --text-muted-color: #9A9A9A !important;
 }
 
 $ph-hi:  #F2F4EA;
@@ -56,16 +60,42 @@ $body:   "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu
   font-family: $mono;
   font-size: .92em;
 }
-.content blockquote {
+/* Plain blockquotes only. Chirpy renders prompt callouts
+   (> … {: .prompt-warning}) as class-carrying blockquotes; the muted italic
+   treatment below made prompt text fail contrast on its coloured panel
+   (e.g. #8F8875 on the amber warning bg = 2.91:1), so leave prompts to the
+   theme. */
+.content blockquote:not([class*="prompt"]) {
   border-left: 2px solid $ph-dim;
   color: $ph-dim;
   padding-left: 1rem;
   font-style: italic;
 }
+/* Image / embed captions were #6d6c6c on the page bg (3.75:1). */
+.content a.popup + em,
+.content .embed-video + em,
+.content .embed-audio + em {
+  color: $ph-dim;
+}
 .content ul,
 .content ol { padding-left: 1.5rem; }
 .content li { margin: .3rem 0; }
 .content hr { border: 0; border-top: 1px solid $rule; margin: 2.2rem 0; }
+
+/* Breadcrumb "Home" link is set off from the current-page text only by
+   colour (< 3:1), with no other cue — axe link-in-text-block. Underline it so
+   it is distinguishable without relying on colour. */
+#breadcrumb a {
+  text-decoration: underline;
+}
+
+/* Category/sub-category links on the /categories/ index sit inline next to
+   their post counts; the green link vs the surrounding light text is only
+   1.9:1, below the 3:1 axe link-in-text-block threshold. Underline them so
+   they don't rely on colour alone. */
+.card.categories a {
+  text-decoration: underline;
+}
 
 #sidebar .nav,
 #sidebar .nav-item,

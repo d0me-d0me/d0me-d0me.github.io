@@ -72,6 +72,24 @@
     });
   });
 
+  // Keyboard access for horizontally-scrollable code blocks (axe:
+  // scrollable-region-focusable). A <pre> whose content overflows can be
+  // scrolled with a mouse/trackpad but not the keyboard unless it is
+  // focusable, so make exactly those focusable (and re-check on resize).
+  const markScrollable = () => {
+    all(".code pre").forEach(pre => {
+      const overflow = pre.scrollWidth > pre.clientWidth + 1;
+      if (overflow && !pre.hasAttribute("tabindex")) {
+        pre.setAttribute("tabindex", "0");
+      } else if (!overflow && pre.getAttribute("tabindex") === "0") {
+        pre.removeAttribute("tabindex");
+      }
+    });
+  };
+  addEventListener("load", markScrollable);
+  addEventListener("resize", markScrollable);
+  markScrollable();
+
   // mobile nav
   const toggle = document.querySelector(".nav-toggle"), nav = document.querySelector(".nav");
   if (toggle && nav) {
