@@ -64,6 +64,26 @@ description: Articles on offensive and defensive security — technique deep-div
   border-radius:2px;padding:0 .35rem;flex:none;
 }
 .dome-postlist-empty{color:rgba(205,211,194,.62);margin-top:1.2rem;}
+
+/* ---- Light mode: dark ink on paper ---- */
+:root[data-bs-theme="light"] .dome-frame{
+  border-color:rgba(20,20,15,.14);
+  background:linear-gradient(180deg,rgba(20,20,15,.03),transparent);
+}
+:root[data-bs-theme="light"] .dome-bar{
+  border-bottom-color:rgba(20,20,15,.14);background:rgba(20,20,15,.04);color:#6B6555;
+}
+:root[data-bs-theme="light"] .dome-bar .d{background:rgba(20,20,15,.14);}
+:root[data-bs-theme="light"] .dome-prompt{color:#6B6555;}
+:root[data-bs-theme="light"] .dome-prompt b{color:#1A1A17;}
+:root[data-bs-theme="light"] .dome-journal-h{color:#1A1A17;}
+:root[data-bs-theme="light"] .dome-journal-h .cur{background:#2E7D32;}
+:root[data-bs-theme="light"] .dome-sub{color:#2B2A25;}
+:root[data-bs-theme="light"] .dome-sub .en{color:#6B6555;}
+:root[data-bs-theme="light"] .dome-postlist li{border-bottom-color:rgba(20,20,15,.12);}
+:root[data-bs-theme="light"] .dome-postlist time{color:#6B6555;}
+:root[data-bs-theme="light"] .dome-postlist .pin{color:#6B6555;border-color:rgba(20,20,15,.25);}
+:root[data-bs-theme="light"] .dome-postlist-empty{color:#6B6555;}
 </style>
 
 <div class="dome-frame">

@@ -173,6 +173,28 @@ layout: default
 @media (prefers-reduced-motion:reduce){
   .dome-home__page>*,.dome-home .dh-prompt .cur{animation:none;}
 }
+
+/* ---- Light mode: dark ink on paper, CRT/phosphor effects dropped ---- */
+:root[data-bs-theme="light"] .dome-home{
+  --bg:#FAF9F5;
+  --ph-hi:#1A1A17;
+  --ph:#2B2A25;
+  --ph-dim:#6B6555;
+  --grn:#2E7D32;
+  --rule:rgba(20,20,15,.14);
+  --card:rgba(20,20,15,.025);
+  --card-hi:rgba(20,20,15,.05);
+}
+:root[data-bs-theme="light"] .dome-home::after{display:none;}
+:root[data-bs-theme="light"] .dome-home .dh-title{text-shadow:none;}
+:root[data-bs-theme="light"] .dome-home .dome-frame{
+  background:linear-gradient(180deg,var(--card-hi),transparent);box-shadow:none;
+}
+:root[data-bs-theme="light"] .dome-home .dome-bar{background:rgba(20,20,15,.04);}
+:root[data-bs-theme="light"] .dome-home .dh-card .glyph{color:rgba(20,20,15,.05);}
+:root[data-bs-theme="light"] .dome-home .dh-card:hover .glyph{color:rgba(20,20,15,.10);}
+/* the motto's .7 opacity would drop --ph-dim to ~3:1 on white; keep it solid */
+:root[data-bs-theme="light"] .dome-home .dh-motto blockquote{opacity:1;color:#6B6555;}
 </style>
 
 <div class="dome-home">
