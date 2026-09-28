@@ -3,6 +3,7 @@
 # layout: about
 icon: fas fa-info-circle
 order: 5
+description: "About d0me — pseudonymous notes and references on offensive and defensive security: penetration testing, red and blue team, and OSCP/OSEP/CPTS-level practice."
 ---
 
 Field notes on offensive and defensive security, built through lab work, CTFs, and reproductions of publicly disclosed CVEs.
