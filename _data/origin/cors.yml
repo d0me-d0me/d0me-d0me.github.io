@@ -1,29 +1,32 @@
-# Copy of jekyll-theme-chirpy 7.6.0 _data/origin/cors.yml with Font
-# Awesome self-hosted. The theme default loads Font Awesome from jsdelivr's
-# version-range path (@7 / @6); the CSS reaches the browser but the webfonts
-# it references (../webfonts/*.woff2) do not resolve, so icons render as an
-# empty frame with no glyph. Serving both the CSS and the woff2 from our own
-# origin (assets/fontawesome/, vendored from fontawesome-free 7.3.1)
-# removes that dependency entirely. Jekyll replaces this whole file, so every
-# key from the theme is kept here. Bump with the theme.
+# Copy of jekyll-theme-chirpy 7.6.0 _data/origin/cors.yml with the web fonts
+# and Font Awesome self-hosted.
+#
+# Font Awesome: the theme default loads it from jsdelivr's version-range path
+# (@7 / @6); the CSS reaches the browser but the webfonts it references
+# (../webfonts/*.woff2) do not resolve, so icons render as an empty frame with
+# no glyph. Serving both the CSS and the woff2 from our own origin
+# (assets/fontawesome/, vendored from fontawesome-free 7.3.1) removes that
+# dependency entirely.
+#
+# Web fonts: the theme default loads Lato + Source Sans Pro from
+# fonts.googleapis.com, which leaks every visitor's IP to Google and adds a
+# third-party dependency. We serve all families (Lato, Source Sans Pro,
+# JetBrains Mono, Zen Kaku Gothic New) from our own origin instead —
+# assets/fonts/, vendored as woff2 from @fontsource (see tools/build-fonts.sh).
+# The fonts.googleapis.com / fonts.gstatic.com resource hints are dropped
+# because nothing loads from them anymore.
+#
+# Jekyll replaces this whole file, so every key from the theme is kept here.
+# Bump with the theme.
 # Resource Hints
 resource_hints:
-  - url: https://fonts.googleapis.com
-    links:
-      - rel: preconnect
-      - rel: dns-prefetch
-  - url: https://fonts.gstatic.com
-    links:
-      - rel: preconnect
-        opts: [crossorigin]
-      - rel: dns-prefetch
   - url: https://cdn.jsdelivr.net
     links:
       - rel: preconnect
       - rel: dns-prefetch
 
-# Web Fonts
-webfonts: https://fonts.googleapis.com/css2?family=Lato:wght@300;400&family=Source+Sans+Pro:wght@400;600;700;900&display=swap
+# Web Fonts (self-hosted — see assets/fonts/fonts.css)
+webfonts: /assets/fonts/fonts.css
 
 # Libraries
 
