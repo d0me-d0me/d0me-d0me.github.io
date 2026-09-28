@@ -15,7 +15,7 @@ Originally written as a notebook for myself, but published in the hope that some
 ## Scope
 
 Techniques are presented from a neutral perspective and accompanied by detection and hardening considerations whenever relevant.
-No client data, private tooling, proprietary research, or functional exploit payloads are published here.
+No client data, private tooling, or functional exploit payloads are published here.
 
 手法は中立に記述し、必要に応じて検知・防御・ハードニングの観点を添える。
 実案件の情報、非公開ツール、実用可能な exploit payload は掲載しない。
@@ -58,7 +58,7 @@ For the complete index and keyword search, see `/refs/all.html` (`/` to focus, `
 
 When studying evasion, I naturally think about what defenders would observe, where they would observe it, and which artefacts remain.
 When working on detection or threat hunting, I reverse the perspective and ask how the same activity appears from the operator's side.
-The level of detail changes, but the way of thinking does not. Attack and defense are simply two viewpoints of the same system, which is why both live in the same place here.
+The level of detail changes, but the way of thinking does not. Attack and defense are simply two viewpoints of the same system.
 
 セキュリティ機能の回避を考えるときは、検知側から何が見え、どこに痕跡が残るかを考える。
 逆に検知や脅威ハンティングを考えるときは、その証跡を攻撃側の視点から考える。
@@ -83,7 +83,7 @@ Trying to understand everything was never realistic. What remains is to keep cli
 - **{{ c.code }}** — [{{ c.issuer }}]({{ c.url }})
 {% endfor %}
 
-*Self-asserted; each link points to the issuer's certification page, not a verification record.*
+*Each link points to the issuer's certification page, not a verification record.*
 各リンクは発行元の資格ページであり、本人確認用の verify リンクではない。
 
 ---
