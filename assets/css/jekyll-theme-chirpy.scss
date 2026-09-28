@@ -124,21 +124,6 @@ $body:   "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu
   }
   #related-posts .post-preview:hover { border-color: rgba(72, 180, 74, .55); }
   #related-posts .post-preview h4 { color: $ph-hi; }
-
-  /* Mode-toggle dropdown (Light/Dark/System): Chirpy's muted item text
-     (#868686) on its highlight bg (#6b6b6b) is only 1.46:1 in our near-black
-     theme. Retint the menu tokens and lighten the item text so every state
-     clears AA (the sidebar's own muted token is left untouched). */
-  --menu-bg: #1A1814;
-  --menu-highlight-bg: #2A2620;
-  --menu-active-color: #F2F4EA;
-  #sidebar .sidebar-bottom #mode-toggle + .dropdown-menu {
-    background-color: #1A1814;
-    .dropdown-item { color: $ph; background-color: #1A1814; }
-    .dropdown-item:hover,
-    .dropdown-item:active,
-    .dropdown-item.active { background-color: #2A2620; color: $ph-hi; }
-  }
 }
 
 /* ---- Light-mode content colours (dark ink on Chirpy's paper white) ---- */
@@ -184,10 +169,10 @@ $body:   "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu
   display: none !important;
 }
 
-/* Hide the mode toggle's "System" option: the site forces dark as the default
-   regardless of the OS (assets/js/mode-default.js), so "System" would resolve
-   to dark and read as a confusing no-op. Leaves Light / Dark. */
-#sidebar .sidebar-bottom #mode-toggle + .dropdown-menu .dropdown-item[data-theme-mode="system"] {
+/* The mode toggle is a single icon: one click flips light/dark (see
+   assets/js/mode-click.js), matching the /refs/ pages. Hide the theme's
+   Light/Dark/System text dropdown entirely. */
+#mode-toggle + .dropdown-menu {
   display: none !important;
 }
 
