@@ -3,8 +3,8 @@
    with HOME and POSTS. Everything is scoped to .refs-home; the terminal look
    mirrors the HOME hero. The full index + keyword search stays in the
    standalone all.html SPA (theme-terminal.css). */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap');
-
+/* Web fonts load site-wide from /assets/fonts/fonts.css via the Chirpy <head>,
+   which wraps this page (layout:default), so no @import is needed here. */
 .refs-home{
   --bg:#0B0B0C; --ph-hi:#F2F4EA; --ph:#D9DCCF; --ph-dim:#8F8875;
   --grn:#48B44A; --rule:rgba(217,220,207,.15);
