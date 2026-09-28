@@ -1,15 +1,17 @@
-// Dark is the site's default. Chirpy's theme script follows the OS
-// prefers-color-scheme when the visitor has not picked a theme; here we force
-// dark instead, unless a choice is already stored. Loaded synchronously in
-// <head> right after the theme script, so it runs before first paint (no
-// flash), and it leaves any stored choice (localStorage 'theme') untouched so
-// the sidebar toggle keeps working.
+// Theme initializer, shared by the Chirpy pages and the standalone /refs/
+// terminal pages. Dark is the site's default; a stored choice (localStorage
+// 'theme', written by the sidebar toggle) is honoured, and anything else
+// (unset, or Chirpy's "system") resolves to dark rather than following the OS.
+// Loaded synchronously in <head> before first paint, so there is no flash.
+// On Chirpy pages it runs after the theme script and simply re-asserts the
+// same value; on the standalone pages it is the only thing that applies the
+// theme. Setting the attribute here does not disable Chirpy's toggle (its
+// toggleability is decided earlier, from the absence of a static attribute).
 (function () {
+  var m = 'dark';
   try {
-    if (!localStorage.getItem('theme')) {
-      document.documentElement.setAttribute('data-bs-theme', 'dark');
-    }
-  } catch (e) {
-    document.documentElement.setAttribute('data-bs-theme', 'dark');
-  }
+    var s = localStorage.getItem('theme');
+    if (s === 'light' || s === 'dark') m = s;
+  } catch (e) {}
+  document.documentElement.setAttribute('data-bs-theme', m);
 })();
