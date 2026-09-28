@@ -3,6 +3,7 @@ layout: page
 icon: fas fa-stream
 order: 1
 title: Posts
+description: Articles on offensive and defensive security — technique deep-dives, lab and CTF writeups, detection engineering, and disclosed-CVE analysis.
 ---
 
 <style>
