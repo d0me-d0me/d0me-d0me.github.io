@@ -74,7 +74,7 @@ description: Articles on offensive and defensive security — technique deep-div
   <div class="dome-frame-body">
     <p class="dome-prompt"><b>d0me</b>:~$ ls -t journal/</p>
     <h1 class="dome-journal-h">Security<br>Field Journal<span class="cur"></span></h1>
-    <p class="dome-sub">攻撃と防御、双方の視点で掘り下げた考察と記録。<span class="en">Essays and writeups from both sides of the field.</span></p>
+    <p class="dome-sub">攻撃と防御、考察と記録。<span class="en">Essays and writeups from both sides of the field.</span></p>
   </div>
 </div>
 
