@@ -17,18 +17,6 @@ a{color:var(--accent);text-decoration:none}
 .wrap{max-width:1080px;margin:0 auto;padding:0 clamp(16px,4vw,40px);position:relative;z-index:1}
 .jp{font-family:var(--jp)} .mono{font-family:var(--mono)}
 
-/* top bar */
-.topbar{border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:0;z-index:50}
-.topbar .wrap{display:flex;align-items:center;gap:1.2rem;height:52px}
-.brand{display:flex;align-items:baseline;gap:.5rem;margin-right:auto}
-.brand .glyph{font-weight:700;font-size:.95rem;color:var(--fg)} .brand .glyph b{color:var(--accent)}
-.brand .tag{font-family:var(--jp);font-size:.75rem;color:var(--mute)}
-.nav{display:flex;gap:1.3rem;font-size:.8rem}
-.nav a{color:var(--dim)} .nav a:hover{color:var(--fg)}
-.nav a::before{content:"› ";color:var(--accent-2)}
-.nav a .en{display:none}
-.nav-toggle{display:none;margin-left:auto;width:36px;height:34px;background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--fg);font-family:var(--mono);cursor:pointer}
-
 /* sheet hero */
 .sheet-hero{padding:clamp(2.4rem,6vw,3.6rem) 0 1.3rem;border-bottom:1px solid var(--line)}
 .crumb{font-size:.78rem;color:var(--mute);margin-bottom:1.3rem}
@@ -133,7 +121,7 @@ a{color:var(--accent);text-decoration:none}
   .doc table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
 }
 
-@media(max-width:620px){.nav{display:none;position:absolute;top:52px;left:0;right:0;flex-direction:column;gap:0;background:var(--panel);border-bottom:1px solid var(--line);padding:.4rem clamp(16px,4vw,40px)}.nav.open{display:flex}.nav a{padding:.7rem 0;border-bottom:1px solid var(--line)}.nav-toggle{display:grid;place-items:center}.foot .wrap{flex-direction:column;align-items:flex-start}}
+@media(max-width:620px){.foot .wrap{flex-direction:column;align-items:flex-start}}
 
 /* ============================================================
    attack-flow: shared MITRE-style phase-flow diagram

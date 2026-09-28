@@ -36,7 +36,7 @@ liability is accepted for misuse.
 This site has two complementary surfaces.
 
 - **Posts** (`/posts/`) — longer articles exploring why a technique matters, where it works, its limitations, and how it compares with alternatives. They share the same top-level axis as the cheat sheets — `Offensive`, `Defensive`, `Other` — each with a topical subcategory (`Active Directory`, `Reconnaissance`, `Forensics & IR`, `Detection`, and so on). Lab/CTF writeups and disclosed-CVE reproductions, when published, are filed under the same domains.
-- **refs** (`/refs/`) — concise terminal-style cheat sheets optimized for quick lookup during practice.
+- **Refs** (`/refs/`) — concise terminal-style cheat sheets optimized for quick lookup during practice.
 
 Posts は「なぜその手法なのか」を、refs は「どう使うか」を扱う。
 Posts の記事は cheat sheet と同じ `Offensive` / `Defensive` / `Other` を top-level に置き、`Active Directory`・`Reconnaissance`・`Forensics & IR`・`Detection` などのトピックを sub-category として付ける。ラボ/CTF の writeup や公開 CVE の再現も、公開する際は同じドメインの下に置く。
