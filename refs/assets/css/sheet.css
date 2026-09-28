@@ -213,4 +213,11 @@ body.rsb-open .rsb{transform:none}
 body.rsb-open .rsb-backdrop{opacity:1;pointer-events:auto}
 @media(max-width:999px){body{padding-top:52px}}
 @media(min-width:1000px){.rsb{transform:none}#rsb-toggle{display:none}.rsb-backdrop{display:none}body{padding-left:230px}}
-@media(min-width:1000px){#toc-toggle{left:calc(230px + 1.4rem)}}
+/* On desktop the left site sidebar occupies 0-230px; keep the TOC overlay
+   (button, panel and its backdrop) clear of it so the panel isn't hidden
+   behind the sidebar. */
+@media(min-width:1000px){
+  #toc-toggle{left:calc(230px + 1.4rem)}
+  .sheet-layout.toc-open > .toc{left:calc(230px + 1.4rem)}
+  .sheet-layout.toc-open::before{left:230px}
+}
