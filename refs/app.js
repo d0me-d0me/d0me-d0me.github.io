@@ -112,7 +112,7 @@
   // the same position. Filtering keeps each domain distinct and combines with
   // the keyword box.
   const dnav = $("#domain-nav");
-  const box = $("#search");
+  const box = $("#refs-search");
   const count = $("#search-count");
   const activeDomains = domains.filter(d => vols.some(v => (v.domain || null) === d.id));
   let curDom = "";
