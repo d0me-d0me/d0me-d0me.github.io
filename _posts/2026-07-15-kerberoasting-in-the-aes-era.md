@@ -8,13 +8,13 @@ description: AES encryption was supposed to end Kerberoasting. A decade later it
 
 ## 概要
 
-AES 化すれば Kerberoasting はもう防げる、という誤解は、この 10 年で最も繰り返されたものの一つだ。 この記事は手順書ではなく、AES 化された Active Directory でもなぜ Kerberoasting が第一選択の権限昇格経路であり続けるのかを、攻撃側と防御側の非対称性という視点で整理する。 RC4 と AES256 のクラック速度差が実は 3 桁あること、それでも弱いパスワードは AES でも落ちること、gMSA 移行が進まない運用実務、RC4 downgrade の余地、targetedKerberoast による攻撃面の拡張、そして検知の本質的な非対称性までを扱う。 攻撃者は 1 つの弱いアカウントを見つければ勝ち、防御側はすべてを守り切らねば負ける — この不均衡は AD の設計に根ざしており、パッチでは消えない。 具体的なコマンドは `/refs/` の Active Directory シートにまとめてある。
+AES 化すれば Kerberoasting はもう防げる、という誤解は、この 10 年で最も繰り返されたものの一つだ。 この記事は手順書ではなく、AES 化された Active Directory でもなぜ Kerberoasting が第一選択の権限昇格経路であり続けるのかを、攻撃側と防御側の非対称性という視点で整理する。 RC4 と AES256 のクラック速度差が実は 3 桁あること、それでも弱いパスワードは AES でも落ちること、gMSA 移行が進まない運用実務、RC4 downgrade の余地、targetedKerberoast による攻撃面の拡張、そして検知の本質的な非対称性までを扱う。 攻撃者は 1 つの弱いアカウントを見つければ勝ち、防御側はすべてを守り切らねば負ける — この不均衡は AD の設計に根ざしており、パッチでは消えない。 具体的なコマンドは [Active Directory シート](/refs/sheets/ad-compromise.html)にまとめてある。
 
 ## Introduction
 
 Kerberoasting has sat at the center of Active Directory intrusion for over a decade. Tim Medin disclosed it in 2014. Since then the encryption moved from RC4 to AES, defensive tooling matured, and detection guidance proliferated. And yet, across lab exercises, red team reports, and pentest write-ups shared in the community, this technique remains the first thing anyone reaches for.
 
-"Just enforce AES and you're safe" is one of the most repeated misconceptions of the last ten years. Why does it still work? Why hasn't defense caught up? This piece isn't a how-to — the commands live in the `/refs/` Active Directory sheet. It's an attempt to lay out the asymmetry that keeps the technique alive.
+"Just enforce AES and you're safe" is one of the most repeated misconceptions of the last ten years. Why does it still work? Why hasn't defense caught up? This piece isn't a how-to — the commands live in the [Active Directory sheet](/refs/sheets/ad-compromise.html). It's an attempt to lay out the asymmetry that keeps the technique alive.
 
 ## A Short Refresher
 

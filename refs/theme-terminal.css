@@ -91,7 +91,7 @@ h1 .cur{display:inline-block;width:.6ch;height:1em;background:var(--accent);vert
 .ft{border-top:1px solid var(--line);margin-top:1.4rem;padding:1.6rem 0 2.4rem;color:var(--mute);font-size:.78rem}
 .ft .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
 .ft b{color:var(--dim);font-weight:500}
-.ft .fnote{flex-basis:100%;order:-1;margin:0 0 .55rem;color:var(--mute);opacity:.85;line-height:1.5}
+.ft .fnote{flex-basis:100%;order:-1;margin:0 0 .55rem;color:var(--mute);line-height:1.5}
 
 /* ---- domain "more" link, all-index link, search (added) ---- */
 .dh-more{color:var(--accent);font-family:var(--mono);font-size:.78rem;margin-left:.6rem}

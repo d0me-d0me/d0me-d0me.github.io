@@ -5,6 +5,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+{% include csp-meta.html %}
 <title>Web Application Attacks — d0me</title>
 <meta name="description" content="Web application attack reference structured by vulnerability class — recon, auth, access control, injection, deserialization, file, SSRF/XXE, client-side, race conditions, and API — with CLI and Burp workflows.">
 <link rel="canonical" href="https://d0me-d0me.github.io/refs/sheets/web.html">
@@ -20,7 +21,7 @@
 <meta name="twitter:image" content="https://d0me-d0me.github.io/assets/img/og.png">
 <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/assets/fonts/fonts.css">
-<link rel="stylesheet" href="../assets/css/sheet.css?v=4">
+<link rel="stylesheet" href="../assets/css/sheet.css?v=6">
 <style>
 /* 攻撃フロー図 (HTML) */
 .flow-section{padding-top:1.8rem}
@@ -1266,8 +1267,8 @@ curl -s https://<span class="v" data-var="TARGET">target.example.com</span>/grap
   </div>
 </footer>
 
-<script src="../content.js?v=1"></script>
-<script src="../assets/js/sheet.js?v=2"></script>
+<script src="../content.js?v=2"></script>
+<script src="../assets/js/sheet.js?v=4"></script>
 <script src="../assets/js/vars.js?v=2"></script>
 <script src="../assets/js/refnav.js?v=2"></script>
 {% endraw %}

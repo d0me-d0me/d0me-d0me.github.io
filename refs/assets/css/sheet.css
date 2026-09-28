@@ -20,7 +20,7 @@ a{color:var(--accent);text-decoration:none}
 /* sheet hero */
 .sheet-hero{padding:clamp(2.4rem,6vw,3.6rem) 0 1.3rem;border-bottom:1px solid var(--line)}
 .crumb{font-size:.78rem;color:var(--mute);margin-bottom:1.3rem}
-.crumb a{color:var(--dim)} .crumb a:hover{color:var(--accent)} .crumb .sep{color:var(--accent-2);margin:0 .5rem}
+.crumb a{color:var(--dim);text-decoration:underline} .crumb a:hover{color:var(--accent)} .crumb .sep{color:var(--accent-2);margin:0 .5rem}
 .sheet-hero h1{font-family:var(--mono);font-weight:700;font-size:clamp(1.9rem,5vw,3rem);letter-spacing:-.02em;margin:0 0 .5rem;color:var(--accent-soft)}
 .sheet-hero h1 .idx{font-family:var(--jp);color:var(--accent);font-weight:700;margin-right:.5rem}
 .sheet-hero .lede{color:var(--dim);max-width:64ch;margin:.6rem 0 1.2rem;font-size:.92rem}
@@ -98,6 +98,19 @@ a{color:var(--accent);text-decoration:none}
 .reveal.in{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
 
+/* related reading — rendered by sheet.js from content.js volume.posts.
+   The reverse of the Posts→Refs links, so the sheet ⇄ post round trip works. */
+.related{margin-top:2.4rem}
+.related .wrap{border-top:1px dashed var(--line);padding-top:1.6rem}
+.related-h{font-family:var(--mono);font-weight:700;font-size:.92rem;letter-spacing:.01em;color:var(--accent-soft);margin:0 0 1rem;display:flex;align-items:baseline;gap:.6rem}
+.related-h .hx{color:var(--accent-2);font-weight:700}
+.related-list{list-style:none;margin:0;padding:0;display:grid;gap:.55rem}
+.related-list li{margin:0}
+.related-list a{display:flex;align-items:baseline;gap:.7rem;color:var(--accent);font-size:.9rem;line-height:1.45;padding:.15rem 0}
+.related-list a:hover{color:var(--accent-soft);text-decoration:underline}
+.related-list .rk{font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ok);border:1px solid var(--line);border-radius:3px;padding:.1rem .4rem;flex:none;position:relative;top:-.06em}
+.related-note{font-family:var(--jp);color:var(--mute);font-size:.78rem;margin:1rem 0 0;line-height:1.55}
+
 /* footer */
 .foot{border-top:1px solid var(--line);margin-top:1.4rem;padding:1.8rem 0 2.6rem;color:var(--mute);font-size:.78rem}
 .foot .wrap{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
@@ -108,7 +121,7 @@ a{color:var(--accent);text-decoration:none}
 .foot .fmeta{color:var(--mute)} .foot .fmeta b{color:var(--dim);font-weight:500}
 .foot .flinks{display:flex;gap:1.2rem}
 .foot .flinks a{color:var(--dim)} .foot .flinks a:hover{color:var(--accent)}
-.foot .fnote{flex-basis:100%;order:-1;margin:0 0 .6rem;color:var(--mute);opacity:.85;line-height:1.5}
+.foot .fnote{flex-basis:100%;order:-1;margin:0 0 .6rem;color:var(--mute);line-height:1.5}
 
 :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
 

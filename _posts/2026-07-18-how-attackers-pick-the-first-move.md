@@ -8,7 +8,7 @@ description: Initial access has no single "best" technique. This piece frames th
 
 ## 概要
 
-Initial access には「これが最強」という答えはない。 Phishing, Valid Accounts, Public-Facing App の exploit, External Remote Services, Supply Chain — どれを選ぶかは attacker の予算と時間軸、target defender の成熟度が組み合わさって決まる。 この記事は個別 technique の手順書ではなく、意思決定を 5 軸(Stealth / Cost / Persistence / Auth Bypass / Maturity Tolerance)に分解して整理する試みだ。 Mandiant M-Trends 2026 の mean time-to-exploit が -7 日に振れた事実と、Verizon DBIR の base rate が年ごとに揺れる事実が、選択の背景条件を作っている。 具体的なコマンドは `/refs/` の関連シートにある。
+Initial access には「これが最強」という答えはない。 Phishing, Valid Accounts, Public-Facing App の exploit, External Remote Services, Supply Chain — どれを選ぶかは attacker の予算と時間軸、target defender の成熟度が組み合わさって決まる。 この記事は個別 technique の手順書ではなく、意思決定を 5 軸(Stealth / Cost / Persistence / Auth Bypass / Maturity Tolerance)に分解して整理する試みだ。 Mandiant M-Trends 2026 の mean time-to-exploit が -7 日に振れた事実と、Verizon DBIR の base rate が年ごとに揺れる事実が、選択の背景条件を作っている。 具体的なコマンドは [refs の関連シート](/refs/)にある。
 
 ## Introduction
 
@@ -16,7 +16,7 @@ If you polled a room of red teamers on "the best way to get initial access," you
 
 Different defenders. Different answers.
 
-This piece is not a how-to. Commands and payload recipes sit in the `/refs/` sheets. What lives here is the framework: how the technique selection actually gets made, why the answer changes across engagements, and what the current base-rate data from Verizon DBIR, Mandiant M-Trends, and CrowdStrike GTR tells us about which axes matter most in 2026.
+This piece is not a how-to. Commands and payload recipes sit in the [refs sheets](/refs/). What lives here is the framework: how the technique selection actually gets made, why the answer changes across engagements, and what the current base-rate data from Verizon DBIR, Mandiant M-Trends, and CrowdStrike GTR tells us about which axes matter most in 2026.
 
 The five axes are Stealth, Cost, Persistence, Auth Bypass, and Maturity Tolerance. No single technique wins on all five. Every technique is a specific set of tradeoffs, and the attacker's job — before writing any payload — is to know which tradeoffs the target's defense makes acceptable.
 
