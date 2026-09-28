@@ -120,3 +120,11 @@ $body:   "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu
 #related-posts .post-preview h4 {
   color: #F2F4EA;
 }
+
+/* Mobile post TOC: Chirpy offers two entry points on small screens — an
+   inline "Contents" pill next to the title (#toc-solo-trigger) and a sticky
+   bar that slides in on scroll (#toc-bar). Both open the same popup, which
+   reads as duplicated. Keep only the sticky bar and hide the inline pill. */
+#toc-solo-trigger {
+  display: none !important;
+}
