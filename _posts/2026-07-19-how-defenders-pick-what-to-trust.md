@@ -8,7 +8,7 @@ description: Windows forensic artifacts don't rank on a single scale. This piece
 
 ## 概要
 
-Windows フォレンジックには「これが最強」という artifact はない。 MFT / UsnJrnl, Prefetch, ShimCache + AmCache, Security EVTX, Sysmon EVTX, Memory — どれを信頼するかは、事案発覚のタイミング・環境の事前準備・攻撃者の tradecraft が組み合わさって決まる。 この記事は個別 artifact の使い方 (それは `/refs/` の forensics-ir シートにある) ではなく、意思決定を 6 軸(Retention / Reliability / Parse-Ease / Coverage / Tamper-Resistance / Availability)に分解する試みだ。 Initial Access 記事で attacker の 5 軸を分解したのと同じ構造で、defender 側を対称に描く。
+Windows フォレンジックには「これが最強」という artifact はない。 MFT / UsnJrnl, Prefetch, ShimCache + AmCache, Security EVTX, Sysmon EVTX, Memory — どれを信頼するかは、事案発覚のタイミング・環境の事前準備・攻撃者の tradecraft が組み合わさって決まる。 この記事は個別 artifact の使い方 (それは [forensics-ir シート](/refs/sheets/forensics-ir.html)にある) ではなく、意思決定を 6 軸(Retention / Reliability / Parse-Ease / Coverage / Tamper-Resistance / Availability)に分解する試みだ。 Initial Access 記事で attacker の 5 軸を分解したのと同じ構造で、defender 側を対称に描く。
 
 ## Introduction
 
@@ -18,7 +18,7 @@ Most important against what? Against ransomware detonation caught at hour zero, 
 
 Different investigations. Different answers.
 
-This piece is not a how-to. Commands, parsers, and tool invocations live in the `/refs/` forensics-ir sheet. What lives here is the framework: how the decision about which artifact to trust actually gets made, why the same practitioner picks different artifacts against different incidents, and what the current state of Windows telemetry — Sysmon becoming a native optional feature in early 2026, HVCI-protected kernels making memory acquisition harder, ShimCache reliability degrading in Windows 10+ — tells us about which axes matter most in 2026.
+This piece is not a how-to. Commands, parsers, and tool invocations live in the [forensics-ir sheet](/refs/sheets/forensics-ir.html). What lives here is the framework: how the decision about which artifact to trust actually gets made, why the same practitioner picks different artifacts against different incidents, and what the current state of Windows telemetry — Sysmon becoming a native optional feature in early 2026, HVCI-protected kernels making memory acquisition harder, ShimCache reliability degrading in Windows 10+ — tells us about which axes matter most in 2026.
 
 The six axes are Retention, Reliability, Parse-Ease, Coverage, Tamper-Resistance, and Availability. No single artifact wins on all six. Every artifact is a specific set of tradeoffs, and the investigator's job — before opening any parser — is to know which artifacts survived long enough to be worth reading.
 
