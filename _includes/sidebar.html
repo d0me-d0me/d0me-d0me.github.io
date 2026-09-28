@@ -42,7 +42,7 @@
         <!-- .nav-item -->
 
         {% if tab.url contains '/posts' %}
-          <li class="nav-item">
+          <li class="nav-item{% if page.url == '/refs/' %}{{ " active" }}{% endif %}">
             <a href="{{ '/refs/' | relative_url }}" class="nav-link">
               <i class="fa-fw fas fa-terminal"></i>
               <span>REFS</span>
