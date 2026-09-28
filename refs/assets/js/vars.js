@@ -38,10 +38,13 @@
     NTLM_HASH: "aad3b435…:31d6cfe0…", B64: "<base64>",
     TOOL_DIR: "/opt/tools", OUT: "/tmp/out", OUT_DIR: "/tmp/loot", PATH: "/tmp/x",
     PAYLOAD_PATH: "/tmp/shell.exe", PID: "1337", SERVICE_NAME: "MyService",
-    SVC_TITLE: "MyService", SVC_DESC: "desc"
+    SVC_TITLE: "MyService", SVC_DESC: "desc",
+    RANGE: "10.10.10.0/24", PORTS: "22,80,443,445,3389"
   };
   const exampleFor = (k, def) => {
-    if (def && !/^<[^<>]+>$/.test(def)) return def; // a real default value is the truest example
+    // A real default value is the truest example, but a placeholder-style
+    // default (<NAME> or a $SHELL_VAR) is not — fall back to a concrete hint.
+    if (def && !/^<[^<>]+>$/.test(def) && !/^\$[A-Za-z_]\w*$/.test(def)) return def;
     return EXAMPLES[k] || EXAMPLES[k.toUpperCase()] || ("<" + k + ">");
   };
 

@@ -29,12 +29,29 @@
     nav.querySelectorAll("a").forEach(a => a.addEventListener("click", () => nav.classList.remove("open")));
   }
 
-  // reveal on scroll
+  // reveal on scroll. A plain viewport check (run on scroll / resize / load)
+  // rather than an IntersectionObserver: the observer occasionally left a
+  // section that was already in view hidden until a resize/zoom nudged it.
+  // This guarantees anything within the viewport is revealed.
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const io = ("IntersectionObserver" in window && !reduce)
-    ? new IntersectionObserver((es) => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: 0.12 })
-    : null;
-  all(".reveal").forEach(el => io ? io.observe(el) : el.classList.add("in"));
+  const reveal = (el) => el.classList.add("in");
+  if (reduce) {
+    all(".reveal").forEach(reveal);
+  } else {
+    let ticking = false;
+    const check = () => {
+      ticking = false;
+      all(".reveal:not(.in)").forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (r.top < innerHeight && r.bottom > 0) reveal(el);   // any part in view
+      });
+    };
+    const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(check); } };
+    addEventListener("scroll", onScroll, { passive: true });
+    addEventListener("resize", onScroll, { passive: true });
+    addEventListener("load", check);
+    check();
+  }
 
   // TOC scroll-spy
   const links = all(".toc a");
