@@ -1,0 +1,199 @@
+/*
+ * Self-hosted web fonts (fontsource, woff2 only) — no third-party CDN.
+ * Privacy: visitor requests never reach fonts.googleapis.com / fonts.gstatic.com.
+ * Families: JetBrains Mono, Lato, Source Sans Pro (latin + latin-ext),
+ *           Zen Kaku Gothic New (japanese + latin).
+ * Regenerate: see tools/build-fonts.sh
+ */
+/* jetbrains-mono-latin-400-normal */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(./files/jetbrains-mono-latin-400-normal.woff2) format('woff2');
+}
+/* jetbrains-mono-latin-500-normal */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url(./files/jetbrains-mono-latin-500-normal.woff2) format('woff2');
+}
+/* jetbrains-mono-latin-700-normal */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url(./files/jetbrains-mono-latin-700-normal.woff2) format('woff2');
+}
+/* jetbrains-mono-latin-ext-400-normal */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(./files/jetbrains-mono-latin-ext-400-normal.woff2) format('woff2');
+}
+/* jetbrains-mono-latin-ext-500-normal */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url(./files/jetbrains-mono-latin-ext-500-normal.woff2) format('woff2');
+}
+/* jetbrains-mono-latin-ext-700-normal */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url(./files/jetbrains-mono-latin-ext-700-normal.woff2) format('woff2');
+}
+/* lato-latin-300-normal */
+@font-face {
+  font-family: 'Lato';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300;
+  src: url(./files/lato-latin-300-normal.woff2) format('woff2');
+}
+/* lato-latin-400-normal */
+@font-face {
+  font-family: 'Lato';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(./files/lato-latin-400-normal.woff2) format('woff2');
+}
+/* lato-latin-ext-300-normal */
+@font-face {
+  font-family: 'Lato';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300;
+  src: url(./files/lato-latin-ext-300-normal.woff2) format('woff2');
+}
+/* lato-latin-ext-400-normal */
+@font-face {
+  font-family: 'Lato';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(./files/lato-latin-ext-400-normal.woff2) format('woff2');
+}
+/* source-sans-pro-latin-400-normal */
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(./files/source-sans-pro-latin-400-normal.woff2) format('woff2');
+}
+/* source-sans-pro-latin-600-normal */
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url(./files/source-sans-pro-latin-600-normal.woff2) format('woff2');
+}
+/* source-sans-pro-latin-700-normal */
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url(./files/source-sans-pro-latin-700-normal.woff2) format('woff2');
+}
+/* source-sans-pro-latin-900-normal */
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 900;
+  src: url(./files/source-sans-pro-latin-900-normal.woff2) format('woff2');
+}
+/* source-sans-pro-latin-ext-400-normal */
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(./files/source-sans-pro-latin-ext-400-normal.woff2) format('woff2');
+}
+/* source-sans-pro-latin-ext-600-normal */
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url(./files/source-sans-pro-latin-ext-600-normal.woff2) format('woff2');
+}
+/* source-sans-pro-latin-ext-700-normal */
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url(./files/source-sans-pro-latin-ext-700-normal.woff2) format('woff2');
+}
+/* source-sans-pro-latin-ext-900-normal */
+@font-face {
+  font-family: 'Source Sans Pro';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 900;
+  src: url(./files/source-sans-pro-latin-ext-900-normal.woff2) format('woff2');
+}
+/* zen-kaku-gothic-new-japanese-400-normal */
+@font-face {
+  font-family: 'Zen Kaku Gothic New';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(./files/zen-kaku-gothic-new-japanese-400-normal.woff2) format('woff2');
+}
+/* zen-kaku-gothic-new-japanese-500-normal */
+@font-face {
+  font-family: 'Zen Kaku Gothic New';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url(./files/zen-kaku-gothic-new-japanese-500-normal.woff2) format('woff2');
+}
+/* zen-kaku-gothic-new-japanese-700-normal */
+@font-face {
+  font-family: 'Zen Kaku Gothic New';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url(./files/zen-kaku-gothic-new-japanese-700-normal.woff2) format('woff2');
+}
+/* zen-kaku-gothic-new-latin-400-normal */
+@font-face {
+  font-family: 'Zen Kaku Gothic New';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(./files/zen-kaku-gothic-new-latin-400-normal.woff2) format('woff2');
+}
+/* zen-kaku-gothic-new-latin-500-normal */
+@font-face {
+  font-family: 'Zen Kaku Gothic New';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url(./files/zen-kaku-gothic-new-latin-500-normal.woff2) format('woff2');
+}
+/* zen-kaku-gothic-new-latin-700-normal */
+@font-face {
+  font-family: 'Zen Kaku Gothic New';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url(./files/zen-kaku-gothic-new-latin-700-normal.woff2) format('woff2');
+}
