@@ -9,6 +9,56 @@
   all("[data-blog]").forEach(e => { if (C.blogUrl) e.setAttribute("href", C.blogUrl); });
   all("[data-year]").forEach(e => e.textContent = new Date().getFullYear());
 
+  // Related reading — the reverse of the Posts→Refs links. Each volume in
+  // content.js may carry posts:[{url,title}]; on the matching sheet we render
+  // them as a "background articles" block so the sheet ⇄ post round trip the
+  // About page describes actually exists. Data-driven: content.js stays the
+  // single edit point, so a new mapping needs no change here.
+  (() => {
+    const main = document.querySelector("main");
+    if (!main || !Array.isArray(C.volumes)) return;
+    const slug = (location.pathname.split("/").pop() || "").replace(/\.html$/, "");
+    const vol = C.volumes.find(v => v.slug === slug);
+    if (!vol || !Array.isArray(vol.posts) || !vol.posts.length) return;
+
+    const sec = document.createElement("section");
+    sec.className = "related";
+    sec.setAttribute("aria-label", "Related reading");
+    const wrap = document.createElement("div");
+    wrap.className = "wrap";
+
+    const h = document.createElement("h2");
+    h.className = "related-h";
+    const hx = document.createElement("span");
+    hx.className = "hx"; hx.textContent = "$";
+    h.appendChild(hx);
+    h.appendChild(document.createTextNode(" related reading — 背景記事"));
+
+    const ul = document.createElement("ul");
+    ul.className = "related-list";
+    vol.posts.forEach(p => {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = p.url;
+      const k = document.createElement("span");
+      k.className = "rk"; k.textContent = "post";
+      a.appendChild(k);
+      a.appendChild(document.createTextNode(" " + p.title));
+      li.appendChild(a);
+      ul.appendChild(li);
+    });
+
+    const note = document.createElement("p");
+    note.className = "related-note";
+    note.textContent = "Refs は「どう使うか」、Posts は「なぜそれを選ぶか」を扱う。";
+
+    wrap.appendChild(h);
+    wrap.appendChild(ul);
+    wrap.appendChild(note);
+    sec.appendChild(wrap);
+    main.appendChild(sec);
+  })();
+
   // copy buttons
   all(".code").forEach(block => {
     const btn = block.querySelector(".copy"), pre = block.querySelector("pre code");
@@ -21,6 +71,24 @@
       } catch { btn.textContent = "err"; }
     });
   });
+
+  // Keyboard access for horizontally-scrollable code blocks (axe:
+  // scrollable-region-focusable). A <pre> whose content overflows can be
+  // scrolled with a mouse/trackpad but not the keyboard unless it is
+  // focusable, so make exactly those focusable (and re-check on resize).
+  const markScrollable = () => {
+    all(".code pre").forEach(pre => {
+      const overflow = pre.scrollWidth > pre.clientWidth + 1;
+      if (overflow && !pre.hasAttribute("tabindex")) {
+        pre.setAttribute("tabindex", "0");
+      } else if (!overflow && pre.getAttribute("tabindex") === "0") {
+        pre.removeAttribute("tabindex");
+      }
+    });
+  };
+  addEventListener("load", markScrollable);
+  addEventListener("resize", markScrollable);
+  markScrollable();
 
   // mobile nav
   const toggle = document.querySelector(".nav-toggle"), nav = document.querySelector(".nav");

@@ -1,0 +1,30 @@
+{% comment %}
+  Content-Security-Policy (single source for the whole site).
+
+  GitHub Pages cannot set HTTP response headers, so the policy is delivered as
+  a <meta http-equiv> tag. Consequences of the meta delivery:
+    - frame-ancestors is ignored in meta form, so clickjacking protection
+      (and HSTS, X-Content-Type-Options, etc.) cannot be enforced here; that
+      would need a host that sets headers. We keep frame-src 'none' instead,
+      which the meta form does honour.
+    - On the Chirpy pages this include lands at the end of <head> (the theme's
+      only head hook, metadata-hook.html), so head resources fetched before it
+      are not governed; it still governs the <body> — the realistic stored-XSS
+      surface for a blog — plus base-uri / object-src / form-action document
+      wide. On the standalone /refs/ sheets we include it first in <head>, so
+      there it is fully effective.
+
+  Allowlist is kept in lock-step with _data/origin/cors.yml and the built
+  output (verified with a headless load, no violations for first-party
+  resources):
+    - cdn.jsdelivr.net    scripts + styles (bootstrap, tocbot, glightbox,
+                          clipboard, dayjs, simple-jekyll-search, mathjax,
+                          loading-attribute-polyfill)
+    - gc.zgo.at           GoatCounter count.js
+    - *.goatcounter.com   GoatCounter hit beacon
+  No 'unsafe-inline' in script-src: the build emits no executable inline
+  scripts (only jekyll-seo-tag's ld+json data block, which script-src does not
+  govern). Inline <style> and style="" attributes do exist, so style-src keeps
+  'unsafe-inline'.
+{% endcomment %}
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; img-src 'self' data: https://d0me.goatcounter.com; font-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' https://cdn.jsdelivr.net https://gc.zgo.at; connect-src 'self' https://d0me.goatcounter.com; form-action 'self'; manifest-src 'self'; worker-src 'self'; upgrade-insecure-requests">

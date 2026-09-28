@@ -54,16 +54,16 @@ description: Articles on offensive and defensive security — technique deep-div
 }
 .dome-postlist time{
   font-family:'JetBrains Mono',monospace;font-size:.8rem;
-  color:rgba(205,211,194,.55);white-space:nowrap;flex:none;
+  color:rgba(205,211,194,.62);white-space:nowrap;flex:none;
 }
 .dome-postlist a{font-size:1rem;text-decoration:none;}
 .dome-postlist a:hover{text-decoration:underline;}
 .dome-postlist .pin{
   font-family:'JetBrains Mono',monospace;font-size:.7rem;
-  color:rgba(205,211,194,.55);border:1px solid rgba(205,211,194,.25);
+  color:rgba(205,211,194,.62);border:1px solid rgba(205,211,194,.25);
   border-radius:2px;padding:0 .35rem;flex:none;
 }
-.dome-postlist-empty{color:rgba(205,211,194,.55);margin-top:1.2rem;}
+.dome-postlist-empty{color:rgba(205,211,194,.62);margin-top:1.2rem;}
 </style>
 
 <div class="dome-frame">
