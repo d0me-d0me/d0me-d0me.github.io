@@ -1,3 +1,5 @@
+---
+---
 <!doctype html>
 <html lang="ja">
 <head>
@@ -23,27 +25,8 @@
 <link rel="stylesheet" href="../assets/css/sheet.css?v=2">
 </head>
 <body>
-<aside class="rsb" aria-label="Site navigation">
-  <a class="rsb-brand" href="/">
-    <img class="rsb-avatar" src="../assets/img/favicon.svg" alt="d0me" onerror="this.style.display='none'">
-    <span class="rsb-title">[<b data-handle>d0me</b>]</span>
-    <span class="rsb-sub">offensive &amp; defensive security</span>
-  </a>
-  <nav class="rsb-nav">
-    <a href="/" data-blog>HOME</a>
-    <a href="/posts/">POSTS</a>
-    <a href="/refs/" class="active" aria-current="page">REFS</a>
-    <a href="/categories/">CATEGORIES</a>
-    <a href="/tags/">TAGS</a>
-    <a href="/archives/">ARCHIVES</a>
-    <a href="/about/">ABOUT</a>
-  </nav>
-  <div class="rsb-social">
-    <a href="#" data-gh-url target="_blank" rel="noopener noreferrer">GitHub</a>
-  </div>
-</aside>
-<button id="rsb-toggle" type="button" aria-label="menu" aria-expanded="false">≡</button>
-<div class="rsb-backdrop"></div>
+{% include refs-sidebar.html %}
+{% raw %}
 
 
 <main>
@@ -951,5 +934,6 @@ wp --path=/var/www/nginx/blog transient delete --all</code></pre></div>
 <script src="../assets/js/sheet.js?v=1"></script>
 <script src="../assets/js/vars.js?v=1"></script>
 <script src="../assets/js/refnav.js?v=1"></script>
+{% endraw %}
 </body>
 </html>

@@ -1,0 +1,26 @@
+<!-- refs left sidebar — single source for every /refs/ page, rendered at
+     build time. The refs pages are otherwise raw static HTML kept outside
+     Liquid because the cheat sheets carry template-injection payloads; each
+     page wraps its body in a raw block and only this include is processed.
+     Mirrors the blog nav order: HOME - POSTS - REFS - CATEGORIES - ... -->
+<aside class="rsb" aria-label="Site navigation">
+  <a class="rsb-brand" href="/">
+    <img class="rsb-avatar" src="/refs/assets/img/favicon.svg" alt="d0me" onerror="this.style.display='none'">
+    <span class="rsb-title">[<b>d0me</b>]</span>
+    <span class="rsb-sub">offensive &amp; defensive security</span>
+  </a>
+  <nav class="rsb-nav">
+    <a href="/">HOME</a>
+    <a href="/posts/">POSTS</a>
+    <a href="/refs/" class="active" aria-current="page">REFS</a>
+    <a href="/categories/">CATEGORIES</a>
+    <a href="/tags/">TAGS</a>
+    <a href="/archives/">ARCHIVES</a>
+    <a href="/about/">ABOUT</a>
+  </nav>
+  <div class="rsb-social">
+    <a href="https://github.com/d0me-d0me" target="_blank" rel="noopener noreferrer">GitHub</a>
+  </div>
+</aside>
+<button id="rsb-toggle" type="button" aria-label="menu" aria-expanded="false">≡</button>
+<div class="rsb-backdrop"></div>
