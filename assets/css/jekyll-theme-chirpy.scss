@@ -48,8 +48,23 @@ $body:   "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu
   padding-bottom: .35rem;
   border-bottom: 1px solid $rule;
 }
-.content a { color: $grn; text-decoration: none; }
-.content a:hover { text-decoration: underline; }
+/* In-prose links keep the green but carry a persistent, non-colour cue
+   (WCAG 1.4.1). On this dark theme colour alone cannot work: a link readable
+   on the near-black background can't also sit 3:1 away from the light body
+   text, so a link distinguished only by hue fails. A subtle always-on
+   underline (thin, offset, half-strength) solves it without loud rules and
+   reads as intentional; hover strengthens it. Image links are excluded. */
+.content a:not(.img-link) {
+  color: $grn;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: .18em;
+  text-decoration-color: rgba(72, 180, 74, .45);
+}
+.content a:not(.img-link):hover {
+  text-decoration-color: $grn;
+}
+.content a.img-link { text-decoration: none; }
 .content strong,
 .content b { color: $ph-hi; }
 .content :not(pre) > code {
