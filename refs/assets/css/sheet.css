@@ -3,7 +3,7 @@
   --bg:#0B0B0C; --panel:#131210; --panel-2:#1A1814; --line:#2A2620; --code-bg:#070707;
   --fg:#E9E1D0; --dim:#8F8875; --mute:#857F6A;
   --accent:#D9DCCF; --accent-2:#6E7264; --accent-soft:#F2F4EA;
-  --ok:#7FC24A; --warn:#E5533B;
+  --ok:#7FC24A; --warn:#E5533B; --var:#E6B450;
   --mono:"JetBrains Mono",ui-monospace,monospace; --jp:"Zen Kaku Gothic New",sans-serif;
 }
 *{box-sizing:border-box}
@@ -70,7 +70,9 @@ a{color:var(--accent);text-decoration:none}
 .code .c{color:var(--mute);font-style:italic}
 .code .k{color:var(--accent-soft);font-weight:500}
 .code .s{color:#B9AE96}
-.code .v{color:var(--accent)}
+/* variable slots are highlighted from the start (amber + dotted underline)
+   so the fill-in points are obvious before any value is entered */
+.code .v{color:var(--var);border-bottom:1px dotted rgba(230,180,80,.55)}
 
 /* callouts */
 .note{border-left:2px solid var(--accent);background:var(--panel);padding:.9rem 1.1rem;border-radius:0 4px 4px 0;margin:1.2rem 0;font-size:.88rem;color:var(--dim)}
@@ -186,8 +188,8 @@ a{color:var(--accent);text-decoration:none}
 #var-bar .vb-field span{font-size:.6rem;letter-spacing:.08em;color:var(--mute)}
 #var-bar .vb-field input{font-family:var(--mono);font-size:.8rem;color:var(--fg);background:var(--code-bg);border:1px solid var(--line);border-radius:3px;padding:.3rem .5rem;min-width:9rem}
 #var-bar .vb-field input:focus{outline:none;border-color:var(--ok)}
-/* filled placeholders stand out from the unset <NAME> tokens */
-.code .v.set,.v.set{color:var(--ok);font-weight:600}
+/* filled placeholders switch to green so set vs unset is obvious at a glance */
+.code .v.set,.v.set{color:var(--ok);font-weight:600;border-bottom-color:transparent}
 
 /* ===== left site sidebar (refs) — mirrors the blog nav ===== */
 .rsb{position:fixed;top:0;left:0;bottom:0;width:230px;z-index:80;display:flex;flex-direction:column;
