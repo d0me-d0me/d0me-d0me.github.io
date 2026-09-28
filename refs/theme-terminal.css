@@ -152,3 +152,20 @@ body.rsb-open .rsb-backdrop{opacity:1;pointer-events:auto}
   body.rsb-collapsed{padding-left:0}
   body.rsb-collapsed .rsb{transform:translateX(-100%)}
   body.rsb-collapsed #rsb-toggle{display:grid}}
+
+/* ===== Light mode (dark ink on paper) — shares the model in sheet.css. Wins
+   over the html[data-accent=…] palettes by specificity, so light renders as a
+   single paper theme regardless of the selected accent. ===== */
+:root[data-bs-theme="light"]{
+  --bg:#FAF9F5; --panel:#FFFFFF; --panel-2:#EFEBE1; --line:#DAD5C8;
+  --fg:#2B2A25; --dim:#6B6555; --mute:#6E6757;
+  --ok:#2E7D32; --warn:#C0392B;
+  --accent:#7A5200; --accent-2:#6E6757; --accent-soft:#1A1A17;
+}
+:root[data-bs-theme="light"] body::after{display:none;}
+:root[data-bs-theme="light"] ::selection{color:#FAF9F5;}
+
+/* Light/dark toggle button (standalone refs pages; injected by mode-toggle.js). */
+#mode-switch{position:fixed;top:1rem;right:1rem;width:40px;height:40px;display:grid;place-items:center;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--accent);font-size:1.05rem;line-height:1;cursor:pointer;z-index:83;transition:border-color .16s,color .16s}
+#mode-switch:hover{border-color:var(--accent)}
+#mode-switch:focus-visible{outline:2px solid var(--accent);outline-offset:2px}

@@ -79,3 +79,16 @@
 .refs-home .index-all-link:hover{color:var(--ph-hi);}
 
 .refs-home .refs-note{margin:2.2rem 0 0;color:var(--ph-dim);font-size:.72rem;opacity:.85;line-height:1.5;}
+
+/* ===== Light mode (dark ink on paper) — matches the HOME hero treatment.
+   The /refs/ landing is a Chirpy page, so it follows data-bs-theme directly. */
+:root[data-bs-theme="light"] .refs-home{
+  --bg:#FAF9F5; --ph-hi:#1A1A17; --ph:#2B2A25; --ph-dim:#6B6555; --grn:#2E7D32;
+  --rule:rgba(20,20,15,.14); --card:rgba(20,20,15,.025); --card-hi:rgba(20,20,15,.05);
+}
+:root[data-bs-theme="light"] .refs-home .frame{box-shadow:none;}
+:root[data-bs-theme="light"] .refs-home .bar{background:rgba(20,20,15,.04);}
+:root[data-bs-theme="light"] .refs-home h1{text-shadow:none;}
+:root[data-bs-theme="light"] .refs-home::after{display:none;}
+
+:root[data-bs-theme="light"] .refs-home .refs-note{opacity:1;color:#6B6555;}
