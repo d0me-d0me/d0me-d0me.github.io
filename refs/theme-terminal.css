@@ -25,13 +25,6 @@ a{color:var(--accent);text-decoration:none}
 .wrap{max-width:1080px;margin:0 auto;padding:0 clamp(16px,4vw,40px);position:relative;z-index:1}
 .jp{font-family:var(--jp)} .amb{color:var(--accent)} .dim{color:var(--dim)} .mute{color:var(--mute)}
 
-.top{border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:0;z-index:50}
-.top .wrap{display:flex;align-items:center;gap:1.2rem;height:52px;font-size:.82rem}
-.top .p{color:var(--dim)} .top .p b{color:var(--accent);font-weight:700}
-.top nav{margin-left:auto;display:flex;gap:1.3rem}
-.top nav a{color:var(--dim)} .top nav a:hover{color:var(--fg)}
-.top nav a::before{content:"› ";color:var(--accent-2)}
-
 .hero{padding:clamp(2.4rem,6vw,4.4rem) 0 2rem}
 .frame{border:1px solid var(--line);border-radius:4px;background:linear-gradient(180deg,var(--panel),var(--bg));overflow:hidden}
 .frame .bar{display:flex;align-items:center;gap:.6rem;padding:.5rem .9rem;border-bottom:1px solid var(--line);background:var(--panel-2);font-size:.74rem;color:var(--dim)}
@@ -99,7 +92,6 @@ h1 .cur{display:inline-block;width:.6ch;height:1em;background:var(--accent);vert
 .ft .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
 .ft b{color:var(--dim);font-weight:500}
 .ft .fnote{flex-basis:100%;order:-1;margin:0 0 .55rem;color:var(--mute);opacity:.85;line-height:1.5}
-@media(max-width:620px){.top nav{display:none}}
 
 /* ---- domain "more" link, all-index link, search (added) ---- */
 .dh-more{color:var(--accent);font-family:var(--mono);font-size:.78rem;margin-left:.6rem}
