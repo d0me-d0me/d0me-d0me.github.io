@@ -145,9 +145,12 @@ assets:
     env: # [development | production]
 
 pwa:
-  enabled: true # The option for PWA feature (installable)
+  enabled: false # Disabled: the service worker's "New content available / Update"
+                 # toast was recurring friction on a frequently-redeployed notes
+                 # site, and offline/installable adds little here. Turning it off
+                 # stops the SW from registering, so the prompt no longer appears.
   cache:
-    enabled: true # The option for PWA offline cache
+    enabled: false # The option for PWA offline cache
     # Paths defined here will be excluded from the PWA cache.
     # Usually its value is the `baseurl` of another website that
     # shares the same domain name as the current website.
