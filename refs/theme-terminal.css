@@ -139,9 +139,16 @@ h1 .cur{display:inline-block;width:.6ch;height:1em;background:var(--accent);vert
 .rsb-social{margin-top:auto;display:flex;gap:1rem;padding-top:1.3rem;font-size:.76rem}
 .rsb-social a{color:var(--dim)} .rsb-social a:hover{color:var(--accent)}
 #rsb-toggle{position:fixed;top:.8rem;left:.8rem;z-index:82;width:40px;height:40px;border:1px solid var(--line);
-  background:var(--panel);color:var(--accent);border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:1.15rem;line-height:1}
+  background:var(--panel);color:var(--accent);border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:1.15rem;line-height:1;display:grid;place-items:center}
 .rsb-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:79;opacity:0;pointer-events:none;transition:opacity .2s}
 body.rsb-open .rsb{transform:none}
 body.rsb-open .rsb-backdrop{opacity:1;pointer-events:auto}
+/* collapse control (desktop): hide the sidebar and reclaim the width */
+#rsb-collapse{position:absolute;top:.6rem;right:.6rem;width:26px;height:26px;display:none;place-items:center;background:transparent;border:1px solid var(--line);border-radius:5px;color:var(--dim);cursor:pointer;font-family:var(--mono);font-size:.9rem;line-height:1}
+#rsb-collapse:hover{color:var(--accent);border-color:var(--accent-2)}
 @media(max-width:999px){body{padding-top:52px}}
-@media(min-width:1000px){.rsb{transform:none}#rsb-toggle{display:none}.rsb-backdrop{display:none}body{padding-left:230px}}
+@media(min-width:1000px){.rsb{transform:none}#rsb-toggle{display:none}.rsb-backdrop{display:none}body{padding-left:230px}
+  #rsb-collapse{display:grid}
+  body.rsb-collapsed{padding-left:0}
+  body.rsb-collapsed .rsb{transform:translateX(-100%)}
+  body.rsb-collapsed #rsb-toggle{display:grid}}
