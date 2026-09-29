@@ -299,10 +299,18 @@ body.rsb-open .rsb-backdrop{opacity:1;pointer-events:auto}
     --accent:#000; --accent-2:#666; --accent-soft:#000;
     --ok:#1a6e1f; --warn:#a5231a; --var:#7a5200;
   }
-  body{background:#fff !important;color:#111 !important;padding:0 !important;font-size:11pt}
+  body{background:#fff !important;color:#111 !important;padding:0 !important;font-size:12.5pt;line-height:1.5}
   body::after{display:none !important}               /* CRT scanlines */
   .wrap{max-width:none;padding:0 6mm}
   a{color:#111 !important}
+  /* readable print sizes (screen uses small rem/em for density) */
+  .doc h2{font-size:17pt} .doc h3{font-size:13.5pt}
+  .doc p,.doc li{font-size:11.5pt}
+  .doc code:not(pre code){font-size:10.5pt}
+  .doc table{font-size:10.5pt}
+  .code code{font-size:10.5pt;line-height:1.5}
+  .note,.defense,.takeaway{font-size:11pt}
+  .sheet-hero h1{font-size:26pt} .sheet-hero .lede{font-size:11.5pt}
   /* interactive-only chrome: nothing to click on paper */
   .rsb,#rsb-toggle,.rsb-backdrop,#toc-toggle,.toc,
   .to-top,#var-bar,#mode-switch,.code .copy{display:none !important}

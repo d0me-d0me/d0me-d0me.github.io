@@ -182,9 +182,10 @@ body.rsb-open .rsb-backdrop{opacity:1;pointer-events:auto}
     --ok:#1a6e1f; --warn:#a5231a;
     --accent:#000; --accent-2:#666; --accent-soft:#000;
   }
-  body{background:#fff !important;color:#111 !important;padding:0 !important;font-size:11pt}
+  body{background:#fff !important;color:#111 !important;padding:0 !important;font-size:12.5pt;line-height:1.5}
   body::after{display:none !important}
   a{color:#111 !important}
+  .vol-title{font-size:12.5pt} .vol-jp,.vol-topics{font-size:10.5pt}
   .rsb,#rsb-toggle,.rsb-backdrop,.search,#domain-nav,#mode-switch{display:none !important}
   .wrap{max-width:none;padding:0 6mm}
   .vol,.domain{break-inside:avoid;page-break-inside:avoid}
