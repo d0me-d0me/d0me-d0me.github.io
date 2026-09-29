@@ -14,4 +14,12 @@
     if (s === 'light' || s === 'dark') m = s;
   } catch (e) {}
   document.documentElement.setAttribute('data-bs-theme', m);
+  // Keep the mobile address-bar colour in step with the resolved theme on the
+  // standalone /refs/ pages, which force dark independently of the OS. Only the
+  // media-less <meta name="theme-color"> those pages carry is touched; the
+  // Chirpy pages' media-scoped ones (light/dark) are left alone.
+  try {
+    var tc = document.querySelector('meta[name="theme-color"]:not([media])');
+    if (tc) tc.setAttribute('content', m === 'light' ? '#FAF9F5' : '#0B0B0C');
+  } catch (e) {}
 })();

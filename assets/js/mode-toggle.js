@@ -18,6 +18,11 @@
     var label = light ? "Switch to dark theme" : "Switch to light theme";
     btn.setAttribute("aria-label", label);
     btn.title = label;
+    // keep the mobile address-bar colour in step with the toggle
+    try {
+      var tc = document.querySelector('meta[name="theme-color"]:not([media])');
+      if (tc) tc.setAttribute("content", light ? "#FAF9F5" : "#0B0B0C");
+    } catch (e) {}
   }
   btn.addEventListener("click", function () {
     var next = cur() === "light" ? "dark" : "light";
