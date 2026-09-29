@@ -170,6 +170,15 @@ body.rsb-open .rsb-backdrop{opacity:1;pointer-events:auto}
 #mode-switch:hover{border-color:var(--accent)}
 #mode-switch:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
+/* Skip link (WCAG 2.4.1): off-screen until focused (see sheet.css for the
+   rationale; refs-sidebar.html injects it first in the body). */
+.skip-link{position:fixed;top:-120px;left:50%;transform:translateX(-50%);z-index:200;
+  background:var(--panel);color:var(--accent);border:1px solid var(--accent);border-radius:6px;
+  padding:.5rem .9rem;font-family:var(--mono);font-size:.85rem;text-decoration:none;
+  transition:top .16s ease}
+.skip-link:focus{top:.6rem;outline:2px solid var(--accent);outline-offset:2px}
+main:focus{outline:none}
+
 /* ===== Print / PDF — ink on paper, no CRT overlay, no interactive chrome,
    provenance watermark (handle only; see sheet.css for rationale). ===== */
 @media print{
