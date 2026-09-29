@@ -185,3 +185,49 @@ $body:   "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu
 
 /* Mobile post TOC: keep only the sticky bar; hide the duplicate inline pill. */
 #toc-solo-trigger { display: none !important; }
+
+/* ==========================================================================
+   Print / PDF (Chirpy-shell pages: About, HOME, /refs/ landing, posts).
+   Dark is the site default, so a reader who prints would otherwise get a
+   near-black page; force ink-on-paper for the prose, drop the custom CRT
+   heroes' backgrounds/scanlines, and stamp the same provenance watermark as
+   the /refs/ cheat sheets. Handle only — no contact or real name (OPSEC).
+   The theme's own print rules already hide the sidebar/topbar chrome.
+   ========================================================================== */
+@media print {
+  :root[data-bs-theme="dark"],
+  :root[data-bs-theme="light"] {
+    --main-bg: #fff !important;
+    --bs-body-bg: #fff !important;
+  }
+  body { background: #fff !important; }
+  /* Chirpy's own print CSS keeps the sidebar/topbar/panel; drop them so the
+     printed page is just the content + watermark, and reclaim the width. */
+  #sidebar, #topbar-wrapper, #panel-wrapper, #search-result-wrapper { display: none !important; }
+  #main-wrapper { padding-left: 0 !important; padding-right: 0 !important; }
+  .content { color: #111 !important; }
+  .content h1, .content h2, .content h3, .content h4, .content h5 { color: #000 !important; }
+  .content a:not(.img-link) { color: #111 !important; text-decoration-color: #666 !important; }
+  .content strong, .content b { color: #000 !important; }
+  /* custom terminal heroes: their scanline/glow ::after and dark surfaces make
+     no sense on paper — neutralise them so text stays legible. */
+  .dome-home::after, .refs-home::after { display: none !important; }
+  .dome-home, .refs-home { background: #fff !important; }
+  /* provenance watermark, repeated on every printed page (position:fixed) */
+  body::before {
+    content: "d0me · authorized & educational use only";
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-32deg);
+    font-family: $mono;
+    font-weight: 700;
+    font-size: 30pt;
+    letter-spacing: .03em;
+    color: rgba(0, 0, 0, .07);
+    white-space: nowrap;
+    z-index: 9999;
+    pointer-events: none;
+  }
+  @page { margin: 16mm; }
+}
