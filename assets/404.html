@@ -1,0 +1,139 @@
+---
+layout: default
+title: "404: Not Found"
+permalink: /404.html
+sitemap: false
+---
+
+<style>
+/* Terminal "command not found" 404, matching the HOME hero and the refs
+   landing so the whole site reads as one system. Scoped to .dome-404; tokens
+   and the dark/light split mirror .dome-home in index.html. Web fonts, CSP,
+   the theme toggle and the print watermark all come from the Chirpy shell. */
+.dome-404{
+  --bg:#0B0B0C; --ph-hi:#F2F4EA; --ph:#D9DCCF; --ph-dim:#8F8875;
+  --grn:#48B44A; --red:#E0533B; --rule:rgba(217,220,207,.15);
+  --card:rgba(217,220,207,.04); --card-hi:rgba(217,220,207,.07);
+  position:relative; margin:-.5rem 0 0;
+  padding:clamp(2rem,5vw,3.2rem) clamp(1.2rem,4vw,2.4rem) 1rem;
+  align-self:start;
+}
+.dome-404::after{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:3;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.14) 0 1px,transparent 1px 3px);
+  opacity:.4;mix-blend-mode:multiply;
+}
+.dome-404__page{position:relative;max-width:52rem;}
+
+.dome-404 .dome-frame{
+  border:1px solid var(--rule);border-radius:6px;overflow:hidden;
+  background:linear-gradient(180deg,var(--card-hi),transparent);
+  margin:0 0 2rem;
+  box-shadow:inset 0 1px 0 rgba(217,220,207,.05), inset 0 0 90px rgba(72,180,74,.035);
+}
+.dome-404 .dome-bar{
+  display:flex;align-items:center;gap:.5rem;
+  padding:.5rem .85rem;border-bottom:1px solid var(--rule);
+  background:rgba(217,220,207,.045);
+  font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--ph-dim);
+}
+.dome-404 .dome-bar .d{width:9px;height:9px;border-radius:50%;background:var(--rule);}
+.dome-404 .dome-bar .d.a{background:#E0533B;}
+.dome-404 .dome-bar .d.b{background:#E6B450;}
+.dome-404 .dome-bar .d.c{background:var(--grn);}
+.dome-404 .dome-bar .t{margin-left:.35rem;letter-spacing:.02em;}
+.dome-404 .dome-frame-body{padding:clamp(1.5rem,4vw,2.4rem);}
+
+.dome-404 .e-prompt{
+  font-family:'JetBrains Mono',monospace;color:var(--ph-dim);
+  font-size:.85rem;letter-spacing:.01em;margin:0 0 .55rem;
+}
+.dome-404 .e-prompt b{color:var(--ph-hi);font-weight:700;}
+.dome-404 .e-err{
+  font-family:'JetBrains Mono',monospace;color:var(--red);
+  font-size:.85rem;letter-spacing:.01em;margin:0 0 1.1rem;
+}
+.dome-404 .e-title{
+  font-family:'JetBrains Mono',monospace;font-weight:700;
+  font-size:clamp(3rem,12vw,5.5rem);line-height:1;letter-spacing:-.02em;
+  color:var(--ph-hi);margin:.1rem 0 .2rem;
+}
+.dome-404 .e-title .cur{
+  display:inline-block;width:.55ch;height:.86em;background:var(--grn);
+  vertical-align:-.06em;margin-left:.12em;animation:e-blink 1.1s steps(1) infinite;
+}
+@keyframes e-blink{50%{opacity:0;}}
+.dome-404 .e-msg .jp{
+  font-family:'Zen Kaku Gothic New',sans-serif;font-weight:500;
+  font-size:clamp(1.05rem,2.8vw,1.35rem);line-height:1.5;
+  color:var(--ph-hi);margin:.6rem 0 .4rem;word-break:keep-all;line-break:strict;
+}
+.dome-404 .e-msg .en{
+  font-family:'JetBrains Mono',monospace;
+  font-size:clamp(.84rem,1.9vw,.98rem);line-height:1.55;color:var(--ph);margin:0;
+}
+.dome-404 .e-exit{
+  font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--ph-dim);
+  margin:1.3rem 0 0;
+}
+
+.dome-404 .e-links{
+  display:flex;flex-wrap:wrap;gap:1.7rem;margin:2rem 0 0;
+  font-family:'JetBrains Mono',monospace;
+}
+.dome-404 .e-links a{
+  color:var(--ph);text-decoration:none;font-size:.95rem;
+  border-bottom:1px solid transparent;padding-bottom:2px;transition:color .16s,border-color .16s;
+}
+.dome-404 .e-links a:hover{color:var(--ph-hi);border-bottom-color:var(--grn);}
+.dome-404 .e-links a:focus-visible{outline:2px solid var(--grn);outline-offset:3px;}
+
+.dome-404__page>*{animation:e-rise .5s ease both;}
+.dome-404 .e-links{animation-delay:.14s;}
+@keyframes e-rise{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+@media (prefers-reduced-motion:reduce){
+  .dome-404__page>*,.dome-404 .e-title .cur{animation:none;}
+}
+@media (max-width:620px){.dome-404__page{padding-left:1.1rem;}}
+
+/* ---- Light mode: dark ink on paper, CRT effects dropped ---- */
+:root[data-bs-theme="light"] .dome-404{
+  --bg:#FAF9F5; --ph-hi:#1A1A17; --ph:#2B2A25; --ph-dim:#6B6555;
+  --grn:#2E7D32; --red:#C0392B; --rule:rgba(20,20,15,.14);
+  --card:rgba(20,20,15,.025); --card-hi:rgba(20,20,15,.05);
+}
+:root[data-bs-theme="light"] .dome-404::after{display:none;}
+:root[data-bs-theme="light"] .dome-404 .dome-frame{
+  background:linear-gradient(180deg,var(--card-hi),transparent);box-shadow:none;
+}
+:root[data-bs-theme="light"] .dome-404 .dome-bar{background:rgba(20,20,15,.04);}
+</style>
+
+<div class="dome-404">
+  <div class="dome-404__page">
+
+    <div class="dome-frame">
+      <div class="dome-bar">
+        <span class="d a"></span><span class="d b"></span><span class="d c"></span>
+        <span class="t">— d0me — error — 80×24</span>
+      </div>
+      <div class="dome-frame-body">
+        <p class="e-prompt"><b>d0me</b>:~$ open $REQUEST_URI</p>
+        <p class="e-err">bash: no such file or directory</p>
+        <h1 class="e-title">404<span class="cur"></span></h1>
+        <div class="e-msg">
+          <p class="jp">お探しのページは見つかりませんでした。</p>
+          <p class="en">The page you requested was not found — it may have moved or never existed.</p>
+        </div>
+        <p class="e-exit">exit status 127</p>
+      </div>
+    </div>
+
+    <nav class="e-links" aria-label="recovery">
+      <a href="{{ '/' | relative_url }}">→ Home</a>
+      <a href="{{ '/refs/' | relative_url }}">→ Refs</a>
+      <a href="{{ '/posts/' | relative_url }}">→ Posts</a>
+    </nav>
+
+  </div>
+</div>
