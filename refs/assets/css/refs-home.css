@@ -92,3 +92,18 @@
 :root[data-bs-theme="light"] .refs-home::after{display:none;}
 
 :root[data-bs-theme="light"] .refs-home .refs-note{opacity:1;color:#6B6555;}
+
+/* ===== Print / PDF — ink on paper regardless of the on-screen theme. The
+   Chirpy print block (assets/css/jekyll-theme-chirpy.scss) drops this hero's
+   scanlines and background and adds the watermark; here we force the hero's
+   own light-on-dark tokens to ink so the text is legible on white. ===== */
+@media print{
+  .refs-home{
+    --bg:#fff; --ph-hi:#000; --ph:#111; --ph-dim:#444; --grn:#1a6e1f;
+    --rule:rgba(0,0,0,.18); --card:transparent; --card-hi:transparent;
+    color:#111 !important;
+  }
+  .refs-home h1{text-shadow:none !important;}
+  .refs-home .frame{box-shadow:none !important;}
+  .refs-home .refs-note{opacity:1 !important;color:#444 !important;}
+}
