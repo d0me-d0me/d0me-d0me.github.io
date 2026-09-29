@@ -279,3 +279,50 @@ body.rsb-open .rsb-backdrop{opacity:1;pointer-events:auto}
 /* web.html flow-diagram section label: --accent-2 (#6E7264) is only 3.59:1 on
    the dark box; give it a readable tan in dark (light already passes). */
 :root[data-bs-theme="dark"] .fl-sec{color:#A39986;}
+
+/* ============================================================
+   Print / PDF — cheat sheets are printed and saved to PDF. Force
+   ink-on-paper regardless of the on-screen theme (so a dark-mode reader
+   doesn't print a near-black page), drop the CRT overlay and interactive
+   chrome, let code wrap, and keep sections from splitting across pages.
+   A diagonal watermark marks provenance and scope; it is text (not a
+   background), so it prints without the browser's "background graphics"
+   option. Handle only — no contact or real name (OPSEC).
+   ============================================================ */
+@media print{
+  /* paper palette wins over any data-bs-theme value */
+  :root,
+  :root[data-bs-theme="dark"],
+  :root[data-bs-theme="light"]{
+    --bg:#fff; --panel:#fff; --panel-2:#fff; --line:#bbb; --code-bg:#f6f5f2;
+    --fg:#111; --dim:#222; --mute:#444;
+    --accent:#000; --accent-2:#666; --accent-soft:#000;
+    --ok:#1a6e1f; --warn:#a5231a; --var:#7a5200;
+  }
+  body{background:#fff !important;color:#111 !important;padding:0 !important;font-size:11pt}
+  body::after{display:none !important}               /* CRT scanlines */
+  .wrap{max-width:none;padding:0 6mm}
+  a{color:#111 !important}
+  /* interactive-only chrome: nothing to click on paper */
+  .rsb,#rsb-toggle,.rsb-backdrop,#toc-toggle,.toc,
+  .to-top,#var-bar,#mode-switch,.code .copy{display:none !important}
+  /* code blocks: literal ink override (theme sets light-on-dark literals) + wrap */
+  .code{background:#f6f5f2 !important;border:1px solid #bbb !important}
+  .code .code-bar{background:#eee !important;border-bottom:1px solid #ccc !important}
+  .code code,.code .k,.code .s,.code .v{color:#111 !important}
+  .code .c{color:#555 !important}
+  .code .v{border-bottom-color:#999 !important}
+  .code pre{white-space:pre-wrap;word-break:break-word;overflow:visible}
+  /* keep logical blocks intact across page breaks */
+  .doc section,.note,.defense,.takeaway,.code,.doc table,.flow-phase{
+    break-inside:avoid;page-break-inside:avoid}
+  .doc h2,.doc h3{break-after:avoid;page-break-after:avoid}
+  /* diagonal watermark, repeated on every printed page (position:fixed) */
+  body::before{
+    content:"d0me · authorized & educational use only";
+    position:fixed;top:50%;left:50%;
+    transform:translate(-50%,-50%) rotate(-32deg);
+    font-family:var(--mono);font-weight:700;font-size:30pt;letter-spacing:.03em;
+    color:rgba(0,0,0,.07);white-space:nowrap;z-index:9999;pointer-events:none}
+  @page{margin:14mm}
+}
