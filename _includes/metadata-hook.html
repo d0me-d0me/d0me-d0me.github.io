@@ -6,6 +6,15 @@
   assets/js/mode-default.js.
 {% endcomment %}
 {% include csp-meta.html %}
+{% comment %}
+  Preload the render-critical mono font (headings here, and the whole terminal
+  UI on HOME / the /refs/ landing) so it is fetched during head parse instead
+  of after CSS resolves — cuts FOUT/CLS. Only the 400/700 latin weights (~21 KB
+  each) are preloaded; the large Japanese subset (~1 MB) is left to font-display
+  swap so it never blocks or wastes bandwidth on mono-only pages.
+{% endcomment %}
+<link rel="preload" as="font" type="font/woff2" crossorigin href="{{ '/assets/fonts/files/jetbrains-mono-latin-400-normal.woff2' | relative_url }}">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="{{ '/assets/fonts/files/jetbrains-mono-latin-700-normal.woff2' | relative_url }}">
 <link rel="stylesheet" href="{{ '/assets/css/print-watermark.css?v=1' | relative_url }}">
 <script src="{{ '/assets/js/mode-default.js' | relative_url }}"></script>
 <script defer src="{{ '/assets/js/mode-click.js' | relative_url }}"></script>
