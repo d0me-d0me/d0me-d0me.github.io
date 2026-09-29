@@ -213,21 +213,7 @@ $body:   "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu
      no sense on paper — neutralise them so text stays legible. */
   .dome-home::after, .refs-home::after { display: none !important; }
   .dome-home, .refs-home { background: #fff !important; }
-  /* provenance watermark, repeated on every printed page (position:fixed) */
-  body::before {
-    content: "d0me · authorized & educational use only";
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) rotate(-32deg);
-    font-family: $mono;
-    font-weight: 700;
-    font-size: 30pt;
-    letter-spacing: .03em;
-    color: rgba(0, 0, 0, .07);
-    white-space: nowrap;
-    z-index: 9999;
-    pointer-events: none;
-  }
+  /* The full-page tiled watermark is shared in assets/css/print-watermark.css
+     (linked from _includes/metadata-hook.html on every Chirpy page). */
   @page { margin: 16mm; }
 }

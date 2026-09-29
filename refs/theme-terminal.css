@@ -189,11 +189,6 @@ body.rsb-open .rsb-backdrop{opacity:1;pointer-events:auto}
   .rsb,#rsb-toggle,.rsb-backdrop,.search,#domain-nav,#mode-switch{display:none !important}
   .wrap{max-width:none;padding:0 6mm}
   .vol,.domain{break-inside:avoid;page-break-inside:avoid}
-  body::before{
-    content:"d0me · authorized & educational use only";
-    position:fixed;top:50%;left:50%;
-    transform:translate(-50%,-50%) rotate(-32deg);
-    font-family:var(--mono);font-weight:700;font-size:30pt;letter-spacing:.03em;
-    color:rgba(0,0,0,.07);white-space:nowrap;z-index:9999;pointer-events:none}
+  /* Full-page tiled watermark is shared in assets/css/print-watermark.css. */
   @page{margin:14mm}
 }
