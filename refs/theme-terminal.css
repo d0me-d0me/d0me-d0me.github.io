@@ -169,3 +169,26 @@ body.rsb-open .rsb-backdrop{opacity:1;pointer-events:auto}
 #mode-switch{position:fixed;top:1rem;right:1rem;width:40px;height:40px;display:grid;place-items:center;background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--accent);font-size:1.05rem;line-height:1;cursor:pointer;z-index:83;transition:border-color .16s,color .16s}
 #mode-switch:hover{border-color:var(--accent)}
 #mode-switch:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ===== Print / PDF — ink on paper, no CRT overlay, no interactive chrome,
+   provenance watermark (handle only; see sheet.css for rationale). ===== */
+@media print{
+  :root,
+  html[data-accent],
+  :root[data-bs-theme="dark"],
+  :root[data-bs-theme="light"]{
+    --bg:#fff; --panel:#fff; --panel-2:#fff; --line:#bbb;
+    --fg:#111; --dim:#222; --mute:#444;
+    --ok:#1a6e1f; --warn:#a5231a;
+    --accent:#000; --accent-2:#666; --accent-soft:#000;
+  }
+  body{background:#fff !important;color:#111 !important;padding:0 !important;font-size:12.5pt;line-height:1.5}
+  body::after{display:none !important}
+  a{color:#111 !important}
+  .vol-title{font-size:12.5pt} .vol-jp,.vol-topics{font-size:10.5pt}
+  .rsb,#rsb-toggle,.rsb-backdrop,.search,#domain-nav,#mode-switch{display:none !important}
+  .wrap{max-width:none;padding:0 6mm}
+  .vol,.domain{break-inside:avoid;page-break-inside:avoid}
+  /* Full-page tiled watermark is shared in assets/css/print-watermark.css. */
+  @page{margin:14mm}
+}

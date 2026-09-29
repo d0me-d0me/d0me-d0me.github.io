@@ -279,3 +279,53 @@ body.rsb-open .rsb-backdrop{opacity:1;pointer-events:auto}
 /* web.html flow-diagram section label: --accent-2 (#6E7264) is only 3.59:1 on
    the dark box; give it a readable tan in dark (light already passes). */
 :root[data-bs-theme="dark"] .fl-sec{color:#A39986;}
+
+/* ============================================================
+   Print / PDF — cheat sheets are printed and saved to PDF. Force
+   ink-on-paper regardless of the on-screen theme (so a dark-mode reader
+   doesn't print a near-black page), drop the CRT overlay and interactive
+   chrome, let code wrap, and keep sections from splitting across pages.
+   A diagonal watermark marks provenance and scope; it is text (not a
+   background), so it prints without the browser's "background graphics"
+   option. Handle only — no contact or real name (OPSEC).
+   ============================================================ */
+@media print{
+  /* paper palette wins over any data-bs-theme value */
+  :root,
+  :root[data-bs-theme="dark"],
+  :root[data-bs-theme="light"]{
+    --bg:#fff; --panel:#fff; --panel-2:#fff; --line:#bbb; --code-bg:#f6f5f2;
+    --fg:#111; --dim:#222; --mute:#444;
+    --accent:#000; --accent-2:#666; --accent-soft:#000;
+    --ok:#1a6e1f; --warn:#a5231a; --var:#7a5200;
+  }
+  body{background:#fff !important;color:#111 !important;padding:0 !important;font-size:12.5pt;line-height:1.5}
+  body::after{display:none !important}               /* CRT scanlines */
+  .wrap{max-width:none;padding:0 6mm}
+  a{color:#111 !important}
+  /* readable print sizes (screen uses small rem/em for density) */
+  .doc h2{font-size:17pt} .doc h3{font-size:13.5pt}
+  .doc p,.doc li{font-size:11.5pt}
+  .doc code:not(pre code){font-size:10.5pt}
+  .doc table{font-size:10.5pt}
+  .code code{font-size:10.5pt;line-height:1.5}
+  .note,.defense,.takeaway{font-size:11pt}
+  .sheet-hero h1{font-size:26pt} .sheet-hero .lede{font-size:11.5pt}
+  /* interactive-only chrome: nothing to click on paper */
+  .rsb,#rsb-toggle,.rsb-backdrop,#toc-toggle,.toc,
+  .to-top,#var-bar,#mode-switch,.code .copy{display:none !important}
+  /* code blocks: literal ink override (theme sets light-on-dark literals) + wrap */
+  .code{background:#f6f5f2 !important;border:1px solid #bbb !important}
+  .code .code-bar{background:#eee !important;border-bottom:1px solid #ccc !important}
+  .code code,.code .k,.code .s,.code .v{color:#111 !important}
+  .code .c{color:#555 !important}
+  .code .v{border-bottom-color:#999 !important}
+  .code pre{white-space:pre-wrap;word-break:break-word;overflow:visible}
+  /* keep logical blocks intact across page breaks */
+  .doc section,.note,.defense,.takeaway,.code,.doc table,.flow-phase{
+    break-inside:avoid;page-break-inside:avoid}
+  .doc h2,.doc h3{break-after:avoid;page-break-after:avoid}
+  /* The full-page tiled watermark is in the shared assets/css/print-watermark.css
+     (linked in each sheet's <head>), so it is defined once for the whole site. */
+  @page{margin:14mm}
+}
