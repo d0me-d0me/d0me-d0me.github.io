@@ -8,11 +8,11 @@ description: An honest review of the AWS Certified AI Practitioner (AIF-C01) —
 
 ## 概要
 
-正直な受験記であって、対策ガイドではない。もともと AWS の基礎を学ぶつもりでいたところに AIF2Cloud キャンペーン (AIF-C01 が半額、合格で CLF が無料) が重なり、AIF-C01 を受けた。準備は公式の学習コンテンツと、数百問の練習問題をひたすら回しただけ。合格はしたが、この受け方で受かること自体が、この認定が「能力」ではなく「認識 — 見たことがあるか」を測っていることを露わにする。AI 分野を実際に学ぶには内容が浅く、その用途には向かない。資格としての意味の線引きを書く。
+受験記であり対策ガイドではない。AWS の基礎を学ぶつもりでいたところに AIF2Cloud キャンペーン (AIF-C01 が半額、合格で CLF が無料) が重なり、AIF-C01 を受けた。準備は公式の学習コンテンツと、数百問の練習問題をひたすら回しただけである。合格はしたが、この受け方で受かるのでこの認定は「能力」をみるものではない。AI 分野を学ぶことにフォーカスすると内容が浅く、その用途には向かない。あくまで AWS の基礎であり入門となるものである。
 
 ## Introduction
 
-This is an honest review, not a study guide. I sat the AWS Certified AI Practitioner (AIF-C01) mostly because I was going to study the AI/generative-AI landscape anyway, and a fee discount made the timing cheap. I prepared with the official learning content and by drilling a few hundred practice questions until the patterns were automatic. I passed. But the fact that you *can* pass a foundational exam by pattern-drilling is the most interesting thing about it — it tells you what the credential measures and what it does not. If you've read [Coverage Is Not Capability](/posts/coverage-is-not-capability/), this is the same distinction applied to a certificate.
+This is a review, not a study guide. I sat the AWS Certified AI Practitioner (AIF-C01) because I was working through the AWS foundational tier, and the AIF2Cloud promo (half-price AIF, a free CLF exam on passing) made the timing cheap. I prepared with the official learning content and by drilling a few hundred practice questions until the patterns were automatic. I passed — but the fact that you *can* pass it this way is the point: the exam measures recognition, not capability. Approached as a way to learn AI, the content is too shallow for the job. Take it for what it is — an entry point to the AWS foundations. If you've read [Coverage Is Not Capability](/posts/coverage-is-not-capability/), this is the same distinction applied to a certificate.
 
 ## Why I sat it
 
