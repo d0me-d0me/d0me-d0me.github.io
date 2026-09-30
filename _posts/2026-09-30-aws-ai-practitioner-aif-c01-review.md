@@ -34,7 +34,9 @@ Honest caveat, because it is the whole point below: most of my "studying" was pa
 
 ## The exam itself
 
-Delivered online through remote proctoring (OnVUE). The format is squarely foundational: scenario-style multiple-choice and multiple-response, 90 minutes, no code. Almost every question is the same shape — a short business scenario, then "which service / which approach fits." The skill under test is *placing* the scenario into the right bucket (is this RAG or fine-tuning? is this Comprehend or Rekognition? is this CloudTrail or CloudWatch?), not building or securing anything.
+Delivered online through remote proctoring (OnVUE). If you go that route, the well-documented operational basics apply: run the system test in advance to confirm your OS, browser, camera and network pass; expect a check-in with a photo and a room/desk scan; keep the desk clear, since notes, phones, second monitors and anyone else in the room are not allowed; and you cannot leave your seat or talk during the exam. A stable connection matters — a drop mid-exam is the classic OnVUE headache. None of this is exam-specific; it's the standard Pearson VUE online-proctoring flow, and knowing it ahead of time removes the only real friction.
+
+The format itself is squarely foundational: scenario-style multiple-choice and multiple-response, 90 minutes, no code. Almost every question is the same shape — a short business scenario, then "which service / which approach fits." The skill under test is *placing* the scenario into the right bucket (is this RAG or fine-tuning? is this Comprehend or Rekognition? is this CloudTrail or CloudWatch?), not building or securing anything.
 
 ## The result, and what it actually measured
 
