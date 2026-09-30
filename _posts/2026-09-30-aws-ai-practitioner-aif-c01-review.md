@@ -8,7 +8,7 @@ description: An honest review of the AWS Certified AI Practitioner (AIF-C01) —
 
 ## 概要
 
-正直な受験記であって、対策ガイドではない。もともと AI/生成 AI の全体像を学ぶつもりでいたところに受験料の割引があり、AIF-C01 を受けた。準備は公式の学習コンテンツと、数百問の練習問題をひたすら回しただけ。合格はしたが、この受け方で受かること自体が、この認定が「能力」ではなく「認識 — 見たことがあるか」を測っていることを露わにする。だから資格としての意味は限定的だと考える。その線引きを書く。
+正直な受験記であって、対策ガイドではない。もともと AWS の基礎を学ぶつもりでいたところに AIF2Cloud キャンペーン (AIF-C01 が半額、合格で CLF が無料) が重なり、AIF-C01 を受けた。準備は公式の学習コンテンツと、数百問の練習問題をひたすら回しただけ。合格はしたが、この受け方で受かること自体が、この認定が「能力」ではなく「認識 — 見たことがあるか」を測っていることを露わにする。AI 分野を実際に学ぶには内容が浅く、その用途には向かない。資格としての意味の線引きを書く。
 
 ## Introduction
 
@@ -18,10 +18,10 @@ This is an honest review, not a study guide. I sat the AWS Certified AI Practiti
 
 Two reasons, in order:
 
-- I wanted the managed-AI vocabulary regardless — the services and boundaries you meet in any threat model that touches an LLM.
-- The price dropped. Foundational certs are cheap signals; when a discount removes the "is it worth the money" question, the expected-value math flips and you just do it.
+- I was going to work through the AWS foundational tier anyway — the managed-service vocabulary and the boundaries you meet in any threat model that touches AWS or an LLM.
+- The economics lined up. AWS ran a promo ([AIF2Cloud](https://www.pearsonvue.com/us/en/aws/aif2cloud.html)): the promo code takes 50% off the AI Practitioner exam, and passing it unlocks a *free* Cloud Practitioner (CLF) exam. That turns one discounted sit into two foundational certs, which flips the "is it worth the money" math entirely.
 
-No career mandate, no employer push. It was a low-stakes, opportunistic sit.
+No career mandate, no employer push. It was a low-stakes, opportunistic sit — pick the cheap entry point (AIF on promo) that also unlocks the next one (CLF free).
 
 ## How I actually prepared
 
@@ -49,11 +49,13 @@ For a security practitioner, split the answer:
 - **Worth it** as a cheap forcing-function to skim the managed-AI surface you will meet in threat models anyway — Bedrock, guardrails, data boundaries, the responsible-AI vocabulary. A weekend, on discount, is a fine trade for that.
 - **Not worth it** if you expect it to certify that you can build or secure AI systems. It doesn't; it certifies you can talk about them. Don't over-index on it, and don't let a hiring signal treat it as more than exposure.
 
+And be clear about one thing it is *not*: a way to actually learn AI. The content is too shallow for that. It teaches you to name services and recite definitions, not to reason about models, data, or failure modes. If your goal is to understand the field, this exam is not the vehicle — read papers, build with the APIs, break things. The cert is a map label, not the territory.
+
 My verdict: buy it when it's discounted, treat it as a structured skim, and move on. It is a low bar cleared cheaply, which is exactly what a foundational cert should be — as long as everyone reads it as that.
 
 ## What's next
 
-Passing unlocks a fee benefit toward the next exam, so Cloud Practitioner (CLF) is the plan — same foundational tier, same expectations, same "recognition, not capability" caveat. Expect a similar review, shorter, when it's done.
+Passing AIF-C01 unlocks the free Cloud Practitioner (CLF) exam under the same AIF2Cloud promo, so CLF is next — same foundational tier, same expectations, same "recognition, not capability" caveat. A free sit is a free sit; I'll take it and expect a shorter version of this same review.
 
 ## Key Takeaways
 
@@ -66,3 +68,4 @@ Passing unlocks a fee benefit toward the next exam, so Cloud Practitioner (CLF) 
 
 - [AWS Certified AI Practitioner — certification overview](https://aws.amazon.com/certification/certified-ai-practitioner/)
 - [AWS Certified AI Practitioner (AIF-C01) — exam guide](https://docs.aws.amazon.com/aws-certification/latest/examguides/ai-practitioner-01.html)
+- [AIF2Cloud promotion (Pearson VUE)](https://www.pearsonvue.com/us/en/aws/aif2cloud.html)
