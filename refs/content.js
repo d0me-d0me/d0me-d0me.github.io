@@ -59,6 +59,7 @@ window.CONTENT = {
       tags: ["evasion", "windows", "in-memory"], status: "ready",
       posts: [
         { url: "/posts/hiding-or-breaking-attack-v19-split/", title: "Hiding or Breaking: The Operator's Side of the ATT&CK v19 Split" },
+        { url: "/posts/prompt-injection-and-rag-data-leakage/", title: "The AI Attack Surface You Inherit — Prompt Injection and RAG Data Leakage" },
       ] },
     { domain: "offensive", slug: "lateral-movement", title: "Lateral Movement", jp: "横展開",
       topics: "primitives · smb/wmi/dcom · winrm · rdp · kerberos transport · mssql · pivot topology",
@@ -78,6 +79,7 @@ window.CONTENT = {
       tags: ["web", "appsec"], status: "ready",
       posts: [
         { url: "/posts/how-attackers-pick-the-first-move/", title: "How Attackers Pick the First Move — Five Axes of Initial Access" },
+        { url: "/posts/prompt-injection-and-rag-data-leakage/", title: "The AI Attack Surface You Inherit — Prompt Injection and RAG Data Leakage" },
       ] },
     { domain: "offensive", slug: "tooling",          title: "File Transfer",          jp: "ファイル転送",
       topics: "http · smb · base64 · exfil · av-evasion",
