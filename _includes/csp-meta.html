@@ -28,3 +28,12 @@
   'unsafe-inline'.
 {% endcomment %}
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; img-src 'self' data: https://d0me.goatcounter.com; font-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' https://cdn.jsdelivr.net https://gc.zgo.at; connect-src 'self' https://d0me.goatcounter.com; form-action 'self'; manifest-src 'self'; worker-src 'self'; upgrade-insecure-requests">
+{% comment %}
+  Referrer-Policy (same single-source include, so it covers every page).
+  no-referrer: the browser sends no Referer header at all — so clicking an
+  outbound link (GitHub, a reference in a sheet) or loading any resource never
+  reveals which page on this site the visitor was on. Analytics is unaffected
+  (GoatCounter reads document.referrer for inbound source, not the outbound
+  Referer this controls).
+{% endcomment %}
+<meta name="referrer" content="no-referrer">
