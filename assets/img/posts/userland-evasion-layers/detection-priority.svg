@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" width="900" height="520" role="img" aria-label="Horizontal bar chart ranking detection surfaces by resilience against userland evasion">
+  <text x="450" y="34" text-anchor="middle" font-family="Zen Kaku Gothic New, sans-serif" font-size="17" font-weight="700" fill="#F2F4EA">Detection Surface Resilience</text>
+  <text x="450" y="57" text-anchor="middle" font-family="Zen Kaku Gothic New, sans-serif" font-size="12" fill="#D9DCCF">How robust each detection surface is against a userland-only evasion loader</text>
+  <text x="450" y="77" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10.5" fill="#615C50">Scale: resilience against the six techniques combined. Higher is harder to evade.</text>
+
+  <!-- Axis -->
+  <line x1="300" y1="100" x2="300" y2="430" stroke="#2A2620" stroke-width="1"/>
+  <line x1="300" y1="430" x2="840" y2="430" stroke="#2A2620" stroke-width="1"/>
+
+  <!-- Scale labels -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#615C50" text-anchor="middle">
+    <text x="300" y="448">0</text>
+    <text x="408" y="448">1</text>
+    <text x="516" y="448">2</text>
+    <text x="624" y="448">3</text>
+    <text x="732" y="448">4</text>
+    <text x="840" y="448">5</text>
+  </g>
+
+  <!-- Grid lines -->
+  <g stroke="#2A2620" stroke-width="0.5" stroke-dasharray="2 4">
+    <line x1="408" y1="100" x2="408" y2="430"/>
+    <line x1="516" y1="100" x2="516" y2="430"/>
+    <line x1="624" y1="100" x2="624" y2="430"/>
+    <line x1="732" y1="100" x2="732" y2="430"/>
+    <line x1="840" y1="100" x2="840" y2="430"/>
+  </g>
+
+  <!-- Bars -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">
+    <!-- ETW-TI -->
+    <text x="290" y="128" text-anchor="end" fill="#D9DCCF">ETW-TI (kernel)</text>
+    <rect x="300" y="112" width="540" height="24" rx="2" fill="#48B44A" fill-opacity="0.35" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="848" y="129" fill="#48B44A" font-weight="700">5</text>
+
+    <!-- Kernel callbacks -->
+    <text x="290" y="168" text-anchor="end" fill="#D9DCCF">Kernel callbacks</text>
+    <rect x="300" y="152" width="540" height="24" rx="2" fill="#48B44A" fill-opacity="0.3" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="848" y="169" fill="#48B44A" font-weight="700">5</text>
+
+    <!-- .pdata / UNWIND_INFO -->
+    <text x="290" y="208" text-anchor="end" fill="#D9DCCF">.pdata validation</text>
+    <rect x="300" y="192" width="486" height="24" rx="2" fill="#48B44A" fill-opacity="0.25" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="794" y="209" fill="#48B44A" font-weight="700">4.5</text>
+
+    <!-- TEB stack bounds -->
+    <text x="290" y="248" text-anchor="end" fill="#D9DCCF">TEB stack bounds</text>
+    <rect x="300" y="232" width="432" height="24" rx="2" fill="#48B44A" fill-opacity="0.2" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="740" y="249" fill="#48B44A" font-weight="700">4</text>
+
+    <!-- ACG -->
+    <text x="290" y="288" text-anchor="end" fill="#D9DCCF">ACG policy</text>
+    <rect x="300" y="272" width="432" height="24" rx="2" fill="#48B44A" fill-opacity="0.15" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="740" y="289" fill="#48B44A" font-weight="700">4</text>
+
+    <!-- ntdll integrity -->
+    <text x="290" y="328" text-anchor="end" fill="#D9DCCF">ntdll integrity check</text>
+    <rect x="300" y="312" width="324" height="24" rx="2" fill="#E5A03B" fill-opacity="0.25" stroke="#E5A03B" stroke-width="1.5"/>
+    <text x="632" y="329" fill="#E5A03B" font-weight="700">3</text>
+
+    <!-- EDR userland hooks -->
+    <text x="290" y="368" text-anchor="end" fill="#D9DCCF">EDR userland hooks</text>
+    <rect x="300" y="352" width="108" height="24" rx="2" fill="#E5533B" fill-opacity="0.25" stroke="#E5533B" stroke-width="1.5"/>
+    <text x="416" y="369" fill="#E5533B" font-weight="700">1</text>
+
+    <!-- Userland ETW -->
+    <text x="290" y="408" text-anchor="end" fill="#D9DCCF">Userland ETW</text>
+    <rect x="300" y="392" width="108" height="24" rx="2" fill="#E5533B" fill-opacity="0.2" stroke="#E5533B" stroke-width="1.5"/>
+    <text x="416" y="409" fill="#E5533B" font-weight="700">1</text>
+  </g>
+
+  <!-- Annotations -->
+  <line x1="60" y1="468" x2="840" y2="468" stroke="#2A2620" stroke-width="1"/>
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#D9DCCF">
+    <rect x="70" y="480" width="14" height="14" rx="2" fill="none" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="94" y="491">Kernel-level &#8212; immune to userland patching</text>
+    <rect x="470" y="480" width="14" height="14" rx="2" fill="none" stroke="#E5A03B" stroke-width="1.5"/>
+    <text x="494" y="491">Integrity monitoring &#8212; detects the patch itself</text>
+    <rect x="70" y="502" width="14" height="14" rx="2" fill="none" stroke="#E5533B" stroke-width="1.5"/>
+    <text x="94" y="513">Userland &#8212; directly bypassed</text>
+  </g>
+</svg>

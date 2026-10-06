@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 650" width="900" height="650" role="img" aria-label="Layered diagram showing userland evasion techniques mapped against kernel and userland detection surfaces">
+  <text x="450" y="34" text-anchor="middle" font-family="Zen Kaku Gothic New, sans-serif" font-size="17" font-weight="700" fill="#F2F4EA">Userland Evasion vs. Detection Layers</text>
+  <text x="450" y="57" text-anchor="middle" font-family="Zen Kaku Gothic New, sans-serif" font-size="12" fill="#D9DCCF">Each evasion technique targets a specific layer. Kernel-level detection surfaces remain unaffected.</text>
+  <text x="450" y="77" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10.5" fill="#615C50">Solid border = detection surface still active. Dashed border = bypassed by the technique.</text>
+
+  <!-- Kernel layer -->
+  <rect x="60" y="100" width="780" height="110" rx="4" fill="#131210" stroke="#48B44A" stroke-width="2"/>
+  <text x="80" y="126" font-family="Zen Kaku Gothic New, sans-serif" font-size="14" font-weight="700" fill="#48B44A">KERNEL</text>
+  <text x="80" y="148" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#D9DCCF">ETW-TI (Microsoft-Windows-Threat-Intelligence)</text>
+  <text x="80" y="166" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#D9DCCF">Kernel callbacks (PsSetCreateProcessNotifyRoutine, PsSetLoadImageNotifyRoutine)</text>
+  <text x="80" y="184" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#D9DCCF">.pdata / UNWIND_INFO stack validation &#183; TEB stack bounds &#183; ACG enforcement</text>
+  <text x="80" y="200" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#48B44A">&#9654; Userland patches cannot reach this layer</text>
+
+  <!-- Userland detection layer -->
+  <rect x="60" y="230" width="780" height="90" rx="4" fill="#131210" stroke="#E5A03B" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="80" y="256" font-family="Zen Kaku Gothic New, sans-serif" font-size="14" font-weight="700" fill="#E5A03B">USERLAND DETECTION</text>
+  <text x="80" y="278" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#D9DCCF">ntdll inline hooks (EDR trampolines) &#183; AMSI (AmsiScanBuffer)</text>
+  <text x="80" y="296" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#D9DCCF">Userland ETW (EtwEventWrite) &#183; .NET CLR scan events</text>
+  <text x="80" y="312" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10" fill="#E5A03B">&#9654; Targeted by the loader&#8217;s six techniques</text>
+
+  <!-- Technique arrows -->
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="10.5" fill="#D9DCCF">
+    <!-- Technique boxes -->
+    <rect x="60"  y="350" width="250" height="55" rx="3" fill="#131210" stroke="#E5533B" stroke-width="1.5"/>
+    <text x="72" y="370" fill="#E5533B" font-weight="700">1. Indirect Syscall</text>
+    <text x="72" y="390" fill="#8F8875">Bypass ntdll hooks via jmp r11</text>
+
+    <rect x="325" y="350" width="250" height="55" rx="3" fill="#131210" stroke="#E5533B" stroke-width="1.5"/>
+    <text x="337" y="370" fill="#E5533B" font-weight="700">2. SSN Dynamic Resolution</text>
+    <text x="337" y="390" fill="#8F8875">Hell&#8217;s Gate / Halo&#8217;s Gate</text>
+
+    <rect x="590" y="350" width="250" height="55" rx="3" fill="#131210" stroke="#E5533B" stroke-width="1.5"/>
+    <text x="602" y="370" fill="#E5533B" font-weight="700">3. Stack Spoofing</text>
+    <text x="602" y="390" fill="#8F8875">Forge RBP frame chain</text>
+
+    <rect x="60"  y="420" width="250" height="55" rx="3" fill="#131210" stroke="#7FA8FF" stroke-width="1.5"/>
+    <text x="72" y="440" fill="#7FA8FF" font-weight="700">4. AMSI Patch</text>
+    <text x="72" y="460" fill="#8F8875">AmsiScanBuffer &#8594; E_INVALIDARG</text>
+
+    <rect x="325" y="420" width="250" height="55" rx="3" fill="#131210" stroke="#7FA8FF" stroke-width="1.5"/>
+    <text x="337" y="440" fill="#7FA8FF" font-weight="700">5. ETW Patch</text>
+    <text x="337" y="460" fill="#8F8875">EtwEventWrite &#8594; ret</text>
+
+    <rect x="590" y="420" width="250" height="55" rx="3" fill="#131210" stroke="#B48BFF" stroke-width="1.5"/>
+    <text x="602" y="440" fill="#B48BFF" font-weight="700">6. AES + W^X Flow</text>
+    <text x="602" y="460" fill="#8F8875">Encrypted shellcode, RW&#8594;RX</text>
+  </g>
+
+  <!-- Connecting lines from techniques to userland layer -->
+  <g stroke="#E5533B" stroke-width="1" stroke-dasharray="3 3">
+    <line x1="185" y1="350" x2="185" y2="320"/>
+    <line x1="450" y1="350" x2="450" y2="320"/>
+    <line x1="715" y1="350" x2="715" y2="320"/>
+  </g>
+  <g stroke="#7FA8FF" stroke-width="1" stroke-dasharray="3 3">
+    <line x1="185" y1="420" x2="185" y2="320"/>
+    <line x1="450" y1="420" x2="450" y2="320"/>
+  </g>
+
+  <!-- Blocked arrows to kernel -->
+  <g stroke="#E5533B" stroke-width="1.5" opacity="0.4">
+    <line x1="185" y1="230" x2="185" y2="210"/>
+    <line x1="178" y1="218" x2="192" y2="206"/>
+    <line x1="192" y1="218" x2="178" y2="206"/>
+  </g>
+  <g stroke="#7FA8FF" stroke-width="1.5" opacity="0.4">
+    <line x1="450" y1="230" x2="450" y2="210"/>
+    <line x1="443" y1="218" x2="457" y2="206"/>
+    <line x1="457" y1="218" x2="443" y2="206"/>
+  </g>
+
+  <!-- Bottom annotation -->
+  <line x1="60" y1="500" x2="840" y2="500" stroke="#2A2620" stroke-width="1"/>
+
+  <g font-family="JetBrains Mono, ui-monospace, monospace" font-size="11" fill="#D9DCCF">
+    <rect x="70" y="520" width="14" height="14" rx="2" fill="none" stroke="#48B44A" stroke-width="1.5"/>
+    <text x="94" y="531">Kernel detection &#8212; unaffected by userland patches</text>
+
+    <rect x="70" y="545" width="14" height="14" rx="2" fill="none" stroke="#E5A03B" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <text x="94" y="556">Userland detection &#8212; bypassed by the loader</text>
+
+    <rect x="470" y="520" width="14" height="14" rx="2" fill="none" stroke="#E5533B" stroke-width="1.5"/>
+    <text x="494" y="531">Syscall-layer evasion (hook bypass, stack forge)</text>
+
+    <rect x="470" y="545" width="14" height="14" rx="2" fill="none" stroke="#7FA8FF" stroke-width="1.5"/>
+    <text x="494" y="556">Scan-layer evasion (AMSI, ETW neutralisation)</text>
+
+    <rect x="470" y="570" width="14" height="14" rx="2" fill="none" stroke="#B48BFF" stroke-width="1.5"/>
+    <text x="494" y="581">Payload-layer evasion (encryption, W^X)</text>
+  </g>
+
+  <text x="70" y="620" font-family="JetBrains Mono, ui-monospace, monospace" font-size="10.5" fill="#8F8875">&#10007; marks a technique that cannot cross the kernel boundary.</text>
+</svg>
