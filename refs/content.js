@@ -64,7 +64,10 @@ window.CONTENT = {
     { domain: "offensive", slug: "lateral-movement", title: "Lateral Movement", jp: "横展開",
       topics: "primitives · smb/wmi/dcom · winrm · rdp · kerberos transport · mssql · pivot topology",
       keywords: ["pass-the-hash","pth","overpass-the-hash","pass-the-ticket","ptt","s4u","psexec","wmiexec","dcomexec","atexec","smbexec","winrm","evil-winrm","psremoting","invoke-command","enter-pssession","dcom","mmc20","shellwindows","wmi","win32_process","restricted admin","rdp hijack","tscon","mssql lateral","linked server","xp_cmdshell","ligolo","chisel","socks pivot","double pivot","proxyjump","ssh key reuse","ssh agent hijack","laps","kerberos delegation lateral","protected users","local admin"],
-      tags: ["lateral-movement", "pivoting", "windows", "kerberos", "cross-platform"], status: "ready" },
+      tags: ["lateral-movement", "pivoting", "windows", "kerberos", "cross-platform"], status: "ready",
+      posts: [
+        { url: "/posts/ms17-010-eternalblue-reproduction/", title: "MS17-010 (EternalBlue) — A Type-Confusion That Became a Worm" },
+      ] },
     { domain: "offensive", slug: "linux-privesc",   title: "Linux Privilege Escalation", jp: "Linux 権限昇格",
       topics: "triage · enum · sudo · suid · capabilities · cron · polkit · creds · container escape · kernel",
       keywords: ["linpeas","lse","linux-smart-enumeration","pspy","linux-exploit-suggester","sudo -l","gtfobins","ld_preload","ld_library_path","suid","sgid","getcap","setcap","cap_setuid","cap_dac_read_search","cap_sys_admin","cap_sys_ptrace","cron","wildcard injection","tar checkpoint","path hijack","systemd unit","pkexec","pwnkit","polkit","udisks","libblockdev","nfs","no_root_squash","docker.sock","lxd","container escape","cgroup release_agent","dirty pipe","dirtypipe","nftables","yescrypt","unshadow","yama","ptrace_scope","userns","CVE-2025-32463","CVE-2025-6019","CVE-2026-23111","CVE-2021-4034","CVE-2022-0847","auditd","linux privesc","privilege escalation"],
@@ -100,6 +103,7 @@ window.CONTENT = {
         { url: "/posts/how-defenders-pick-what-to-trust/", title: "How Defenders Pick What to Trust — Six Axes of Windows Forensic Artifacts" },
         { url: "/posts/the-asymmetry-that-isnt-where-you-think/", title: "Timestomping and the Asymmetry That Isn't Where You Think" },
         { url: "/posts/coverage-is-not-capability/", title: "Coverage Is Not Capability: Reading the ATT&CK Detection Model as an Investment Signal" },
+        { url: "/posts/ms17-010-eternalblue-reproduction/", title: "MS17-010 (EternalBlue) — A Type-Confusion That Became a Worm" },
       ] },
     // ---- other ----
     { domain: "other", slug: "reporting", title: "Reporting", jp: "報告",
