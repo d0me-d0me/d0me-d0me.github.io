@@ -20,6 +20,8 @@ The subject is a common architecture, not a single tool. A modern userland evasi
 
 Each of these techniques is well documented individually. What matters here is the pattern they form together and the single architectural boundary they all share: every one of them operates in userland. Not one reaches the kernel. That is not a detail of this particular loader. It is a structural property of the approach class, and it has direct consequences for where detection is robust and where it is not.
 
+A C# reference implementation demonstrating this architecture is [available on GitHub](https://github.com/d0me-d0me/d0me-d0me.github.io/blob/main/assets/code/OSEPUltimateEvolution.cs). It contains placeholder shellcode and intentional debug output; it is published for educational reference, not operational use.
+
 ## The Six Techniques and What They Target
 
 ![Userland evasion techniques mapped against kernel and userland detection surfaces](/assets/img/posts/userland-evasion-layers/defense-layers.svg){: width="900" height="650" }

@@ -15,10 +15,10 @@ Originally written as a notebook for myself, but published in the hope that some
 ## Scope
 
 Techniques are presented from a neutral perspective and accompanied by detection and hardening considerations whenever relevant.
-No client data, private tooling, or functional exploit payloads are published here.
+No client data or private tooling is published here.
 
 手法は中立に記述し、必要に応じて検知・防御・ハードニングの観点を添える。
-実案件の情報、非公開ツール、実用可能な exploit payload は掲載しない。
+実案件の情報、非公開ツールは掲載しない。
 
 ## Authorized use only
 
