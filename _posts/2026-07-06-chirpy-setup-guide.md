@@ -3,6 +3,7 @@ title: "Setting up a Chirpy-based Jekyll site: a reproducible walkthrough"
 date: 2026-07-06 10:00:00 +0000
 categories: [Other, Meta]
 tags: [jekyll, chirpy, github-pages, opsec, setup]
+description: "A step-by-step walkthrough for building a Chirpy-based Jekyll site on GitHub Pages — from repository creation and theme configuration to custom domains and operational security considerations."
 permalink: /posts/chirpy-setup-guide/
 ---
 
