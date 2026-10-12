@@ -2,3 +2,4 @@ User-agent: *
 Allow: /
 
 Sitemap: https://d0me-d0me.github.io/sitemap.xml
+Sitemap: https://d0me-d0me.github.io/refs/sitemap.xml
