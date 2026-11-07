@@ -110,5 +110,9 @@ window.CONTENT = {
       topics: "structure · severity · findings · evidence · remediation",
       keywords: ["report","reporting","cvss","cvss v3.1","cvss v4.0","vector","severity","risk","finding","evidence","redaction","remediation","executive summary","scope","rules of engagement","methodology","ptes","nist 800-115","owasp wstg","cwe","retest","impact","likelihood","deliverable"],
       tags: ["reporting", "process", "documentation"], status: "ready" },
+    { domain: "other", slug: "php2shell", title: "PHP2Shell", jp: "PHP2Shell",
+      topics: "CVE-2026-109618 / 109619 · OOM UAF · ASLR bypass · ROP · apache mod_php",
+      keywords: ["php","use-after-free","oom","session","upload_progress","heap","rop","aslr","mod_php","prefork","zend","cve-2026-109618","cve-2026-109619"],
+      tags: ["cve", "exploit", "php", "use-after-free", "rop", "apache"], status: "ready" },
   ],
 };
