@@ -19,7 +19,7 @@ PHP powers more than three-quarters of the web's server-side code. When a critic
 
 CVE-2026-109618 and CVE-2026-109619, collectively known as PHP2Shell, each carry a CVSS v4.0 score of 9.2. They chain together to produce unauthenticated remote code execution on Apache mod_php — and the attack fires before application code runs, rendering all application-level defenses irrelevant. By October 26, both CVEs had been added to CISA's Known Exploited Vulnerabilities (KEV) catalog, with federal agencies given just three days to remediate under BOD 26-04.
 
-The scale of exposure is substantial. Based on Shodan scans, roughly 2.23 million hosts advertise PHP via the `X-Powered-By` header, and approximately 884,000 of those run versions that will receive no upstream fix. Japan alone accounts for over 55,000 of those unpatched hosts.
+The scale of exposure is substantial. Based on Shodan scans, roughly 2.24 million hosts advertise PHP in Shodan banner data, and approximately 884,000 of those run versions that will receive no upstream fix. The United States leads with over 228,000 unpatched hosts, followed by China, Japan, and Germany.
 
 This article dissects the root causes of both vulnerabilities, explains how they combine into a multi-stage exploitation chain, and identifies the detection and mitigation opportunities that defenders can act on. The focus is on understanding why these vulnerabilities exist and why the exploit works the way it does — the architectural decisions and implementation patterns that created this attack surface.
 
@@ -67,7 +67,7 @@ The attack does not require writing shellcode to executable memory. It reuses co
 
 ## Chaining the Two: A Multi-Stage Exploitation Sequence
 
-The two CVEs are individually concerning but not independently weaponizable for reliable RCE. CVE-2026-109619 provides a memory disclosure primitive but no code execution path. CVE-2026-109618 provides a code execution path but requires knowledge of memory layout that ASLR obscures. Together, they form a complete chain.
+The two CVEs are individually concerning but not independently weaponizable for reliable RCE. CVE-2026-109619 is classified as RCE-capable in its GHSA, but the demonstrated exploit chain uses it as a memory disclosure primitive for ASLR bypass. CVE-2026-109618 provides a code execution path but requires knowledge of memory layout that ASLR obscures. Together, they form a complete chain.
 
 ![PHP2Shell three-stage exploitation chain from worker pinning through ASLR bypass to ROP-based RCE](/assets/img/posts/php2shell-oom-rce/exploit-chain-flow.svg){: width="800" height="580" }
 
@@ -77,9 +77,9 @@ _PHP2Shell exploitation flow: three phases of increasing noise, each dependent o
 
 Before the chain can begin, the attacker must solve Apache prefork's process model. Each request is assigned to an arbitrary worker from the pool, but both the disclosure stage and the RCE stage must target the same worker — the disclosure leaks that specific worker's memory layout, and the RCE must execute within that same address space.
 
-The approach involves saturating the worker pool. By opening enough persistent connections to occupy all available workers (typically 150 in a default Apache configuration), the attacker controls which worker handles the next request. The technique proceeds in three phases: a pool scrub that cycles all workers to a known state, a capacity probe that determines `MaxRequestWorkers`, and a parallel repin that occupies every worker except one, routing the attack through that single available slot.
+The approach involves saturating the worker pool. By opening enough persistent connections to occupy all available workers (256 in a default Apache prefork configuration), the attacker controls which worker handles the next request. The technique proceeds in three phases: a pool scrub that cycles all workers to a known state, a capacity probe that determines `MaxRequestWorkers`, and a parallel repin that occupies every worker except one, routing the attack through that single available slot.
 
-This is the noisiest part of the attack. An observer monitoring connection counts will see a rapid spike to the `MaxRequestWorkers` limit, sustained for the duration of the exploitation sequence. The pool saturation pattern — 150 simultaneous persistent connections from a single source — is a strong indicator of an attack in progress.
+This is the noisiest part of the attack. An observer monitoring connection counts will see a rapid spike to the `MaxRequestWorkers` limit, sustained for the duration of the exploitation sequence. The pool saturation pattern — simultaneous persistent connections approaching the `MaxRequestWorkers` limit from a single source — is a strong indicator of an attack in progress.
 
 ### Stage 1: Information Disclosure via Overlong Set-Cookie
 
@@ -95,9 +95,9 @@ Armed with the libphp base address and heap location, the attacker constructs th
 
 The attacker controls what sits in the freed memory region by carefully sizing the multipart body. When the array destructor walks the corrupted hash table during cleanup, it encounters the forged bucket. The cleanup code follows the forged pointers through a chain: forged value → forged object → forged handler table → stack pivot gadget → ROP chain → `zif_system()`.
 
-The ROP chain itself is compact. A pop-rdi gadget loads the command string's address into the first argument register, a pop-rsi gadget sets the return value pointer, and then `zif_system()` executes the command. The command is embedded directly in the payload, limited to 47 usable characters by the carrier structure's fixed size.
+The ROP chain itself is compact. A pop-rdi gadget loads the command string's address into the first argument register, a pop-rsi gadget sets the return value pointer, and then `zif_system()` executes the command. The command is embedded directly in the payload, constrained to a few dozen characters by the carrier structure's fixed size.
 
-The worker crashes after execution — the ROP chain corrupts the stack beyond recovery — so any command output that is not redirected to a file or a reverse shell is lost. The practical approach is to write a minimal web shell in a single command (which fits within the 47-character limit) and then execute unlimited commands through it.
+The worker crashes after execution — the ROP chain corrupts the stack beyond recovery — so any command output that is not redirected to a file or a reverse shell is lost. The practical approach is to write a minimal web shell in a single command (which fits within that character limit) and then execute unlimited commands through it.
 
 ## Why mod_php Is the Primary Target
 
